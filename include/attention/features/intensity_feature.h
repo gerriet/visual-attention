@@ -32,11 +32,12 @@ class IntensityFeature
    */
   struct Config
   {
-    int pyramid_levels;     // Number of pyramid levels (default: 6)
+    int pyramid_levels;     // Number of pyramid levels (0 = auto-detect from image size)
     int center_levels[3];   // Center scales (c)
     int surround_deltas[2]; // Surround offsets (delta)
 
-    Config() : pyramid_levels(6), center_levels{2, 3, 4}, surround_deltas{1, 2} {}
+    Config() : pyramid_levels(0), center_levels{2, 3, 4}, surround_deltas{3, 4} {}
+    // Setting pyramid_levels=0 enables adaptive sizing based on input dimensions
   };
 
   explicit IntensityFeature(const Config& config = Config());

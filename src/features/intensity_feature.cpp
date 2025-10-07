@@ -30,8 +30,24 @@ core::FeatureMap IntensityFeature::extract(const core::Frame& frame) const
     gray.convertTo(intensity, CV_32F, 1.0 / 255.0);
   }
 
+  // Determine adaptive pyramid levels if set to 0
+  int pyramid_levels = config_.pyramid_levels;
+  if (pyramid_levels == 0)
+  {
+    // Compute adaptive pyramid levels: ensure we can reach at least 16x16 at finest scale
+    int min_dim = std::min(frame.width(), frame.height());
+    pyramid_levels = 0;
+    while (min_dim > 16 && pyramid_levels < 12)
+    {
+      min_dim /= 2;
+      pyramid_levels++;
+    }
+    // Ensure we have enough levels for center-surround (need at least level 8)
+    pyramid_levels = std::max(9, pyramid_levels);
+  }
+
   // Create pyramid
-  std::vector<cv::Mat> pyramid = create_pyramid(intensity, config_.pyramid_levels);
+  std::vector<cv::Mat> pyramid = create_pyramid(intensity, pyramid_levels);
 
   // Compute center-surround
   cv::Mat saliency = compute_center_surround(pyramid);
@@ -66,8 +82,14 @@ cv::Mat IntensityFeature::compute_center_surround(const std::vector<cv::Mat>& py
     return cv::Mat();
   }
 
-  // Use first level size as target size
-  cv::Size target_size = pyramid[0].size();
+  // Use scale 4 as intermediate size (Itti-Koch approach)
+  // This avoids excessive upsampling of coarse features
+  int intermediate_scale = 4;
+  if (intermediate_scale >= static_cast<int>(pyramid.size()))
+  {
+    intermediate_scale = std::max(0, static_cast<int>(pyramid.size()) - 1);
+  }
+  cv::Size target_size = pyramid[intermediate_scale].size();
   cv::Mat accumulated = cv::Mat::zeros(target_size, CV_32F);
 
   int num_differences = 0;
@@ -93,22 +115,31 @@ cv::Mat IntensityFeature::compute_center_surround(const std::vector<cv::Mat>& py
         continue;
       }
 
-      // Upsample both to target size for comparison
-      cv::Mat center_resized, surround_resized;
-      cv::resize(center, center_resized, target_size, 0, 0, cv::INTER_LINEAR);
-      cv::resize(surround, surround_resized, target_size, 0, 0, cv::INTER_LINEAR);
+      // Resize surround to center size for comparison (interpolate coarser to finer)
+      cv::Mat surround_at_center;
+      cv::resize(surround, surround_at_center, center.size(), 0, 0, cv::INTER_LINEAR);
 
-      // Compute absolute difference
+      // Compute absolute difference at center scale
       cv::Mat diff;
-      cv::absdiff(center_resized, surround_resized, diff);
+      cv::absdiff(center, surround_at_center, diff);
 
-      // Accumulate
-      accumulated += diff;
+      // Normalize this difference (Itti-Koch normalization operator)
+      double minVal, maxVal;
+      cv::minMaxLoc(diff, &minVal, &maxVal);
+      if (maxVal > minVal)
+      {
+        diff = (diff - minVal) / (maxVal - minVal);
+      }
+
+      // Resize to intermediate scale and accumulate
+      cv::Mat diff_resized;
+      cv::resize(diff, diff_resized, target_size, 0, 0, cv::INTER_LINEAR);
+      accumulated += diff_resized;
       num_differences++;
     }
   }
 
-  // Normalize by number of differences
+  // Average across all center-surround combinations
   if (num_differences > 0)
   {
     accumulated /= static_cast<float>(num_differences);

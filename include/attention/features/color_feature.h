@@ -31,14 +31,15 @@ class ColorFeature
    */
   struct Config
   {
-    int pyramid_levels;      // Number of pyramid levels (default: 5)
+    int pyramid_levels;      // Number of pyramid levels (0 = auto-detect from image size)
     int center_levels[3];    // Center scales (c)
     int surround_deltas[2];  // Surround offsets (delta)
     bool normalize_channels; // Normalize color channels before processing
 
-    Config() : pyramid_levels(6), center_levels{2, 3, 4}, surround_deltas{1, 2}, normalize_channels(true) {}
+    Config() : pyramid_levels(0), center_levels{2, 3, 4}, surround_deltas{3, 4}, normalize_channels(true) {}
     // Original Itti-Koch uses c ∈ {2,3,4}, δ ∈ {3,4} with 9-level pyramid
-    // We use smaller deltas to fit in 6-level pyramid: surround = c + δ ∈ {3,4,5,6}
+    // Creates 6 center-surround pairs: (2,5), (2,6), (3,6), (3,7), (4,7), (4,8)
+    // Setting pyramid_levels=0 enables adaptive sizing based on input dimensions
   };
 
   explicit ColorFeature(const Config& config = Config());
