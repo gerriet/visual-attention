@@ -95,6 +95,83 @@ struct SaliencyMap
       cv::normalize(map, map, 0.0, 1.0, cv::NORM_MINMAX);
     }
   }
+
+  /**
+   * Detect local maxima peaks in the saliency map using non-maximum suppression.
+   * @param min_distance Minimum distance between peaks (in pixels)
+   * @param threshold Minimum saliency value for a peak (0-1)
+   * @param max_peaks Maximum number of peaks to return (0 = unlimited)
+   */
+  void detect_peaks(int min_distance = 20, float threshold = 0.3f, int max_peaks = 10)
+  {
+    peaks.clear();
+
+    if (map.empty())
+    {
+      return;
+    }
+
+    // Apply threshold
+    cv::Mat thresholded;
+    cv::threshold(map, thresholded, threshold, 255.0, cv::THRESH_BINARY);
+    thresholded.convertTo(thresholded, CV_8U);
+
+    // Find local maxima using dilation
+    // A pixel is a local maximum if it equals the dilated image at that location
+    cv::Mat dilated;
+    int kernel_size = min_distance / 2 + 1;
+    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(kernel_size * 2 + 1, kernel_size * 2 + 1));
+    cv::dilate(map, dilated, kernel);
+
+    // Local maxima are where original equals dilated
+    cv::Mat local_max;
+    cv::compare(map, dilated, local_max, cv::CMP_GE);
+
+    // Combine with threshold
+    cv::Mat peak_mask;
+    cv::bitwise_and(local_max, thresholded, peak_mask);
+
+    // Extract peak locations and values
+    std::vector<Peak> candidate_peaks;
+    for (int y = 0; y < peak_mask.rows; ++y)
+    {
+      for (int x = 0; x < peak_mask.cols; ++x)
+      {
+        if (peak_mask.at<uchar>(y, x) > 0)
+        {
+          float value = map.at<float>(y, x);
+          candidate_peaks.push_back(Peak(cv::Point(x, y), value));
+        }
+      }
+    }
+
+    // Sort by value (descending)
+    std::sort(candidate_peaks.begin(), candidate_peaks.end());
+
+    // Apply non-maximum suppression to enforce minimum distance
+    for (const auto& candidate : candidate_peaks)
+    {
+      bool too_close = false;
+      for (const auto& existing_peak : peaks)
+      {
+        float dist = cv::norm(candidate.location - existing_peak.location);
+        if (dist < min_distance)
+        {
+          too_close = true;
+          break;
+        }
+      }
+
+      if (!too_close)
+      {
+        peaks.push_back(candidate);
+        if (max_peaks > 0 && static_cast<int>(peaks.size()) >= max_peaks)
+        {
+          break;
+        }
+      }
+    }
+  }
 };
 
 } // namespace core

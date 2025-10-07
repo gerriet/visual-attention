@@ -102,19 +102,14 @@ void AttentionPipeline::integrate_features()
 
 void AttentionPipeline::detect_peaks()
 {
-  // TODO (Week 3): Implement proper peak detection with non-maximum suppression
-  // For now, just find global maximum and a few random peaks
+  // Use the built-in peak detection with non-maximum suppression
+  // Parameters tuned for typical attention scenarios:
+  // - min_distance: 30 pixels (avoid cluttered peaks)
+  // - threshold: 0.3 (ignore low-saliency regions)
+  // - max_peaks: 10 (show top salient locations)
+  saliency_.detect_peaks(30, 0.3f, 10);
 
-  // Global maximum
-  auto global_max = saliency_.get_global_max();
-  saliency_.peaks.push_back(global_max);
-
-  // Add a couple more peaks for visualization
-  int w = saliency_.size().width;
-  int h = saliency_.size().height;
-
-  saliency_.peaks.push_back(core::Peak(cv::Point(w / 4, h / 4), 0.7f));
-  saliency_.peaks.push_back(core::Peak(cv::Point(3 * w / 4, h / 4), 0.6f));
+  std::cout << "  Peaks detected: " << saliency_.peaks.size() << std::endl;
 }
 
 cv::Mat AttentionPipeline::visualize(bool save_individual)
