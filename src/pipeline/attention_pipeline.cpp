@@ -1,4 +1,5 @@
 #include "attention/pipeline/attention_pipeline.h"
+#include "attention/features/color_feature.h"
 #include "attention/visualization/visualizer.h"
 #include <stdexcept>
 
@@ -58,37 +59,16 @@ void AttentionPipeline::process()
 
 void AttentionPipeline::extract_features()
 {
-  // TODO (Week 2): Implement real feature extraction
-  // For now, create dummy features for testing
-
-  // Dummy feature 1: Simple gradient
-  cv::Mat dummy1(frame_.height(), frame_.width(), CV_32F);
-  for (int y = 0; y < dummy1.rows; ++y)
+  // Extract color feature (if image is color)
+  if (frame_.channels() == 3)
   {
-    for (int x = 0; x < dummy1.cols; ++x)
-    {
-      // Radial gradient
-      float dx = x - dummy1.cols / 2.0f;
-      float dy = y - dummy1.rows / 2.0f;
-      float dist = std::sqrt(dx * dx + dy * dy);
-      float max_dist = std::sqrt(dummy1.cols * dummy1.cols / 4.0f + dummy1.rows * dummy1.rows / 4.0f);
-      dummy1.at<float>(y, x) = 1.0f - (dist / max_dist);
-    }
+    features::ColorFeature color_extractor;
+    core::FeatureMap color_feature = color_extractor.extract(frame_);
+    features_.push_back(std::move(color_feature));
   }
 
-  features_.push_back(core::FeatureMap("dummy_radial", dummy1, 1.0f));
-
-  // Dummy feature 2: Horizontal gradient
-  cv::Mat dummy2(frame_.height(), frame_.width(), CV_32F);
-  for (int y = 0; y < dummy2.rows; ++y)
-  {
-    for (int x = 0; x < dummy2.cols; ++x)
-    {
-      dummy2.at<float>(y, x) = static_cast<float>(x) / dummy2.cols;
-    }
-  }
-
-  features_.push_back(core::FeatureMap("dummy_horizontal", dummy2, 0.5f));
+  // TODO (Week 2, Session 2): Add intensity feature
+  // TODO (Week 2, Session 3): Add more features (edges, orientation, etc.)
 }
 
 void AttentionPipeline::integrate_features()
@@ -132,7 +112,7 @@ void AttentionPipeline::detect_peaks()
   saliency_.peaks.push_back(core::Peak(cv::Point(3 * w / 4, h / 4), 0.6f));
 }
 
-cv::Mat AttentionPipeline::visualize()
+cv::Mat AttentionPipeline::visualize(bool save_individual)
 {
   if (!is_processed())
   {
@@ -156,7 +136,13 @@ cv::Mat AttentionPipeline::visualize()
   vis_images.push_back(original_bgr);
   labels.push_back("Original");
 
+  if (save_individual)
+  {
+    cv::imwrite("../results/01_original.png", original_bgr);
+  }
+
   // Feature visualizations
+  int feature_idx = 2;
   for (const auto& feature : features_)
   {
     cv::Mat feature_vis = visualization::visualize_feature_map(feature);
@@ -164,12 +150,24 @@ cv::Mat AttentionPipeline::visualize()
     cv::cvtColor(feature_vis, feature_bgr, cv::COLOR_GRAY2BGR);
     vis_images.push_back(feature_bgr);
     labels.push_back(feature.name);
+
+    if (save_individual)
+    {
+      std::string filename = "../results/0" + std::to_string(feature_idx) + "_" + feature.name + ".png";
+      cv::imwrite(filename, feature_vis);
+      feature_idx++;
+    }
   }
 
   // Saliency overlay
   cv::Mat saliency_vis = visualization::visualize_saliency_map(saliency_, frame_.image, "", true, false);
   vis_images.push_back(saliency_vis);
   labels.push_back("Saliency");
+
+  if (save_individual)
+  {
+    cv::imwrite("../results/99_saliency.png", saliency_vis);
+  }
 
   // Combine all visualizations
   return visualization::visualize_side_by_side(vis_images, labels, "", false);

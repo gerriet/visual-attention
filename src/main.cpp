@@ -50,7 +50,7 @@ int main(int argc, char** argv)
 
     // Visualize results
     std::cout << "\nGenerating visualization..." << std::endl;
-    cv::Mat visualization = pipeline.visualize();
+    cv::Mat visualization = pipeline.visualize(true); // Save individual features
 
     if (display)
     {

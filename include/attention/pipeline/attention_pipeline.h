@@ -66,10 +66,11 @@ class AttentionPipeline
   /**
    * Visualize the results.
    * Creates a visualization showing original image, features, and saliency.
+   * @param save_individual If true, save individual feature maps to results/
    * @return Visualization as BGR image
    * @throws std::runtime_error if process() not called yet
    */
-  cv::Mat visualize();
+  cv::Mat visualize(bool save_individual = false);
 
   /**
    * Get the computed saliency map.
