@@ -1,0 +1,35 @@
+# Build artifacts
+build/
+*.o
+*.a
+*.so
+*.dylib
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+
+# Generated files
+results/
+*.log
+
+# Large data files (download separately)
+data/MIT1003/
+data/PASCAL_VOC/
+data/middlebury/
+
+# macOS
+.DS_Store
+
+# Editor backup
+*.bak

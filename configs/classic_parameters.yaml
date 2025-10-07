@@ -1,0 +1,49 @@
+# Classic Parameters from Dissertation
+# These values were validated in the original research
+
+neural_field_2d:
+  alpha: 0.5              # Time constant
+  beta: 30.0              # Sigmoid steepness
+  rest_value: -0.25       # Resting activity level
+  global_mult: 1.0        # Global interaction strength
+  convergence:
+    max_iterations: 50
+    threshold: 0.01
+
+  kernel:
+    type: "difference_of_gaussians"
+    sigma_exc: 2.0        # Excitatory spread
+    sigma_inh: 10.0       # Inhibitory spread
+    A_exc: 1.5            # Excitatory amplitude
+    A_inh: 0.5            # Inhibitory amplitude
+
+features:
+  color:
+    weight: 1.2           # From readargs.h:89
+    num_scales: 3
+    threshold: 8.0
+    method: "opponent_colors"
+
+  intensity:
+    weight: 0.35          # From readargs.h:90
+    num_scales: 3
+
+  symmetry:
+    weight: 1.6           # From readargs.h:91
+    num_orientations: 6
+    scales: [1, 2, 4]
+
+  stereo:
+    weight: 0.7           # From readargs.h:92
+    min_disparity: -25    # From experiments
+    max_disparity: 0
+    block_size: 15
+    correlation_method: "sgbm"
+
+selection:
+  method: "wta"           # Winner-take-all
+  ior:
+    enabled: true
+    radius: 20
+    strength: 0.5
+    decay: 0.95
