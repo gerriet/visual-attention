@@ -1,0 +1,30 @@
+Language:          Cpp
+BasedOnStyle:      Google
+BreakBeforeBraces: Allman
+Standard:          Latest
+IndentCaseLabels:  false
+TabWidth:          2
+ConstructorInitializerIndentWidth: 2
+IndentWidth:       2
+ColumnLimit:       120
+SpacesBeforeTrailingComments: 1
+AllowShortIfStatementsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortBlocksOnASingleLine: Empty
+AllowShortLoopsOnASingleLine: false
+DerivePointerAlignment: false
+PointerAlignment: Left
+ReferenceAlignment: Left
+AlwaysBreakTemplateDeclarations: Yes
+IncludeBlocks:   Preserve
+IncludeCategories: 
+  - Regex:           '^<ext/.*\.h>'
+    Priority:        3
+  - Regex:           '^<.*\.h>'
+    Priority:        4
+  - Regex:           '^<.*'
+    Priority:        3
+  - Regex:           '.*'
+    Priority:        2
+  - Regex:           '^"stdafx.h"'
+    Priority:        1

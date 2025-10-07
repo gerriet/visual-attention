@@ -30,6 +30,9 @@ make
 - `docs/REALISTIC_TIMELINE.md` - Timeline and effort estimates
 - `docs/MODERN_ATTENTION_RESEARCH.md` - Survey of modern attention systems
 - `docs/MIGRATION_GUIDE.md` - How to use old code as reference
+- `docs/DEVELOPMENT_GUIDELINES.md` - **Development best practices and coding guidelines**
+- `docs/CODE_STYLE.md` - Code style guide (Google-Allman hybrid)
+- `docs/FORMATTING.md` - Code formatting with clang-format
 - `docs/thesis/` - Original dissertation and extracted equations
 - `reference/old_code/` - Original implementation (reference only, not compiled)
 
@@ -51,6 +54,20 @@ attention-framework/
 ## Development
 
 See `docs/PHASE1_ACTION_PLAN.md` for the phased development approach.
+
+### Code Formatting
+
+This project uses clang-format for automatic code formatting:
+
+```bash
+# Format all code
+cmake --build build --target format
+
+# Check formatting (CI/CD)
+cmake --build build --target format-check
+```
+
+A pre-commit hook automatically formats code before each commit. See `docs/FORMATTING.md` for details.
 
 **Phase 1 (3-4 weeks)**: Minimal working system
 - Core data structures

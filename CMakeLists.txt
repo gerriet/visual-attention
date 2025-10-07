@@ -18,6 +18,38 @@ include_directories(${OpenCV_INCLUDE_DIRS})
 add_executable(attention src/main.cpp)
 target_link_libraries(attention ${OpenCV_LIBS})
 
+# Optional: clang-format targets for code formatting
+find_program(CLANG_FORMAT clang-format)
+if(CLANG_FORMAT)
+    # Get all C++ source files
+    file(GLOB_RECURSE ALL_CXX_SOURCE_FILES
+        ${CMAKE_SOURCE_DIR}/include/*.h
+        ${CMAKE_SOURCE_DIR}/src/*.cpp
+    )
+
+    # Target to check if formatting is needed (CI/CD)
+    add_custom_target(format-check
+        COMMAND ${CLANG_FORMAT} --dry-run --Werror ${ALL_CXX_SOURCE_FILES}
+        COMMENT "Checking code formatting..."
+        VERBATIM
+    )
+
+    # Target to apply formatting
+    add_custom_target(format
+        COMMAND ${CLANG_FORMAT} -i ${ALL_CXX_SOURCE_FILES}
+        COMMENT "Formatting code with clang-format..."
+        VERBATIM
+    )
+
+    message(STATUS "clang-format found: ${CLANG_FORMAT}")
+    message(STATUS "  Run 'cmake --build . --target format' to format code")
+    message(STATUS "  Run 'cmake --build . --target format-check' to check formatting (CI mode)")
+    message(STATUS "  Or use 'ninja format' / 'make format' depending on your generator")
+else()
+    message(WARNING "clang-format not found. Code formatting targets unavailable.")
+endif()
+
+message(STATUS "")
 message(STATUS "OpenCV version: ${OpenCV_VERSION}")
 message(STATUS "OpenCV libs: ${OpenCV_LIBS}")
 message(STATUS "")
