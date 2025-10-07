@@ -1,5 +1,6 @@
 #include "attention/pipeline/attention_pipeline.h"
 #include "attention/features/color_feature.h"
+#include "attention/features/intensity_feature.h"
 #include "attention/visualization/visualizer.h"
 #include <stdexcept>
 
@@ -67,8 +68,12 @@ void AttentionPipeline::extract_features()
     features_.push_back(std::move(color_feature));
   }
 
-  // TODO (Week 2, Session 2): Add intensity feature
-  // TODO (Week 2, Session 3): Add more features (edges, orientation, etc.)
+  // Extract intensity feature (always)
+  features::IntensityFeature intensity_extractor;
+  core::FeatureMap intensity_feature = intensity_extractor.extract(frame_);
+  features_.push_back(std::move(intensity_feature));
+
+  // TODO (Week 2, Session 3): Add more features (edges, orientation, symmetry, etc.)
 }
 
 void AttentionPipeline::integrate_features()
