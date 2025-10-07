@@ -15,7 +15,10 @@ include_directories(include)
 include_directories(${OpenCV_INCLUDE_DIRS})
 
 # Build main executable
-add_executable(attention src/main.cpp)
+add_executable(attention
+    src/main.cpp
+    src/pipeline/attention_pipeline.cpp
+)
 target_link_libraries(attention ${OpenCV_LIBS})
 
 # Optional: clang-format targets for code formatting
