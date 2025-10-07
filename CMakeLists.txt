@@ -14,12 +14,12 @@ find_package(OpenCV 4 REQUIRED)
 include_directories(include)
 include_directories(${OpenCV_INCLUDE_DIRS})
 
-# Placeholder for now - will add sources in Phase 1
-# add_subdirectory(src)
-# add_subdirectory(examples)
+# Build main executable
+add_executable(attention src/main.cpp)
+target_link_libraries(attention ${OpenCV_LIBS})
 
 message(STATUS "OpenCV version: ${OpenCV_VERSION}")
 message(STATUS "OpenCV libs: ${OpenCV_LIBS}")
 message(STATUS "")
-message(STATUS "Project structure created. Ready to start Phase 1!")
-message(STATUS "See docs/PHASE1_ACTION_PLAN.md for next steps.")
+message(STATUS "Build the project with: cmake --build .")
+message(STATUS "Run with: ./attention <image_path>")
