@@ -3,6 +3,7 @@
 
 #include "attention/config/config_loader.h"
 #include "attention/pipeline/attention_pipeline.h"
+#include <chrono>
 #include <iostream>
 #include <opencv2/opencv.hpp>
 #include <string>
@@ -85,10 +86,16 @@ int main(int argc, char** argv)
 
     // Process through attention pipeline
     std::cout << "\nProcessing..." << std::endl;
+    auto start_time = std::chrono::high_resolution_clock::now();
+
     pipeline.process();
+
+    auto end_time = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
 
     std::cout << "  Features extracted: " << pipeline.get_features().size() << std::endl;
     std::cout << "  Peaks detected: " << pipeline.get_saliency_map().peaks.size() << std::endl;
+    std::cout << "  Processing time: " << duration.count() << " ms" << std::endl;
     std::cout << "✓ Processing complete!" << std::endl;
 
     // Visualize results

@@ -3,6 +3,8 @@
 #include "attention/features/intensity_feature.h"
 #include "attention/features/symmetry_feature.h"
 #include "attention/visualization/visualizer.h"
+#include <chrono>
+#include <iostream>
 #include <stdexcept>
 
 namespace attention
@@ -49,14 +51,30 @@ void AttentionPipeline::process()
   features_.clear();
   saliency_ = core::SaliencyMap();
 
+  auto t_start = std::chrono::high_resolution_clock::now();
+
   // Step 1: Extract features
+  auto t_extract_start = std::chrono::high_resolution_clock::now();
   extract_features();
+  auto t_extract_end = std::chrono::high_resolution_clock::now();
+  auto extract_ms = std::chrono::duration_cast<std::chrono::milliseconds>(t_extract_end - t_extract_start).count();
 
   // Step 2: Integrate features into saliency map
+  auto t_integrate_start = std::chrono::high_resolution_clock::now();
   integrate_features();
+  auto t_integrate_end = std::chrono::high_resolution_clock::now();
+  auto integrate_ms =
+      std::chrono::duration_cast<std::chrono::milliseconds>(t_integrate_end - t_integrate_start).count();
 
   // Step 3: Detect peaks
+  auto t_peaks_start = std::chrono::high_resolution_clock::now();
   detect_peaks();
+  auto t_peaks_end = std::chrono::high_resolution_clock::now();
+  auto peaks_ms = std::chrono::duration_cast<std::chrono::milliseconds>(t_peaks_end - t_peaks_start).count();
+
+  std::cout << "    Feature extraction: " << extract_ms << " ms" << std::endl;
+  std::cout << "    Integration: " << integrate_ms << " ms" << std::endl;
+  std::cout << "    Peak detection: " << peaks_ms << " ms" << std::endl;
 
   processed_ = true;
 }
