@@ -28,11 +28,11 @@ features:
     method: "opponent_colors"
 
   intensity:
-    weight: 0.35          # From readargs.h:90
+    weight: 0.75          # From readargs.h:90
     num_scales: 3
 
   symmetry:
-    weight: 1.6           # From readargs.h:91
+    weight: 0.6           
     num_orientations: 6
     scales: [1, 2, 4]
 

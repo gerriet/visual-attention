@@ -8,7 +8,11 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Find dependencies
 find_package(OpenCV 4 REQUIRED)
 # find_package(Eigen3 REQUIRED)  # Uncomment when needed
-# find_package(yaml-cpp REQUIRED)  # Uncomment when needed
+
+# yaml-cpp (homebrew installation)
+set(YAML_CPP_DIR "/opt/homebrew/opt/yaml-cpp")
+include_directories(${YAML_CPP_DIR}/include)
+link_directories(${YAML_CPP_DIR}/lib)
 
 # Include directories
 include_directories(include)
@@ -21,8 +25,9 @@ add_executable(attention
     src/features/color_feature.cpp
     src/features/intensity_feature.cpp
     src/features/symmetry_feature.cpp
+    src/config/config_loader.cpp
 )
-target_link_libraries(attention ${OpenCV_LIBS})
+target_link_libraries(attention ${OpenCV_LIBS} yaml-cpp)
 
 # Optional: clang-format targets for code formatting
 find_program(CLANG_FORMAT clang-format)

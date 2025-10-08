@@ -1,0 +1,33 @@
+# Attention Framework Configuration
+# This file configures the visual attention pipeline
+
+# Input configuration
+input:
+  image: "data/test_images/lena.png"
+
+# Feature extraction and weights
+features:
+  # Color saliency (R-G, B-Y opponent channels)
+  color:
+    weight: 1.0
+
+  # Intensity/brightness saliency
+  intensity:
+    weight: 1.0
+
+  # Bilateral symmetry saliency
+  symmetry:
+    weight: 1.0
+
+# Peak detection parameters
+peaks:
+  min_distance: 30    # Minimum distance between peaks (pixels)
+  threshold: 0.3      # Minimum saliency value for a peak (0-1)
+  max_count: 10       # Maximum number of peaks to detect
+
+# Output configuration
+output:
+  save_features: true     # Save individual feature maps
+  save_saliency: true     # Save final saliency map
+  output_dir: "results/"  # Output directory for saved images
+  display: false          # Display visualization window (true/false)
