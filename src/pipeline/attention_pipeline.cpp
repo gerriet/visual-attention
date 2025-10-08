@@ -1,6 +1,7 @@
 #include "attention/pipeline/attention_pipeline.h"
 #include "attention/features/color_feature.h"
 #include "attention/features/intensity_feature.h"
+#include "attention/features/symmetry_feature.h"
 #include "attention/visualization/visualizer.h"
 #include <stdexcept>
 
@@ -9,7 +10,9 @@ namespace attention
 namespace pipeline
 {
 
-AttentionPipeline::AttentionPipeline() : processed_(false) {}
+AttentionPipeline::AttentionPipeline() : config_(), processed_(false) {}
+
+AttentionPipeline::AttentionPipeline(const PipelineConfig& config) : config_(config), processed_(false) {}
 
 void AttentionPipeline::load_image(const std::string& image_path)
 {
@@ -73,7 +76,12 @@ void AttentionPipeline::extract_features()
   core::FeatureMap intensity_feature = intensity_extractor.extract(frame_);
   features_.push_back(std::move(intensity_feature));
 
-  // TODO (Week 2, Session 3): Add more features (edges, orientation, symmetry, etc.)
+  // Extract symmetry feature (always)
+  features::SymmetryFeature symmetry_extractor;
+  core::FeatureMap symmetry_feature = symmetry_extractor.extract(frame_);
+  features_.push_back(std::move(symmetry_feature));
+
+  std::cout << "  Features extracted: " << features_.size() << std::endl;
 }
 
 void AttentionPipeline::integrate_features()
@@ -83,15 +91,21 @@ void AttentionPipeline::integrate_features()
     throw std::runtime_error("No features to integrate");
   }
 
-  // TODO (Week 3): Implement proper weighted integration
-  // For now, simple weighted sum
-
+  // Weighted integration using configured feature weights
   cv::Mat integrated = cv::Mat::zeros(frame_.size(), CV_32F);
 
   for (const auto& feature : features_)
   {
-    // Weight by confidence
-    integrated += feature.confidence * feature.data;
+    // Get weight from config (default to 1.0 if not configured)
+    float weight = 1.0f;
+    auto it = config_.feature_weights.find(feature.name);
+    if (it != config_.feature_weights.end())
+    {
+      weight = it->second;
+    }
+
+    // Apply weight and feature confidence
+    integrated += weight * feature.confidence * feature.data;
   }
 
   // Normalize to [0, 1]
@@ -103,11 +117,8 @@ void AttentionPipeline::integrate_features()
 void AttentionPipeline::detect_peaks()
 {
   // Use the built-in peak detection with non-maximum suppression
-  // Parameters tuned for typical attention scenarios:
-  // - min_distance: 30 pixels (avoid cluttered peaks)
-  // - threshold: 0.3 (ignore low-saliency regions)
-  // - max_peaks: 10 (show top salient locations)
-  saliency_.detect_peaks(30, 0.3f, 10);
+  // Parameters from configuration
+  saliency_.detect_peaks(config_.peak_min_distance, config_.peak_threshold, config_.peak_max_count);
 
   std::cout << "  Peaks detected: " << saliency_.peaks.size() << std::endl;
 }

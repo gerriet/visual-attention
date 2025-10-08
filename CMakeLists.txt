@@ -20,6 +20,7 @@ add_executable(attention
     src/pipeline/attention_pipeline.cpp
     src/features/color_feature.cpp
     src/features/intensity_feature.cpp
+    src/features/symmetry_feature.cpp
 )
 target_link_libraries(attention ${OpenCV_LIBS})
 

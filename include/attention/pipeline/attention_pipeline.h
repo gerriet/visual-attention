@@ -3,6 +3,7 @@
 #include "attention/core/feature_map.h"
 #include "attention/core/frame.h"
 #include "attention/core/saliency_map.h"
+#include <map>
 #include <opencv2/opencv.hpp>
 #include <string>
 #include <vector>
@@ -11,6 +12,29 @@ namespace attention
 {
 namespace pipeline
 {
+
+/**
+ * Configuration for the attention pipeline.
+ */
+struct PipelineConfig
+{
+  // Feature weights for integration
+  // Keys are feature names (e.g., "color", "intensity", "symmetry")
+  std::map<std::string, float> feature_weights;
+
+  // Peak detection parameters
+  int peak_min_distance = 30;  // Minimum distance between peaks (pixels)
+  float peak_threshold = 0.3f; // Minimum saliency value for peaks
+  int peak_max_count = 10;     // Maximum number of peaks to detect
+
+  PipelineConfig()
+  {
+    // Default weights
+    feature_weights["color"] = 1.0f;
+    feature_weights["intensity"] = 1.0f;
+    feature_weights["symmetry"] = 1.0f;
+  }
+};
 
 /**
  * AttentionPipeline orchestrates the complete attention computation process.
@@ -32,6 +56,7 @@ class AttentionPipeline
 {
  public:
   AttentionPipeline();
+  explicit AttentionPipeline(const PipelineConfig& config);
   ~AttentionPipeline() = default;
 
   // Disable copy (use move semantics for efficiency)
@@ -102,7 +127,22 @@ class AttentionPipeline
    */
   bool is_processed() const { return processed_; }
 
+  /**
+   * Set configuration.
+   * @param config New configuration
+   */
+  void set_config(const PipelineConfig& config) { config_ = config; }
+
+  /**
+   * Get current configuration.
+   * @return Current configuration
+   */
+  const PipelineConfig& get_config() const { return config_; }
+
  private:
+  // Configuration
+  PipelineConfig config_;
+
   // Current frame being processed
   core::Frame frame_;
 
