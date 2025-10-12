@@ -1,4 +1,5 @@
 #include "attention/features/symmetry_feature.h"
+#include <cmath>
 #include <stdexcept>
 
 namespace attention
@@ -21,35 +22,12 @@ core::FeatureMap SymmetryFeature::extract(const core::Frame& frame) const
     throw std::runtime_error("SymmetryFeature: Grayscale pyramid not computed. Call frame.compute_pyramids() first.");
   }
 
-  // Compute symmetry at each scale of the cached pyramid
+  // Compute radial symmetry at each scale of the cached pyramid
   std::vector<cv::Mat> symmetry_maps;
   for (const auto& level : frame.gray_pyramid)
   {
-    cv::Mat combined = cv::Mat::zeros(level.size(), CV_32F);
-    int num_orientations = 0;
-
-    // Vertical symmetry (left-right)
-    if (config_.compute_vertical)
-    {
-      cv::Mat vert_sym = compute_symmetry(level, true);
-      combined += vert_sym;
-      num_orientations++;
-    }
-
-    // Horizontal symmetry (top-bottom)
-    if (config_.compute_horizontal)
-    {
-      cv::Mat horiz_sym = compute_symmetry(level, false);
-      combined += horiz_sym;
-      num_orientations++;
-    }
-
-    if (num_orientations > 0)
-    {
-      combined /= static_cast<float>(num_orientations);
-    }
-
-    symmetry_maps.push_back(combined);
+    cv::Mat sym = compute_radial_symmetry(level);
+    symmetry_maps.push_back(sym);
   }
 
   // Combine scales
@@ -61,7 +39,7 @@ core::FeatureMap SymmetryFeature::extract(const core::Frame& frame) const
   return core::FeatureMap("symmetry", result, 1.0f);
 }
 
-cv::Mat SymmetryFeature::compute_symmetry(const cv::Mat& image, bool vertical) const
+cv::Mat SymmetryFeature::compute_radial_symmetry(const cv::Mat& image) const
 {
   if (image.empty())
   {
@@ -73,25 +51,23 @@ cv::Mat SymmetryFeature::compute_symmetry(const cv::Mat& image, bool vertical) c
   cv::Sobel(image, grad_x, CV_32F, 1, 0, 3);
   cv::Sobel(image, grad_y, CV_32F, 0, 1, 3);
 
-  // Compute gradient magnitude and orientation
-  cv::Mat magnitude, orientation;
-  cv::cartToPolar(grad_x, grad_y, magnitude, orientation);
+  // Compute gradient magnitude
+  cv::Mat magnitude;
+  cv::magnitude(grad_x, grad_y, magnitude);
 
-  // Threshold: only consider significant gradients
+  // Find maximum gradient for thresholding
   double max_mag;
   cv::minMaxLoc(magnitude, nullptr, &max_mag);
-  float mag_threshold = static_cast<float>(max_mag * 0.1);
+  float mag_threshold = static_cast<float>(max_mag * config_.gradient_threshold);
 
-  // Initialize symmetry contribution map
-  cv::Mat symmetry = cv::Mat::zeros(image.size(), CV_32F);
+  // Initialize accumulator for symmetry votes
+  cv::Mat accumulator = cv::Mat::zeros(image.size(), CV_32F);
 
-  // For each pixel with significant gradient
   int rows = image.rows;
   int cols = image.cols;
+  int max_radius = std::min(rows, cols) / config_.max_radius_factor;
 
-  // Define search range based on image size
-  int max_range = std::min(rows, cols) / 4;
-
+  // For each pixel with significant gradient
   for (int y = 0; y < rows; ++y)
   {
     for (int x = 0; x < cols; ++x)
@@ -100,103 +76,53 @@ cv::Mat SymmetryFeature::compute_symmetry(const cv::Mat& image, bool vertical) c
       if (mag < mag_threshold)
         continue;
 
-      float angle = orientation.at<float>(y, x);
+      // Get normalized gradient direction
+      float gx = grad_x.at<float>(y, x);
+      float gy = grad_y.at<float>(y, x);
 
-      // For vertical symmetry: look for matching gradient on opposite side
-      // The gradient should point toward or away from the symmetry axis
-      if (vertical)
+      // Normalize
+      float norm = std::sqrt(gx * gx + gy * gy);
+      if (norm < 1e-6f)
+        continue;
+
+      gx /= norm;
+      gy /= norm;
+
+      // Vote along gradient direction (and opposite direction for bilateral symmetry)
+      for (int sign = -1; sign <= 1; sign += 2)
       {
-        // Search horizontally for mirrored gradient
-        for (int offset = 1; offset < max_range && x + offset < cols && x - offset >= 0; ++offset)
+        float dir_x = sign * gx;
+        float dir_y = sign * gy;
+
+        // Cast votes along this direction
+        for (int d = 1; d <= max_radius; ++d)
         {
-          int x_left = x - offset;
-          int x_right = x + offset;
+          // Candidate symmetry center
+          int cx = static_cast<int>(x + d * dir_x + 0.5f);
+          int cy = static_cast<int>(y + d * dir_y + 0.5f);
 
-          float mag_left = magnitude.at<float>(y, x_left);
-          float mag_right = magnitude.at<float>(y, x_right);
+          // Check bounds
+          if (cx < 0 || cx >= cols || cy < 0 || cy >= rows)
+            break;
 
-          if (mag_left < mag_threshold || mag_right < mag_threshold)
-            continue;
+          // Compute vote weight: magnitude * distance_falloff
+          float distance_weight = 1.0f / std::pow(static_cast<float>(d), config_.distance_alpha);
+          float vote = mag * distance_weight;
 
-          float angle_left = orientation.at<float>(y, x_left);
-          float angle_right = orientation.at<float>(y, x_right);
-
-          // Check if gradients are mirror-symmetric
-          // For vertical symmetry, x-component should be opposite, y-component same
-          float expected_angle_right = CV_PI - angle_left;
-          float angle_diff = std::abs(angle_right - expected_angle_right);
-          if (angle_diff > CV_PI)
-            angle_diff = 2 * CV_PI - angle_diff;
-
-          // If angles match (mirror symmetry)
-          if (angle_diff < 0.5f) // ~30 degrees tolerance
-          {
-            float contribution = (mag_left * mag_right) / (max_mag * max_mag) / static_cast<float>(offset);
-            symmetry.at<float>(y, x) += contribution;
-            symmetry.at<float>(y, x_left) += contribution;
-            symmetry.at<float>(y, x_right) += contribution;
-          }
-        }
-      }
-      else
-      {
-        // Horizontal symmetry: search vertically
-        for (int offset = 1; offset < max_range && y + offset < rows && y - offset >= 0; ++offset)
-        {
-          int y_top = y - offset;
-          int y_bottom = y + offset;
-
-          float mag_top = magnitude.at<float>(y_top, x);
-          float mag_bottom = magnitude.at<float>(y_bottom, x);
-
-          if (mag_top < mag_threshold || mag_bottom < mag_threshold)
-            continue;
-
-          float angle_top = orientation.at<float>(y_top, x);
-          float angle_bottom = orientation.at<float>(y_bottom, x);
-
-          // For horizontal symmetry, angles should be vertically mirrored
-          float expected_angle_bottom = -angle_top;
-          if (expected_angle_bottom < 0)
-            expected_angle_bottom += 2 * CV_PI;
-
-          float angle_diff = std::abs(angle_bottom - expected_angle_bottom);
-          if (angle_diff > CV_PI)
-            angle_diff = 2 * CV_PI - angle_diff;
-
-          if (angle_diff < 0.5f)
-          {
-            float contribution = (mag_top * mag_bottom) / (max_mag * max_mag) / static_cast<float>(offset);
-            symmetry.at<float>(y, x) += contribution;
-            symmetry.at<float>(y_top, x) += contribution;
-            symmetry.at<float>(y_bottom, x) += contribution;
-          }
+          // Accumulate vote
+          accumulator.at<float>(cy, cx) += vote;
         }
       }
     }
   }
 
-  // Normalize
-  cv::normalize(symmetry, symmetry, 0.0, 1.0, cv::NORM_MINMAX);
+  // Normalize accumulator
+  cv::normalize(accumulator, accumulator, 0.0, 1.0, cv::NORM_MINMAX);
 
-  return symmetry;
-}
+  // Optional: Apply Gaussian smoothing to reduce noise
+  cv::GaussianBlur(accumulator, accumulator, cv::Size(5, 5), 1.0);
 
-std::vector<cv::Mat> SymmetryFeature::create_pyramid(const cv::Mat& input, int levels) const
-{
-  std::vector<cv::Mat> pyramid;
-  pyramid.push_back(input.clone());
-
-  cv::Mat current = input;
-  for (int i = 1; i < levels; ++i)
-  {
-    cv::Mat downsampled;
-    cv::pyrDown(current, downsampled);
-    pyramid.push_back(downsampled);
-    current = downsampled;
-  }
-
-  return pyramid;
+  return accumulator;
 }
 
 cv::Mat SymmetryFeature::combine_scales(const std::vector<cv::Mat>& symmetry_maps) const

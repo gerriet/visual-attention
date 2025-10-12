@@ -12,14 +12,19 @@ namespace features
 {
 
 /**
- * SymmetryFeature detects bilateral (mirror) symmetry in images.
+ * SymmetryFeature detects radial symmetry in images using gradient voting.
  *
- * This feature computes symmetry at multiple scales and orientations:
- * - Vertical symmetry (left-right mirror)
- * - Horizontal symmetry (top-bottom mirror)
- * - Diagonal symmetries (optional)
+ * This feature implements the approach from Reisfeld, Wolfson & Yeshurun (1995).
+ * For each edge pixel, the gradient direction votes for potential symmetry centers.
+ * Regions with converging gradients (faces, circles, symmetric objects) receive
+ * high votes and thus high saliency.
  *
- * Symmetric regions (faces, objects, patterns) have high saliency.
+ * The algorithm:
+ * 1. Compute gradients at multiple scales
+ * 2. For each edge pixel with gradient (gx, gy):
+ *    - Project along gradient direction to find candidate centers
+ *    - Vote with weight = magnitude * distance_falloff
+ * 3. Accumulate votes across scales
  *
  * References:
  * - Reisfeld et al. (1995): Context-free attentional operators
@@ -33,12 +38,12 @@ class SymmetryFeature : public FeatureExtractor
    */
   struct Config
   {
-    int pyramid_levels;             // Number of pyramid levels (0 = auto-detect)
-    bool compute_vertical = true;   // Compute vertical (left-right) symmetry
-    bool compute_horizontal = true; // Compute horizontal (top-bottom) symmetry
-    int kernel_size = 5;            // Smoothing kernel size
+    int pyramid_levels;       // Number of pyramid levels (0 = auto-detect)
+    float gradient_threshold; // Minimum gradient magnitude (fraction of max, 0-1)
+    float distance_alpha;     // Distance falloff exponent (1.0 = 1/d, 2.0 = 1/d²)
+    int max_radius_factor;    // Max search radius = min(w,h) / factor
 
-    Config() : pyramid_levels(0) {}
+    Config() : pyramid_levels(0), gradient_threshold(0.1f), distance_alpha(1.0f), max_radius_factor(4) {}
   };
 
   explicit SymmetryFeature(const Config& config = Config());
@@ -59,11 +64,8 @@ class SymmetryFeature : public FeatureExtractor
  private:
   Config config_;
 
-  // Compute symmetry for a single orientation
-  cv::Mat compute_symmetry(const cv::Mat& image, bool vertical) const;
-
-  // Create Gaussian pyramid
-  std::vector<cv::Mat> create_pyramid(const cv::Mat& input, int levels) const;
+  // Compute radial symmetry contribution map for a single scale
+  cv::Mat compute_radial_symmetry(const cv::Mat& image) const;
 
   // Combine multi-scale symmetry
   cv::Mat combine_scales(const std::vector<cv::Mat>& symmetry_maps) const;
