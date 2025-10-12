@@ -3,25 +3,134 @@
 
 #include "attention/config/config_loader.h"
 #include "attention/pipeline/attention_pipeline.h"
+#include "attention/visualization/visualizer.h"
+#include <algorithm>
 #include <chrono>
+#include <filesystem>
 #include <iostream>
 #include <opencv2/opencv.hpp>
 #include <string>
+#include <vector>
+
+namespace fs = std::filesystem;
+
+void process_batch(const std::string& directory, const attention::pipeline::PipelineConfig& config,
+                   const std::string& output_base = "")
+{
+  std::vector<std::string> image_paths;
+
+  // Collect all image files
+  for (const auto& entry : fs::directory_iterator(directory))
+  {
+    if (entry.is_regular_file())
+    {
+      std::string ext = entry.path().extension().string();
+      std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+      if (ext == ".jpg" || ext == ".jpeg" || ext == ".png" || ext == ".bmp")
+      {
+        image_paths.push_back(entry.path().string());
+      }
+    }
+  }
+
+  std::sort(image_paths.begin(), image_paths.end());
+
+  std::cout << "Found " << image_paths.size() << " images in " << directory << std::endl;
+  std::cout << "Processing batch..." << std::endl;
+  std::cout << std::endl;
+
+  attention::pipeline::AttentionPipeline pipeline(config);
+
+  for (size_t i = 0; i < image_paths.size(); ++i)
+  {
+    const std::string& image_path = image_paths[i];
+    fs::path input_path(image_path);
+    std::string filename = input_path.stem().string();
+
+    std::cout << "[" << (i + 1) << "/" << image_paths.size() << "] Processing: " << filename << std::endl;
+
+    try
+    {
+      pipeline.load_image(image_path);
+      const auto& frame = pipeline.get_frame();
+      std::cout << "  Size: " << frame.width() << "x" << frame.height() << std::endl;
+
+      auto start = std::chrono::high_resolution_clock::now();
+      pipeline.process();
+      auto end = std::chrono::high_resolution_clock::now();
+      auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+
+      std::cout << "  Time: " << duration.count() << " ms" << std::endl;
+      std::cout << "  Features: " << pipeline.get_features().size()
+                << ", Peaks: " << pipeline.get_saliency_map().peaks.size() << std::endl;
+
+      // Determine output directory
+      fs::path output_dir;
+      if (!output_base.empty())
+      {
+        output_dir = fs::path(output_base) / filename;
+      }
+      else
+      {
+        output_dir = input_path.parent_path() / "results_batch" / filename;
+      }
+      fs::create_directories(output_dir);
+
+      // Save original
+      cv::imwrite((output_dir / "00_original.png").string(), frame.image);
+
+      // Save each feature
+      int idx = 1;
+      for (const auto& feature : pipeline.get_features())
+      {
+        cv::Mat feature_vis = attention::visualization::visualize_feature_map(feature);
+        std::string feature_filename = "0" + std::to_string(idx) + "_" + feature.name + ".png";
+        cv::imwrite((output_dir / feature_filename).string(), feature_vis);
+        idx++;
+      }
+
+      // Save saliency map
+      cv::Mat saliency_vis =
+          attention::visualization::visualize_saliency_map(pipeline.get_saliency_map(), frame.image, "", true, false);
+      cv::imwrite((output_dir / "99_saliency.png").string(), saliency_vis);
+
+      // Save combined visualization
+      cv::Mat combined = pipeline.visualize(false);
+      cv::imwrite((output_dir / "combined.png").string(), combined);
+
+      std::cout << "  ✓ Saved to: " << output_dir.string() << std::endl;
+    }
+    catch (const std::exception& e)
+    {
+      std::cerr << "  ✗ Error: " << e.what() << std::endl;
+    }
+
+    std::cout << std::endl;
+  }
+
+  std::cout << "Batch processing complete!" << std::endl;
+}
 
 void print_usage(const char* program_name)
 {
   std::cerr << "Usage:" << std::endl;
   std::cerr << "  " << program_name << " <image_path> [--no-display]" << std::endl;
   std::cerr << "  " << program_name << " --config <config.yaml>" << std::endl;
+  std::cerr << "  " << program_name << " --batch <directory> [--output <output_dir>]" << std::endl;
   std::cerr << std::endl;
   std::cerr << "Examples:" << std::endl;
   std::cerr << "  " << program_name << " data/test_images/input.png" << std::endl;
   std::cerr << "  " << program_name << " data/test_images/input.png --no-display" << std::endl;
   std::cerr << "  " << program_name << " --config config.yaml" << std::endl;
+  std::cerr << "  " << program_name << " --batch data/test_images/" << std::endl;
+  std::cerr << "  " << program_name << " --batch data/test_images/ --output results/" << std::endl;
   std::cerr << std::endl;
   std::cerr << "Options:" << std::endl;
   std::cerr << "  --no-display  Process without displaying windows (saves to results/)" << std::endl;
   std::cerr << "  --config      Load configuration from YAML file" << std::endl;
+  std::cerr << "  --batch       Process all images in directory, save features separately" << std::endl;
+  std::cerr << "  --output      Specify output directory for batch mode (default: input_dir/results_batch)"
+            << std::endl;
 }
 
 int main(int argc, char** argv)
@@ -39,7 +148,29 @@ int main(int argc, char** argv)
     bool use_config_file = false;
 
     // Parse command line arguments
-    if (std::string(argv[1]) == "--config")
+    if (std::string(argv[1]) == "--batch")
+    {
+      if (argc < 3)
+      {
+        std::cerr << "Error: --batch requires a directory path" << std::endl;
+        print_usage(argv[0]);
+        return 1;
+      }
+
+      std::string directory = argv[2];
+      std::string output_dir = "";
+
+      // Check for optional --output flag
+      if (argc >= 5 && std::string(argv[3]) == "--output")
+      {
+        output_dir = argv[4];
+      }
+
+      config = attention::config::ConfigLoader::create_default();
+      process_batch(directory, config.pipeline, output_dir);
+      return 0;
+    }
+    else if (std::string(argv[1]) == "--config")
     {
       if (argc < 3)
       {
