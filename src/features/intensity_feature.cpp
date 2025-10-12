@@ -15,42 +15,14 @@ core::FeatureMap IntensityFeature::extract(const core::Frame& frame) const
     throw std::runtime_error("IntensityFeature: Cannot extract from empty frame");
   }
 
-  // Convert to grayscale intensity
-  cv::Mat intensity;
-  if (frame.channels() == 1)
+  // Use precomputed grayscale pyramid from frame
+  if (!frame.pyramids_computed || frame.gray_pyramid.empty())
   {
-    // Already grayscale
-    frame.image.convertTo(intensity, CV_32F, 1.0 / 255.0);
-  }
-  else
-  {
-    // Convert BGR to grayscale
-    cv::Mat gray;
-    cv::cvtColor(frame.image, gray, cv::COLOR_BGR2GRAY);
-    gray.convertTo(intensity, CV_32F, 1.0 / 255.0);
+    throw std::runtime_error("IntensityFeature: Grayscale pyramid not computed. Call frame.compute_pyramids() first.");
   }
 
-  // Determine adaptive pyramid levels if set to 0
-  int pyramid_levels = config_.pyramid_levels;
-  if (pyramid_levels == 0)
-  {
-    // Compute adaptive pyramid levels: ensure we can reach at least 16x16 at finest scale
-    int min_dim = std::min(frame.width(), frame.height());
-    pyramid_levels = 0;
-    while (min_dim > 16 && pyramid_levels < 12)
-    {
-      min_dim /= 2;
-      pyramid_levels++;
-    }
-    // Ensure we have enough levels for center-surround (need at least level 8)
-    pyramid_levels = std::max(9, pyramid_levels);
-  }
-
-  // Create pyramid
-  std::vector<cv::Mat> pyramid = create_pyramid(intensity, pyramid_levels);
-
-  // Compute center-surround
-  cv::Mat saliency = compute_center_surround(pyramid);
+  // Compute center-surround using the cached pyramid
+  cv::Mat saliency = compute_center_surround(frame.gray_pyramid);
 
   // Normalize and resize to original size
   cv::Mat result = normalize_and_resize(saliency, frame.size());

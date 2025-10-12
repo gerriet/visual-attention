@@ -2,6 +2,7 @@
 
 #include "attention/core/feature_map.h"
 #include "attention/core/frame.h"
+#include "attention/features/feature_extractor.h"
 #include <opencv2/opencv.hpp>
 #include <vector>
 
@@ -24,7 +25,7 @@ namespace features
  * - Reisfeld et al. (1995): Context-free attentional operators
  * - Original dissertation symmetry feature
  */
-class SymmetryFeature
+class SymmetryFeature : public FeatureExtractor
 {
  public:
   /**
@@ -47,7 +48,13 @@ class SymmetryFeature
    * @param frame Input frame (color or grayscale)
    * @return Symmetry feature map with saliency values [0, 1]
    */
-  core::FeatureMap extract(const core::Frame& frame) const;
+  core::FeatureMap extract(const core::Frame& frame) const override;
+
+  /**
+   * Get feature name.
+   * @return "symmetry"
+   */
+  std::string name() const override { return "symmetry"; }
 
  private:
   Config config_;

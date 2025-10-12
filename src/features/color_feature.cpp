@@ -20,37 +20,21 @@ core::FeatureMap ColorFeature::extract(const core::Frame& frame) const
     throw std::runtime_error("ColorFeature: Frame must be color (3 channels)");
   }
 
-  // Convert to float for processing
-  cv::Mat rgb_float;
-  frame.image.convertTo(rgb_float, CV_32FC3, 1.0 / 255.0);
-
-  // Compute opponent color channels
-  cv::Mat rg, by;
-  compute_opponent_colors(rgb_float, rg, by);
-
-  // Determine adaptive pyramid levels if set to 0
-  int pyramid_levels = config_.pyramid_levels;
-  if (pyramid_levels == 0)
+  // Use precomputed RGB pyramid from frame
+  if (!frame.pyramids_computed || frame.rgb_pyramid.empty())
   {
-    // Compute adaptive pyramid levels: ensure we can reach at least 16x16 at finest scale
-    // For Itti-Koch c∈{2,3,4}, δ∈{3,4}, we need up to level 8, so min_size >> 8 should be ≥16
-    int min_dim = std::min(frame.width(), frame.height());
-    pyramid_levels = 0;
-    while (min_dim > 16 && pyramid_levels < 12)
-    {
-      min_dim /= 2;
-      pyramid_levels++;
-    }
-    // Ensure we have enough levels for center-surround (need at least level 8)
-    pyramid_levels = std::max(9, pyramid_levels);
-
-    std::cout << "  Adaptive pyramid: " << pyramid_levels << " levels for " << frame.width() << "x" << frame.height()
-              << " image" << std::endl;
+    throw std::runtime_error("ColorFeature: RGB pyramid not computed. Call frame.compute_pyramids() first.");
   }
 
-  // Create pyramids for each channel
-  std::vector<cv::Mat> rg_pyramid = create_pyramid(rg, pyramid_levels);
-  std::vector<cv::Mat> by_pyramid = create_pyramid(by, pyramid_levels);
+  // Compute opponent color pyramids from the cached RGB pyramid
+  std::vector<cv::Mat> rg_pyramid, by_pyramid;
+  for (const auto& rgb_level : frame.rgb_pyramid)
+  {
+    cv::Mat rg, by;
+    compute_opponent_colors(rgb_level, rg, by);
+    rg_pyramid.push_back(rg);
+    by_pyramid.push_back(by);
+  }
 
   // Compute center-surround for each channel
   cv::Mat rg_saliency = compute_center_surround(rg_pyramid);

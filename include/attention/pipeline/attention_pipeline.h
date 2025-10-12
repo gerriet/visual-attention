@@ -156,6 +156,7 @@ class AttentionPipeline
   bool processed_;
 
   // Internal processing methods
+  int compute_pyramid_levels() const;
   void extract_features();
   void integrate_features();
   void detect_peaks();

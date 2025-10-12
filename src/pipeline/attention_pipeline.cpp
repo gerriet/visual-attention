@@ -1,11 +1,16 @@
 #include "attention/pipeline/attention_pipeline.h"
 #include "attention/features/color_feature.h"
+#include "attention/features/feature_extractor.h"
 #include "attention/features/intensity_feature.h"
 #include "attention/features/symmetry_feature.h"
 #include "attention/visualization/visualizer.h"
+#include <algorithm>
 #include <chrono>
 #include <iostream>
+#include <memory>
 #include <stdexcept>
+#include <thread>
+#include <vector>
 
 namespace attention
 {
@@ -53,6 +58,13 @@ void AttentionPipeline::process()
 
   auto t_start = std::chrono::high_resolution_clock::now();
 
+  // Step 0: Compute pyramids once (shared across features)
+  auto t_pyramid_start = std::chrono::high_resolution_clock::now();
+  int pyramid_levels = compute_pyramid_levels();
+  frame_.compute_pyramids(pyramid_levels);
+  auto t_pyramid_end = std::chrono::high_resolution_clock::now();
+  auto pyramid_ms = std::chrono::duration_cast<std::chrono::milliseconds>(t_pyramid_end - t_pyramid_start).count();
+
   // Step 1: Extract features
   auto t_extract_start = std::chrono::high_resolution_clock::now();
   extract_features();
@@ -72,6 +84,7 @@ void AttentionPipeline::process()
   auto t_peaks_end = std::chrono::high_resolution_clock::now();
   auto peaks_ms = std::chrono::duration_cast<std::chrono::milliseconds>(t_peaks_end - t_peaks_start).count();
 
+  std::cout << "    Pyramid computation: " << pyramid_ms << " ms" << std::endl;
   std::cout << "    Feature extraction: " << extract_ms << " ms" << std::endl;
   std::cout << "    Integration: " << integrate_ms << " ms" << std::endl;
   std::cout << "    Peak detection: " << peaks_ms << " ms" << std::endl;
@@ -79,27 +92,52 @@ void AttentionPipeline::process()
   processed_ = true;
 }
 
+int AttentionPipeline::compute_pyramid_levels() const
+{
+  // Adaptive pyramid levels based on image size
+  int min_dim = std::min(frame_.width(), frame_.height());
+  int levels = 0;
+  while (min_dim > 16 && levels < 12)
+  {
+    min_dim /= 2;
+    levels++;
+  }
+  return std::max(9, levels); // At least 9 levels for Itti-Koch
+}
+
 void AttentionPipeline::extract_features()
 {
-  // Extract color feature (if image is color)
+  // Create list of feature extractors to run in parallel
+  std::vector<std::unique_ptr<features::FeatureExtractor>> extractors;
+
+  // Add color feature (if image is color)
   if (frame_.channels() == 3)
   {
-    features::ColorFeature color_extractor;
-    core::FeatureMap color_feature = color_extractor.extract(frame_);
-    features_.push_back(std::move(color_feature));
+    extractors.push_back(std::make_unique<features::ColorFeature>());
   }
 
-  // Extract intensity feature (always)
-  features::IntensityFeature intensity_extractor;
-  core::FeatureMap intensity_feature = intensity_extractor.extract(frame_);
-  features_.push_back(std::move(intensity_feature));
+  // Add intensity feature (always)
+  extractors.push_back(std::make_unique<features::IntensityFeature>());
 
-  // Extract symmetry feature (always)
-  features::SymmetryFeature symmetry_extractor;
-  core::FeatureMap symmetry_feature = symmetry_extractor.extract(frame_);
-  features_.push_back(std::move(symmetry_feature));
+  // Add symmetry feature (always)
+  extractors.push_back(std::make_unique<features::SymmetryFeature>());
 
-  std::cout << "  Features extracted: " << features_.size() << std::endl;
+  // Extract features in parallel using threads
+  features_.resize(extractors.size());
+  std::vector<std::thread> threads;
+
+  for (size_t i = 0; i < extractors.size(); ++i)
+  {
+    threads.emplace_back([this, i, &extractors]() { features_[i] = extractors[i]->extract(frame_); });
+  }
+
+  // Wait for all threads to complete
+  for (auto& thread : threads)
+  {
+    thread.join();
+  }
+
+  std::cout << "  Features extracted: " << features_.size() << " (parallel)" << std::endl;
 }
 
 void AttentionPipeline::integrate_features()

@@ -15,44 +15,15 @@ core::FeatureMap SymmetryFeature::extract(const core::Frame& frame) const
     throw std::runtime_error("SymmetryFeature: Cannot extract from empty frame");
   }
 
-  // Convert to grayscale for symmetry computation
-  cv::Mat gray;
-  if (frame.channels() == 1)
+  // Use precomputed grayscale pyramid from frame
+  if (!frame.pyramids_computed || frame.gray_pyramid.empty())
   {
-    gray = frame.image.clone();
-  }
-  else
-  {
-    cv::cvtColor(frame.image, gray, cv::COLOR_BGR2GRAY);
+    throw std::runtime_error("SymmetryFeature: Grayscale pyramid not computed. Call frame.compute_pyramids() first.");
   }
 
-  // Convert to float
-  cv::Mat gray_float;
-  gray.convertTo(gray_float, CV_32F, 1.0 / 255.0);
-
-  // Smooth to reduce noise
-  cv::GaussianBlur(gray_float, gray_float, cv::Size(config_.kernel_size, config_.kernel_size), 0);
-
-  // Determine adaptive pyramid levels if set to 0
-  int pyramid_levels = config_.pyramid_levels;
-  if (pyramid_levels == 0)
-  {
-    int min_dim = std::min(frame.width(), frame.height());
-    pyramid_levels = 0;
-    while (min_dim > 32 && pyramid_levels < 6)
-    {
-      min_dim /= 2;
-      pyramid_levels++;
-    }
-    pyramid_levels = std::max(3, pyramid_levels); // At least 3 levels
-  }
-
-  // Create pyramid
-  std::vector<cv::Mat> pyramid = create_pyramid(gray_float, pyramid_levels);
-
-  // Compute symmetry at each scale
+  // Compute symmetry at each scale of the cached pyramid
   std::vector<cv::Mat> symmetry_maps;
-  for (const auto& level : pyramid)
+  for (const auto& level : frame.gray_pyramid)
   {
     cv::Mat combined = cv::Mat::zeros(level.size(), CV_32F);
     int num_orientations = 0;

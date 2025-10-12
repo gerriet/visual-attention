@@ -2,6 +2,7 @@
 
 #include "attention/core/feature_map.h"
 #include "attention/core/frame.h"
+#include "attention/features/feature_extractor.h"
 #include <opencv2/opencv.hpp>
 #include <vector>
 
@@ -23,7 +24,7 @@ namespace features
  * - Itti, Koch, Niebur (1998): A Model of Saliency-Based Visual Attention
  * - Original dissertation implementation (2003-2005)
  */
-class ColorFeature
+class ColorFeature : public FeatureExtractor
 {
  public:
   /**
@@ -50,7 +51,13 @@ class ColorFeature
    * @return Color feature map with saliency values [0, 1]
    * @throws std::runtime_error if frame is not color
    */
-  core::FeatureMap extract(const core::Frame& frame) const;
+  core::FeatureMap extract(const core::Frame& frame) const override;
+
+  /**
+   * Get feature name.
+   * @return "color"
+   */
+  std::string name() const override { return "color"; }
 
  private:
   Config config_;
