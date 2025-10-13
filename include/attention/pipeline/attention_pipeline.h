@@ -14,6 +14,27 @@ namespace pipeline
 {
 
 /**
+ * Performance timing information for pipeline stages.
+ */
+struct PipelineTiming
+{
+  long pyramid_ms = 0;                    // Pyramid computation time
+  long integration_ms = 0;                // Feature integration time
+  long peak_detection_ms = 0;             // Peak detection time
+  std::map<std::string, long> feature_ms; // Per-feature extraction time
+
+  long total_ms() const
+  {
+    long feature_total = 0;
+    for (const auto& pair : feature_ms)
+    {
+      feature_total += pair.second;
+    }
+    return pyramid_ms + feature_total + integration_ms + peak_detection_ms;
+  }
+};
+
+/**
  * Configuration for the attention pipeline.
  */
 struct PipelineConfig
@@ -128,6 +149,12 @@ class AttentionPipeline
   bool is_processed() const { return processed_; }
 
   /**
+   * Get performance timing information from last process() call.
+   * @return Timing breakdown
+   */
+  const PipelineTiming& get_timing() const { return timing_; }
+
+  /**
    * Set configuration.
    * @param config New configuration
    */
@@ -154,6 +181,9 @@ class AttentionPipeline
 
   // Processing state
   bool processed_;
+
+  // Performance timing
+  PipelineTiming timing_;
 
   // Internal processing methods
   int compute_pyramid_levels() const;

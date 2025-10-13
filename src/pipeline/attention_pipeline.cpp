@@ -55,6 +55,7 @@ void AttentionPipeline::process()
   // Clear previous results
   features_.clear();
   saliency_ = core::SaliencyMap();
+  timing_ = PipelineTiming(); // Reset timing
 
   auto t_start = std::chrono::high_resolution_clock::now();
 
@@ -63,31 +64,33 @@ void AttentionPipeline::process()
   int pyramid_levels = compute_pyramid_levels();
   frame_.compute_pyramids(pyramid_levels);
   auto t_pyramid_end = std::chrono::high_resolution_clock::now();
-  auto pyramid_ms = std::chrono::duration_cast<std::chrono::milliseconds>(t_pyramid_end - t_pyramid_start).count();
+  timing_.pyramid_ms = std::chrono::duration_cast<std::chrono::milliseconds>(t_pyramid_end - t_pyramid_start).count();
 
-  // Step 1: Extract features
-  auto t_extract_start = std::chrono::high_resolution_clock::now();
+  // Step 1: Extract features (with per-feature timing)
   extract_features();
-  auto t_extract_end = std::chrono::high_resolution_clock::now();
-  auto extract_ms = std::chrono::duration_cast<std::chrono::milliseconds>(t_extract_end - t_extract_start).count();
 
   // Step 2: Integrate features into saliency map
   auto t_integrate_start = std::chrono::high_resolution_clock::now();
   integrate_features();
   auto t_integrate_end = std::chrono::high_resolution_clock::now();
-  auto integrate_ms =
+  timing_.integration_ms =
       std::chrono::duration_cast<std::chrono::milliseconds>(t_integrate_end - t_integrate_start).count();
 
   // Step 3: Detect peaks
   auto t_peaks_start = std::chrono::high_resolution_clock::now();
   detect_peaks();
   auto t_peaks_end = std::chrono::high_resolution_clock::now();
-  auto peaks_ms = std::chrono::duration_cast<std::chrono::milliseconds>(t_peaks_end - t_peaks_start).count();
+  timing_.peak_detection_ms =
+      std::chrono::duration_cast<std::chrono::milliseconds>(t_peaks_end - t_peaks_start).count();
 
-  std::cout << "    Pyramid computation: " << pyramid_ms << " ms" << std::endl;
-  std::cout << "    Feature extraction: " << extract_ms << " ms" << std::endl;
-  std::cout << "    Integration: " << integrate_ms << " ms" << std::endl;
-  std::cout << "    Peak detection: " << peaks_ms << " ms" << std::endl;
+  // Print timing breakdown
+  std::cout << "    Pyramid computation: " << timing_.pyramid_ms << " ms" << std::endl;
+  for (const auto& pair : timing_.feature_ms)
+  {
+    std::cout << "    Feature '" << pair.first << "': " << pair.second << " ms" << std::endl;
+  }
+  std::cout << "    Integration: " << timing_.integration_ms << " ms" << std::endl;
+  std::cout << "    Peak detection: " << timing_.peak_detection_ms << " ms" << std::endl;
 
   processed_ = true;
 }
@@ -120,21 +123,46 @@ void AttentionPipeline::extract_features()
   extractors.push_back(std::make_unique<features::IntensityFeature>());
 
   // Add symmetry feature (always)
-  extractors.push_back(std::make_unique<features::SymmetryFeature>());
+  // Use quarter resolution for large images (>640px in any dimension) for performance
+  features::SymmetryFeature::Config sym_config;
+  if (frame_.width() > 640 || frame_.height() > 640)
+  {
+    sym_config.compute_at_scale = 2; // Quarter resolution for large images
+  }
+  else
+  {
+    sym_config.compute_at_scale = 0; // Full resolution for small images
+  }
+  extractors.push_back(std::make_unique<features::SymmetryFeature>(sym_config));
 
-  // Extract features in parallel using threads
+  // Extract features in parallel using threads, with per-feature timing
   features_.resize(extractors.size());
   std::vector<std::thread> threads;
+  std::vector<std::chrono::high_resolution_clock::time_point> start_times(extractors.size());
+  std::vector<long> durations(extractors.size());
 
   for (size_t i = 0; i < extractors.size(); ++i)
   {
-    threads.emplace_back([this, i, &extractors]() { features_[i] = extractors[i]->extract(frame_); });
+    threads.emplace_back(
+        [this, i, &extractors, &start_times, &durations]()
+        {
+          auto t_start = std::chrono::high_resolution_clock::now();
+          features_[i] = extractors[i]->extract(frame_);
+          auto t_end = std::chrono::high_resolution_clock::now();
+          durations[i] = std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_start).count();
+        });
   }
 
   // Wait for all threads to complete
   for (auto& thread : threads)
   {
     thread.join();
+  }
+
+  // Store per-feature timing
+  for (size_t i = 0; i < features_.size(); ++i)
+  {
+    timing_.feature_ms[features_[i].name] = durations[i];
   }
 
   std::cout << "  Features extracted: " << features_.size() << " (parallel)" << std::endl;

@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <chrono>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <opencv2/opencv.hpp>
 #include <string>
@@ -97,6 +98,24 @@ void process_batch(const std::string& directory, const attention::pipeline::Pipe
       // Save combined visualization
       cv::Mat combined = pipeline.visualize(false);
       cv::imwrite((output_dir / "combined.png").string(), combined);
+
+      // Save timing information
+      const auto& timing = pipeline.get_timing();
+      std::ofstream timing_file((output_dir / "timing.txt").string());
+      timing_file << "Performance Timing (ms)" << std::endl;
+      timing_file << "======================" << std::endl;
+      timing_file << "Image size: " << frame.width() << "x" << frame.height() << std::endl;
+      timing_file << std::endl;
+      timing_file << "Pyramid computation: " << timing.pyramid_ms << " ms" << std::endl;
+      for (const auto& pair : timing.feature_ms)
+      {
+        timing_file << "Feature '" << pair.first << "': " << pair.second << " ms" << std::endl;
+      }
+      timing_file << "Integration: " << timing.integration_ms << " ms" << std::endl;
+      timing_file << "Peak detection: " << timing.peak_detection_ms << " ms" << std::endl;
+      timing_file << std::endl;
+      timing_file << "Total: " << timing.total_ms() << " ms" << std::endl;
+      timing_file.close();
 
       std::cout << "  ✓ Saved to: " << output_dir.string() << std::endl;
     }

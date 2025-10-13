@@ -42,8 +42,12 @@ class SymmetryFeature : public FeatureExtractor
     float gradient_threshold; // Minimum gradient magnitude (fraction of max, 0-1)
     float distance_alpha;     // Distance falloff exponent (1.0 = 1/d, 2.0 = 1/d²)
     int max_radius_factor;    // Max search radius = min(w,h) / factor
+    int compute_at_scale;     // Pyramid scale to compute at (0=full res, 1=half, 2=quarter, etc.)
 
-    Config() : pyramid_levels(0), gradient_threshold(0.1f), distance_alpha(1.0f), max_radius_factor(4) {}
+    Config()
+      : pyramid_levels(0), gradient_threshold(0.1f), distance_alpha(1.0f), max_radius_factor(4), compute_at_scale(0)
+    {
+    }
   };
 
   explicit SymmetryFeature(const Config& config = Config());

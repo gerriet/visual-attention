@@ -22,19 +22,34 @@ core::FeatureMap SymmetryFeature::extract(const core::Frame& frame) const
     throw std::runtime_error("SymmetryFeature: Grayscale pyramid not computed. Call frame.compute_pyramids() first.");
   }
 
-  // Compute radial symmetry at each scale of the cached pyramid
-  std::vector<cv::Mat> symmetry_maps;
-  for (const auto& level : frame.gray_pyramid)
+  cv::Mat result;
+
+  // If compute_at_scale is specified, only compute at that scale
+  if (config_.compute_at_scale > 0)
   {
+    int scale_index = std::min(config_.compute_at_scale, static_cast<int>(frame.gray_pyramid.size()) - 1);
+    const auto& level = frame.gray_pyramid[scale_index];
     cv::Mat sym = compute_radial_symmetry(level);
-    symmetry_maps.push_back(sym);
+
+    // Resize to original size and normalize
+    result = normalize_and_resize(sym, frame.size());
   }
+  else
+  {
+    // Default: compute radial symmetry at each scale of the cached pyramid
+    std::vector<cv::Mat> symmetry_maps;
+    for (const auto& level : frame.gray_pyramid)
+    {
+      cv::Mat sym = compute_radial_symmetry(level);
+      symmetry_maps.push_back(sym);
+    }
 
-  // Combine scales
-  cv::Mat combined_symmetry = combine_scales(symmetry_maps);
+    // Combine scales
+    cv::Mat combined_symmetry = combine_scales(symmetry_maps);
 
-  // Resize to original size and normalize
-  cv::Mat result = normalize_and_resize(combined_symmetry, frame.size());
+    // Resize to original size and normalize
+    result = normalize_and_resize(combined_symmetry, frame.size());
+  }
 
   return core::FeatureMap("symmetry", result, 1.0f);
 }
