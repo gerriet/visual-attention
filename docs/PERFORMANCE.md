@@ -21,7 +21,7 @@ timing.total_ms()        // Total time
 
 In batch processing mode, timing information is automatically saved to `timing.txt` in each result directory:
 
-```
+```text
 Performance Timing (ms)
 ======================
 Image size: 512x512
@@ -37,6 +37,7 @@ Total: 18 ms
 ```
 
 Usage:
+
 ```bash
 ./attention --batch ../data/test_images/ --output ../results
 cat ../results/lena/timing.txt
@@ -47,7 +48,8 @@ cat ../results/lena/timing.txt
 ### Timing Breakdown (Before Optimization)
 
 On a 512×512 image (Lena):
-```
+
+```text
 Pyramid computation:  4 ms   (1.8%)
 Feature 'color':      2 ms   (0.9%)
 Feature 'intensity':  1 ms   (0.5%)
@@ -58,7 +60,8 @@ Total:              217 ms
 ```
 
 On a 1436×2011 image:
-```
+
+```text
 Pyramid computation:   10 ms   (0.3%)
 Feature 'color':       26 ms   (0.9%)
 Feature 'intensity':    3 ms   (0.1%)
@@ -73,7 +76,8 @@ Total:               2892 ms
 ### Symmetry Computational Complexity
 
 The radial symmetry algorithm:
-```
+
+```text
 For each pixel (x, y):
   For each direction (forward, backward):
     For distance d = 1 to max_radius:
@@ -94,6 +98,7 @@ For 1436×2011 with max_radius=500: ~1.4B operations
 **Solution:** Compute pyramids once in the Frame structure, share across all features.
 
 **Implementation:**
+
 ```cpp
 // In AttentionPipeline::process()
 frame_.compute_pyramids(pyramid_levels);  // Compute once
@@ -103,6 +108,7 @@ const auto& gray_pyramid = frame_.gray_pyramid;  // Reuse
 ```
 
 **Impact:**
+
 - Small images (512×512): 82ms → 57ms (30% faster)
 - Large images (1436×2011): 479ms → 394ms (18% faster)
 
@@ -113,6 +119,7 @@ const auto& gray_pyramid = frame_.gray_pyramid;  // Reuse
 **Solution:** Extract features in parallel using std::thread (3 threads for color images).
 
 **Implementation:**
+
 ```cpp
 std::vector<std::thread> threads;
 for (size_t i = 0; i < extractors.size(); ++i) {
@@ -126,6 +133,7 @@ for (auto& thread : threads) {
 ```
 
 **Impact:**
+
 - Modest speedup (~15%) due to OpenCV internal threading
 - Enables per-feature timing measurement
 - Better CPU utilization
@@ -137,12 +145,14 @@ for (auto& thread : threads) {
 **Solution:** Compute symmetry at reduced resolution (pyramid scale 2 = quarter resolution).
 
 **Rationale:**
+
 - Symmetry is a coarse, global feature (faces, objects)
 - Fine details not critical for attention
 - Upsampling preserves spatial structure
 - Reduces computation by 16× (4× width, 4× height)
 
 **Implementation:**
+
 ```cpp
 struct Config {
   int compute_at_scale; // 0=full, 1=half, 2=quarter, 3=eighth
@@ -169,25 +179,29 @@ if (frame_.width() > 640 || frame_.height() > 640) {
 **Impact:**
 
 The system uses **adaptive resolution** based on image size:
+
 - Images ≤640px: Full resolution (best quality)
 - Images >640px: Quarter resolution (best performance)
 
 Small images (256×256, full res):
-```
+
+```text
 Before: Symmetry  38ms, Total  43ms
 After:  Symmetry  33ms, Total  37ms
 Speedup: 1.2× (minimal, already fast)
 ```
 
 Medium images (512×512, full res):
-```
+
+```text
 Symmetry: 194ms, Total 210ms
 Quality: Full detail preserved
 Use case: Standard images, balanced approach
 ```
 
 Large images (1436×2011, quarter res):
-```
+
+```text
 Before: Symmetry 2718ms, Total 2892ms
 After:  Symmetry   52ms, Total  202ms
 Speedup: 52× for symmetry, 14× overall
@@ -195,6 +209,7 @@ Quality: Excellent (coarse features preserved)
 ```
 
 **Quality Assessment:**
+
 - ✓ Face detection preserved
 - ✓ Symmetric regions still highlighted
 - ✓ Less noise (better generalization)
@@ -205,7 +220,8 @@ Quality: Excellent (coarse features preserved)
 ### Timing Breakdown (After All Optimizations)
 
 256×256 image (small, full res):
-```
+
+```text
 Pyramid computation:  1 ms   (2.7%)
 Feature 'color':      0 ms   (0%)
 Feature 'intensity':  0 ms   (0%)
@@ -216,7 +232,8 @@ Total:               37 ms
 ```
 
 512×512 image (medium, full res):
-```
+
+```text
 Pyramid computation:  2 ms   (1.0%)
 Feature 'color':      2 ms   (1.0%)
 Feature 'intensity':  0 ms   (0%)
@@ -227,7 +244,8 @@ Total:              210 ms
 ```
 
 1436×2011 image (large, quarter res):
-```
+
+```text
 Pyramid computation:  12 ms   (5.9%)
 Feature 'color':      27 ms  (13.4%)
 Feature 'intensity':   4 ms   (2.0%)
@@ -306,6 +324,7 @@ Total:               202 ms
    - No configuration needed
 
 2. **Manual override** (if needed):
+
    ```cpp
    features::SymmetryFeature::Config sym_config;
    sym_config.compute_at_scale = 0; // Force full resolution
@@ -362,12 +381,14 @@ std::cout << "Total: " << timing.total_ms() << "ms\n";
 ## Conclusion
 
 Through systematic profiling and targeted optimization:
+
 - **15× average speedup** on large images (>640px)
 - **Full quality preserved** on small/medium images (≤640px)
 - **Adaptive resolution**: Automatically balances quality vs performance
 - **Real-time capable**: 512×512 in 210ms (~5 FPS), large images in ~200ms
 
 The key insights:
+
 1. Identified symmetry as the bottleneck (90-95% of time)
 2. Applied reduced-resolution computation for large images only
 3. Maintained full quality for typical image sizes
