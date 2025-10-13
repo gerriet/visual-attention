@@ -111,27 +111,41 @@ struct SaliencyMap
       return;
     }
 
-    // Apply threshold
+    // For large images, downsample for peak detection performance
+    // Detection works on coarse scale, peaks are mapped back to full resolution
+    cv::Mat detection_map = map;
+    float scale_factor = 1.0f;
+    int scaled_min_distance = min_distance;
+
+    // Adaptive downsampling: use half resolution if larger than 640px
+    if (map.cols > 640 || map.rows > 640)
+    {
+      scale_factor = 0.5f;
+      cv::resize(map, detection_map, cv::Size(), scale_factor, scale_factor, cv::INTER_AREA);
+      scaled_min_distance = static_cast<int>(min_distance * scale_factor + 0.5f);
+    }
+
+    // Apply threshold on detection map
     cv::Mat thresholded;
-    cv::threshold(map, thresholded, threshold, 255.0, cv::THRESH_BINARY);
+    cv::threshold(detection_map, thresholded, threshold, 255.0, cv::THRESH_BINARY);
     thresholded.convertTo(thresholded, CV_8U);
 
     // Find local maxima using dilation
     // A pixel is a local maximum if it equals the dilated image at that location
     cv::Mat dilated;
-    int kernel_size = min_distance / 2 + 1;
+    int kernel_size = scaled_min_distance / 2 + 1;
     cv::Mat kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(kernel_size * 2 + 1, kernel_size * 2 + 1));
-    cv::dilate(map, dilated, kernel);
+    cv::dilate(detection_map, dilated, kernel);
 
     // Local maxima are where original equals dilated
     cv::Mat local_max;
-    cv::compare(map, dilated, local_max, cv::CMP_GE);
+    cv::compare(detection_map, dilated, local_max, cv::CMP_GE);
 
     // Combine with threshold
     cv::Mat peak_mask;
     cv::bitwise_and(local_max, thresholded, peak_mask);
 
-    // Extract peak locations and values
+    // Extract peak locations and values from detection map
     std::vector<Peak> candidate_peaks;
     for (int y = 0; y < peak_mask.rows; ++y)
     {
@@ -139,8 +153,17 @@ struct SaliencyMap
       {
         if (peak_mask.at<uchar>(y, x) > 0)
         {
-          float value = map.at<float>(y, x);
-          candidate_peaks.push_back(Peak(cv::Point(x, y), value));
+          // Scale coordinates back to original resolution
+          int orig_x = static_cast<int>(x / scale_factor + 0.5f);
+          int orig_y = static_cast<int>(y / scale_factor + 0.5f);
+
+          // Clamp to map bounds
+          orig_x = std::min(orig_x, map.cols - 1);
+          orig_y = std::min(orig_y, map.rows - 1);
+
+          // Get value from original resolution map
+          float value = map.at<float>(orig_y, orig_x);
+          candidate_peaks.push_back(Peak(cv::Point(orig_x, orig_y), value));
         }
       }
     }
