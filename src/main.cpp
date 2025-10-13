@@ -8,6 +8,7 @@
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <opencv2/opencv.hpp>
 #include <string>
@@ -41,6 +42,30 @@ void process_batch(const std::string& directory, const attention::pipeline::Pipe
   std::cout << std::endl;
 
   attention::pipeline::AttentionPipeline pipeline(config);
+
+  // Statistics tracking
+  struct Stats
+  {
+    long min = LONG_MAX;
+    long max = 0;
+    long sum = 0;
+    int count = 0;
+
+    void add(long value)
+    {
+      if (value < min)
+        min = value;
+      if (value > max)
+        max = value;
+      sum += value;
+      count++;
+    }
+
+    double mean() const { return count > 0 ? static_cast<double>(sum) / count : 0.0; }
+  };
+
+  Stats pyramid_stats, integration_stats, peak_stats, total_stats;
+  std::map<std::string, Stats> feature_stats;
 
   for (size_t i = 0; i < image_paths.size(); ++i)
   {
@@ -117,6 +142,16 @@ void process_batch(const std::string& directory, const attention::pipeline::Pipe
       timing_file << "Total: " << timing.total_ms() << " ms" << std::endl;
       timing_file.close();
 
+      // Collect statistics
+      pyramid_stats.add(timing.pyramid_ms);
+      integration_stats.add(timing.integration_ms);
+      peak_stats.add(timing.peak_detection_ms);
+      total_stats.add(timing.total_ms());
+      for (const auto& pair : timing.feature_ms)
+      {
+        feature_stats[pair.first].add(pair.second);
+      }
+
       std::cout << "  ✓ Saved to: " << output_dir.string() << std::endl;
     }
     catch (const std::exception& e)
@@ -128,6 +163,31 @@ void process_batch(const std::string& directory, const attention::pipeline::Pipe
   }
 
   std::cout << "Batch processing complete!" << std::endl;
+  std::cout << std::endl;
+
+  // Print timing statistics
+  if (total_stats.count > 0)
+  {
+    std::cout << "Timing Statistics (ms) - " << total_stats.count << " images processed" << std::endl;
+    std::cout << "=======================================================" << std::endl;
+    std::cout << std::fixed << std::setprecision(1);
+
+    auto print_stats = [](const std::string& label, const Stats& stats)
+    {
+      std::cout << std::left << std::setw(20) << label << "  min: " << std::setw(6) << std::right << stats.min
+                << "  max: " << std::setw(6) << stats.max << "  mean: " << std::setw(7) << stats.mean() << std::endl;
+    };
+
+    print_stats("Pyramid:", pyramid_stats);
+    for (const auto& pair : feature_stats)
+    {
+      print_stats("Feature '" + pair.first + "':", pair.second);
+    }
+    print_stats("Integration:", integration_stats);
+    print_stats("Peak detection:", peak_stats);
+    std::cout << "-------------------------------------------------------" << std::endl;
+    print_stats("Total:", total_stats);
+  }
 }
 
 void print_usage(const char* program_name)
