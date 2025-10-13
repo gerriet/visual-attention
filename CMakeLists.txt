@@ -26,6 +26,7 @@ add_executable(attention
     src/features/intensity_feature.cpp
     src/features/symmetry_feature.cpp
     src/config/config_loader.cpp
+    src/visualization/visualizer.cpp
 )
 target_link_libraries(attention ${OpenCV_LIBS} yaml-cpp)
 

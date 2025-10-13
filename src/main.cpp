@@ -120,6 +120,10 @@ void process_batch(const std::string& directory, const attention::pipeline::Pipe
           attention::visualization::visualize_saliency_map(pipeline.get_saliency_map(), frame.image, "", true, false);
       cv::imwrite((output_dir / "99_saliency.png").string(), saliency_vis);
 
+      // Save scan path visualization
+      cv::Mat scan_path_vis = attention::visualization::visualize_scan_path(pipeline.get_saliency_map(), frame.image);
+      cv::imwrite((output_dir / "98_scan_path.png").string(), scan_path_vis);
+
       // Save combined visualization
       cv::Mat combined = pipeline.visualize(false);
       cv::imwrite((output_dir / "combined.png").string(), combined);
@@ -312,12 +316,20 @@ int main(int argc, char** argv)
     std::cout << "\nGenerating visualization..." << std::endl;
     cv::Mat visualization = pipeline.visualize(config.save_features);
 
+    // Generate scan path visualization
+    cv::Mat scan_path = attention::visualization::visualize_scan_path(pipeline.get_saliency_map(), frame.image);
+
     if (config.display)
     {
       // Show in window
       const std::string window_name = "Attention Framework - Pipeline Results";
       cv::namedWindow(window_name, cv::WINDOW_AUTOSIZE);
       cv::imshow(window_name, visualization);
+
+      // Show scan path in separate window
+      const std::string scan_path_window = "Scan Path";
+      cv::namedWindow(scan_path_window, cv::WINDOW_AUTOSIZE);
+      cv::imshow(scan_path_window, scan_path);
 
       std::cout << "✓ Visualization displayed" << std::endl;
       std::cout << "\nPress any key in the window to exit..." << std::endl;
@@ -330,6 +342,11 @@ int main(int argc, char** argv)
       std::string output_path = config.output_dir + "pipeline_output.png";
       cv::imwrite(output_path, visualization);
       std::cout << "✓ Saved visualization: " << output_path << std::endl;
+
+      // Save scan path
+      std::string scan_path_output = config.output_dir + "scan_path.png";
+      cv::imwrite(scan_path_output, scan_path);
+      std::cout << "✓ Saved scan path: " << scan_path_output << std::endl;
     }
 
     return 0;
