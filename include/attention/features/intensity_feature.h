@@ -59,9 +59,6 @@ class IntensityFeature : public FeatureExtractor
  private:
   Config config_;
 
-  // Create Gaussian pyramid
-  std::vector<cv::Mat> create_pyramid(const cv::Mat& input, int levels) const;
-
   // Compute center-surround differences
   cv::Mat compute_center_surround(const std::vector<cv::Mat>& pyramid) const;
 

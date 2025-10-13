@@ -65,9 +65,6 @@ class ColorFeature : public FeatureExtractor
   // Convert RGB to opponent color channels
   void compute_opponent_colors(const cv::Mat& rgb, cv::Mat& rg, cv::Mat& by) const;
 
-  // Create Gaussian pyramid
-  std::vector<cv::Mat> create_pyramid(const cv::Mat& input, int levels) const;
-
   // Compute center-surround differences for one channel
   cv::Mat compute_center_surround(const std::vector<cv::Mat>& pyramid) const;
 

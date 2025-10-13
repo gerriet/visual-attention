@@ -93,23 +93,6 @@ void ColorFeature::compute_opponent_colors(const cv::Mat& rgb, cv::Mat& rg, cv::
   }
 }
 
-std::vector<cv::Mat> ColorFeature::create_pyramid(const cv::Mat& input, int levels) const
-{
-  std::vector<cv::Mat> pyramid;
-  pyramid.push_back(input.clone());
-
-  cv::Mat current = input;
-  for (int i = 1; i < levels; ++i)
-  {
-    cv::Mat downsampled;
-    cv::pyrDown(current, downsampled);
-    pyramid.push_back(downsampled);
-    current = downsampled;
-  }
-
-  return pyramid;
-}
-
 cv::Mat ColorFeature::compute_center_surround(const std::vector<cv::Mat>& pyramid) const
 {
   if (pyramid.empty())
