@@ -1,16 +1,25 @@
 # Visual Attention Framework
 
-Modern reimplementation of neural field-based visual attention system.
+Modern C++ reimplementation of neural field-based visual attention system from doctoral dissertation (2003-2005).
 
-Based on doctoral dissertation work (2003-2005), reimplemented with modern C++ and OpenCV.
+## Current Status: Week 4 Complete ✓
 
-## Features
+**Implemented Features:**
 
-- Multi-feature visual attention (color, intensity, stereo depth, symmetry)
-- Neural field dynamics for feature integration
-- 3D attention with stereo vision
-- Configurable via YAML
-- Python bindings for analysis
+- ✅ Color attention (red-green, blue-yellow opponent channels)
+- ✅ Intensity attention (center-surround contrast)
+- ✅ Radial symmetry (gradient voting, Reisfeld et al. 1995)
+- ✅ Multi-scale processing with cached pyramids
+- ✅ Parallel feature extraction
+- ✅ Winner-take-all peak detection with inhibition of return
+- ✅ YAML configuration system
+- ✅ Batch processing mode
+
+**Performance:**
+
+- 512×512 image: ~210ms
+- 1436×2011 image: ~3000ms
+- Optimized with shared pyramids and parallel extraction
 
 ## Quick Start
 
@@ -20,7 +29,22 @@ Based on doctoral dissertation work (2003-2005), reimplemented with modern C++ a
 mkdir build && cd build
 cmake ..
 make
-./attention ../configs/phase1_simple.yaml
+```
+
+### Usage
+
+```bash
+# Process single image (display results)
+./attention ../data/test_images/lena.png
+
+# Process without display (save to results/)
+./attention ../data/test_images/lena.png --no-display
+
+# Batch process directory
+./attention --batch ../data/test_images/ --output ../results
+
+# Use configuration file
+./attention --config ../configs/default.yaml
 ```
 
 ## Documentation
@@ -38,7 +62,7 @@ make
 
 ## Project Structure
 
-```
+```text
 attention-framework/
 ├── docs/              # Documentation
 ├── reference/         # Old code for reference
@@ -51,33 +75,46 @@ attention-framework/
 └── tools/             # Utilities
 ```
 
+## Architecture
+
+**Core Pipeline:**
+
+```
+Input Image → Multi-scale Pyramids → Parallel Feature Extraction →
+Feature Integration → Winner-Take-All → Attention Peaks
+```
+
+**Key Design Decisions:**
+
+- Shared pyramid computation (eliminates redundancy)
+- Parallel feature extraction (3 threads for color images)
+- Cached data structures for efficiency
+- YAML-based configuration for flexibility
+
 ## Development
 
-See `docs/PHASE1_ACTION_PLAN.md` for the phased development approach.
+### Current Progress
+
+**Week 1-3:** Core infrastructure, features, pipeline ✓
+**Week 4:** Configuration system, optimization, batch processing ✓
+**Week 5:** Additional features (orientation, motion) - *pending*
+**Week 6+:** Neural field dynamics, 3D stereo attention - *pending*
+
+See `docs/PHASE1_ACTION_PLAN.md` for detailed development phases.
 
 ### Code Formatting
 
-This project uses clang-format for automatic code formatting:
+This project uses clang-format with automatic formatting on commit:
 
 ```bash
-# Format all code
+# Format all code manually
 cmake --build build --target format
 
 # Check formatting (CI/CD)
 cmake --build build --target format-check
 ```
 
-A pre-commit hook automatically formats code before each commit. See `docs/FORMATTING.md` for details.
-
-**Phase 1 (3-4 weeks)**: Minimal working system
-- Core data structures
-- 2-3 basic features
-- Simple integration
-- Visualization
-
-**Phase 2 (2-3 weeks)**: Video + more features
-**Phase 3 (2-3 weeks)**: Neural field integration
-**Phase 4 (2-3 weeks)**: Stereo/3D attention
+See `docs/FORMATTING.md` and `docs/DEVELOPMENT_GUIDELINES.md` for coding standards.
 
 ## License
 
@@ -86,4 +123,5 @@ A pre-commit hook automatically formats code before each commit. See `docs/FORMA
 ## Citation
 
 If you use this work, please cite the original dissertation:
-[Add citation information]
+
+- Backer, G. 2004. Modellierung visueller Aufmerksamkeit im Computer-Sehen: Ein zweistufiges Selektionsmodell für ein Aktives Sehsystem. Ph.D. thesis, Universität Hamburg, Germany.
