@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <cmath>
 #include <opencv2/opencv.hpp>
 #include <string>
 #include <vector>
@@ -21,9 +22,12 @@ struct Frame
   cv::Mat image;
 
   // Cached pyramids (computed once, shared across features)
-  std::vector<cv::Mat> rgb_pyramid;  // RGB color pyramid
-  std::vector<cv::Mat> gray_pyramid; // Grayscale intensity pyramid
-  bool pyramids_computed = false;    // Flag to track if pyramids are cached
+  std::vector<cv::Mat> rgb_pyramid;                       // RGB color pyramid
+  std::vector<cv::Mat> gray_pyramid;                      // Grayscale intensity pyramid
+  std::vector<std::vector<cv::Mat>> gabor_pyramids;       // Gabor filter pyramids [level][orientation]
+  bool pyramids_computed = false;                         // Flag to track if pyramids are cached
+  bool gabor_pyramids_computed = false;                   // Flag for Gabor pyramids
+  int num_gabor_orientations = 12;                        // Number of Gabor orientations (default 12)
 
   // Optional metadata
   std::string source_path;
@@ -118,6 +122,28 @@ struct Frame
 
     pyramids_computed = true;
   }
+
+  /**
+   * Compute and cache Gabor filter pyramids.
+   * Creates Gabor responses for multiple orientations at each pyramid level.
+   * @param levels Number of pyramid levels
+   * @param num_orientations Number of orientations (default 12, typical values: 4, 8, 12)
+   * @param wavelength Wavelength of the Gabor filter (default 4.0)
+   * @param bandwidth Bandwidth parameter (default 1.0)
+   */
+  void compute_gabor_pyramids(int levels, int num_orientations = 12, double wavelength = 4.0, double bandwidth = 1.0);
+
+private:
+  /**
+   * Create a Gabor filter kernel.
+   * @param wavelength Wavelength of the sinusoidal factor
+   * @param theta Orientation of the normal to the parallel stripes
+   * @param bandwidth Bandwidth parameter (sigma relative to wavelength)
+   * @return Gabor kernel
+   */
+  cv::Mat create_gabor_kernel(double wavelength, double theta, double bandwidth) const;
+
+public:
 };
 
 } // namespace core

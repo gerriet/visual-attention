@@ -21,6 +21,7 @@ include_directories(${OpenCV_INCLUDE_DIRS})
 # Build main executable
 add_executable(attention
     src/main.cpp
+    src/core/frame.cpp
     src/pipeline/attention_pipeline.cpp
     src/features/color_feature.cpp
     src/features/intensity_feature.cpp
