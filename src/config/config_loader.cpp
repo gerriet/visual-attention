@@ -103,6 +103,22 @@ void ConfigLoader::load_peaks(const void* yaml_node_ptr, pipeline::PipelineConfi
   {
     config.peak_max_count = peaks["max_count"].as<int>();
   }
+
+  // IOR parameters
+  if (peaks["enable_ior"])
+  {
+    config.enable_ior = peaks["enable_ior"].as<bool>();
+  }
+
+  if (peaks["ior_radius"])
+  {
+    config.ior_radius = peaks["ior_radius"].as<int>();
+  }
+
+  if (peaks["ior_strength"])
+  {
+    config.ior_strength = peaks["ior_strength"].as<float>();
+  }
 }
 
 void ConfigLoader::load_output(const void* yaml_node_ptr, Config& config)

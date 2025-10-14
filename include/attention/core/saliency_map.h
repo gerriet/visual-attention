@@ -101,8 +101,12 @@ struct SaliencyMap
    * @param min_distance Minimum distance between peaks (in pixels)
    * @param threshold Minimum saliency value for a peak (0-1)
    * @param max_peaks Maximum number of peaks to return (0 = unlimited)
+   * @param enable_ior Enable Inhibition of Return (sequential inhibition)
+   * @param ior_radius Radius of IOR inhibition disk (only used if enable_ior = true)
+   * @param ior_strength Strength of IOR inhibition 0-1 (only used if enable_ior = true)
    */
-  void detect_peaks(int min_distance = 20, float threshold = 0.3f, int max_peaks = 10)
+  void detect_peaks(int min_distance = 20, float threshold = 0.3f, int max_peaks = 10, bool enable_ior = false,
+                    int ior_radius = 50, float ior_strength = 0.8f)
   {
     peaks.clear();
 
@@ -111,6 +115,24 @@ struct SaliencyMap
       return;
     }
 
+    if (enable_ior)
+    {
+      // IOR-based sequential peak detection
+      detect_peaks_with_ior(threshold, max_peaks, ior_radius, ior_strength);
+    }
+    else
+    {
+      // Traditional non-maximum suppression approach
+      detect_peaks_nms(min_distance, threshold, max_peaks);
+    }
+  }
+
+private:
+  /**
+   * Traditional peak detection using non-maximum suppression.
+   */
+  void detect_peaks_nms(int min_distance, float threshold, int max_peaks)
+  {
     // For large images, downsample for peak detection performance
     // Detection works on coarse scale, peaks are mapped back to full resolution
     cv::Mat detection_map = map;
@@ -195,6 +217,81 @@ struct SaliencyMap
       }
     }
   }
+
+  /**
+   * IOR-based sequential peak detection.
+   * Each detected peak inhibits surrounding region for subsequent peaks.
+   */
+  void detect_peaks_with_ior(float threshold, int max_peaks, int ior_radius, float ior_strength)
+  {
+    // Create working copy of saliency map for sequential inhibition
+    cv::Mat working_map = map.clone();
+
+    // Pre-compute Gaussian inhibition kernel
+    int kernel_size = ior_radius * 2 + 1;
+    cv::Mat ior_kernel = cv::Mat::zeros(kernel_size, kernel_size, CV_32F);
+
+    // Create Gaussian inhibition disk
+    float sigma = ior_radius / 2.5f; // Standard Gaussian spread
+    float sum = 0.0f;
+    for (int y = 0; y < kernel_size; ++y)
+    {
+      for (int x = 0; x < kernel_size; ++x)
+      {
+        int dx = x - ior_radius;
+        int dy = y - ior_radius;
+        float dist_sq = dx * dx + dy * dy;
+        float gauss = std::exp(-dist_sq / (2.0f * sigma * sigma));
+        ior_kernel.at<float>(y, x) = gauss;
+        sum += gauss;
+      }
+    }
+
+    // Normalize kernel
+    ior_kernel /= sum;
+
+    // Sequential peak detection with IOR
+    for (int i = 0; i < max_peaks; ++i)
+    {
+      // Find global maximum in working map
+      cv::Point max_loc;
+      double max_val;
+      cv::minMaxLoc(working_map, nullptr, &max_val, nullptr, &max_loc);
+
+      // Check if peak exceeds threshold
+      if (max_val < threshold)
+      {
+        break; // No more significant peaks
+      }
+
+      // Add peak to results
+      peaks.push_back(Peak(max_loc, static_cast<float>(max_val)));
+
+      // Apply IOR: inhibit region around detected peak
+      // Create inhibition mask
+      for (int dy = -ior_radius; dy <= ior_radius; ++dy)
+      {
+        for (int dx = -ior_radius; dx <= ior_radius; ++dx)
+        {
+          int x = max_loc.x + dx;
+          int y = max_loc.y + dy;
+
+          // Check bounds
+          if (x >= 0 && x < working_map.cols && y >= 0 && y < working_map.rows)
+          {
+            int kx = dx + ior_radius;
+            int ky = dy + ior_radius;
+            float inhibition = ior_kernel.at<float>(ky, kx) * ior_strength;
+
+            // Apply inhibition: multiply by (1 - inhibition)
+            working_map.at<float>(y, x) *= (1.0f - inhibition);
+          }
+        }
+      }
+    }
+  }
+
+public:
 };
 
 } // namespace core

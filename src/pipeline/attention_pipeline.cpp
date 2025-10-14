@@ -200,11 +200,17 @@ void AttentionPipeline::integrate_features()
 
 void AttentionPipeline::detect_peaks()
 {
-  // Use the built-in peak detection with non-maximum suppression
+  // Use the built-in peak detection
   // Parameters from configuration
-  saliency_.detect_peaks(config_.peak_min_distance, config_.peak_threshold, config_.peak_max_count);
+  saliency_.detect_peaks(config_.peak_min_distance, config_.peak_threshold, config_.peak_max_count, config_.enable_ior,
+                         config_.ior_radius, config_.ior_strength);
 
-  std::cout << "  Peaks detected: " << saliency_.peaks.size() << std::endl;
+  std::cout << "  Peaks detected: " << saliency_.peaks.size();
+  if (config_.enable_ior)
+  {
+    std::cout << " (IOR)";
+  }
+  std::cout << std::endl;
 }
 
 cv::Mat AttentionPipeline::visualize(bool save_individual)

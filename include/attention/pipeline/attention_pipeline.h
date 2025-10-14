@@ -48,6 +48,11 @@ struct PipelineConfig
   float peak_threshold = 0.3f; // Minimum saliency value for peaks
   int peak_max_count = 10;     // Maximum number of peaks to detect
 
+  // Inhibition of Return (IOR) parameters
+  bool enable_ior = false;     // Enable IOR for sequential peak detection
+  int ior_radius = 50;         // Radius of inhibition disk (pixels)
+  float ior_strength = 0.8f;   // Inhibition strength (0-1, 1 = complete suppression)
+
   PipelineConfig()
   {
     // Default weights

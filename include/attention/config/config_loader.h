@@ -28,6 +28,9 @@ namespace config
  *   min_distance: 30
  *   threshold: 0.3
  *   max_count: 10
+ *   enable_ior: true
+ *   ior_radius: 50
+ *   ior_strength: 0.8
  *
  * output:
  *   save_features: true

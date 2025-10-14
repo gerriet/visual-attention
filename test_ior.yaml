@@ -1,0 +1,23 @@
+input:
+  image: "data/test_images/art.jpg"
+
+features:
+  color:
+    weight: 1.0
+  intensity:
+    weight: 1.0
+  symmetry:
+    weight: 1.0
+
+peaks:
+  threshold: 0.3
+  max_count: 10
+  enable_ior: true
+  ior_radius: 60
+  ior_strength: 0.85
+
+output:
+  save_features: false
+  save_saliency: true
+  output_dir: "results/"
+  display: false
