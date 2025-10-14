@@ -221,20 +221,55 @@ cv::Mat visualize_scan_path(const core::SaliencyMap& saliency, const cv::Mat& or
   }
 
   // Draw scan path: arrows connecting peaks in order
-  const int arrow_thickness = 2;
-  const double arrow_tip_length = 0.2;
+  const int circle_radius = 12;
+  const int arrow_thickness = 1;
+  const double arrow_tip_length = 0.1;
 
+  // First pass: draw all arrows (so they appear behind circles)
+  for (size_t i = 0; i + 1 < saliency.peaks.size(); ++i)
+  {
+    const auto& peak = saliency.peaks[i];
+    const auto& next_peak = saliency.peaks[i + 1];
+
+    // Calculate direction vector from current to next peak
+    cv::Point2f direction(next_peak.location.x - peak.location.x, next_peak.location.y - peak.location.y);
+    float length = std::sqrt(direction.x * direction.x + direction.y * direction.y);
+
+    if (length > 0)
+    {
+      // Normalize direction
+      direction.x /= length;
+      direction.y /= length;
+
+      // Start arrow at edge of current circle
+      cv::Point arrow_start(peak.location.x + static_cast<int>(direction.x * circle_radius),
+                            peak.location.y + static_cast<int>(direction.y * circle_radius));
+
+      // End arrow at edge of next circle
+      cv::Point arrow_end(next_peak.location.x - static_cast<int>(direction.x * circle_radius),
+                          next_peak.location.y - static_cast<int>(direction.y * circle_radius));
+
+      // Draw arrow with white outline for visibility
+      cv::arrowedLine(vis, arrow_start, arrow_end, cv::Scalar(255, 255, 255), arrow_thickness + 2, cv::LINE_AA, 0,
+                      arrow_tip_length);
+      // Draw arrow with cyan color
+      cv::arrowedLine(vis, arrow_start, arrow_end, cv::Scalar(255, 255, 0), arrow_thickness, cv::LINE_AA, 0,
+                      arrow_tip_length);
+    }
+  }
+
+  // Second pass: draw circles and numbers on top of arrows
   for (size_t i = 0; i < saliency.peaks.size(); ++i)
   {
     const auto& peak = saliency.peaks[i];
 
     // Draw circle at peak location
     // White outer circle
-    cv::circle(vis, peak.location, 12, cv::Scalar(255, 255, 255), 2);
+    cv::circle(vis, peak.location, circle_radius, cv::Scalar(255, 255, 255), 2);
     // Black inner circle
-    cv::circle(vis, peak.location, 10, cv::Scalar(0, 0, 0), 2);
+    cv::circle(vis, peak.location, circle_radius - 2, cv::Scalar(0, 0, 0), 2);
     // Yellow fill
-    cv::circle(vis, peak.location, 8, cv::Scalar(0, 255, 255), -1);
+    cv::circle(vis, peak.location, circle_radius - 4, cv::Scalar(0, 255, 255), -1);
 
     // Draw sequence number
     std::string number = std::to_string(i + 1);
@@ -242,18 +277,6 @@ cv::Mat visualize_scan_path(const core::SaliencyMap& saliency, const cv::Mat& or
     cv::Size text_size = cv::getTextSize(number, cv::FONT_HERSHEY_SIMPLEX, 0.5, 2, &baseline);
     cv::Point text_pos(peak.location.x - text_size.width / 2, peak.location.y + text_size.height / 2);
     cv::putText(vis, number, text_pos, cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 0), 2);
-
-    // Draw arrow to next peak
-    if (i + 1 < saliency.peaks.size())
-    {
-      const auto& next_peak = saliency.peaks[i + 1];
-      // Draw arrow with white outline for visibility
-      cv::arrowedLine(vis, peak.location, next_peak.location, cv::Scalar(255, 255, 255), arrow_thickness + 2,
-                      cv::LINE_AA, 0, arrow_tip_length);
-      // Draw arrow with cyan color
-      cv::arrowedLine(vis, peak.location, next_peak.location, cv::Scalar(255, 255, 0), arrow_thickness, cv::LINE_AA, 0,
-                      arrow_tip_length);
-    }
   }
 
   // Display
