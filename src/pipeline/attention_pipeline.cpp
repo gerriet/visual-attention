@@ -1,5 +1,6 @@
 #include "attention/pipeline/attention_pipeline.h"
 #include "attention/features/color_feature.h"
+#include "attention/features/eccentricity_feature.h"
 #include "attention/features/feature_extractor.h"
 #include "attention/features/intensity_feature.h"
 #include "attention/features/orientation_feature.h"
@@ -125,6 +126,19 @@ void AttentionPipeline::extract_features()
 
   // Add orientation feature (always)
   extractors.push_back(std::make_unique<features::OrientationFeature>());
+
+  // Add eccentricity feature (always)
+  // Use quarter resolution for large images for performance
+  features::EccentricityFeature::Config ecc_config;
+  if (frame_.width() > 640 || frame_.height() > 640)
+  {
+    ecc_config.compute_at_scale = 2; // Quarter resolution for large images
+  }
+  else
+  {
+    ecc_config.compute_at_scale = 0; // Full resolution for small images
+  }
+  extractors.push_back(std::make_unique<features::EccentricityFeature>(ecc_config));
 
   // Add symmetry feature (always)
   // Use quarter resolution for large images (>640px in any dimension) for performance
