@@ -1,5 +1,6 @@
 #pragma once
 
+#include "attention/core/constants.h"
 #include <algorithm>
 #include <opencv2/opencv.hpp>
 #include <vector>
@@ -92,7 +93,7 @@ struct SaliencyMap
   {
     if (!map.empty())
     {
-      cv::normalize(map, map, 0.0, 1.0, cv::NORM_MINMAX);
+      cv::normalize(map, map, 0.0f, 1.0f, cv::NORM_MINMAX);
     }
   }
 
@@ -232,7 +233,7 @@ private:
     cv::Mat ior_kernel = cv::Mat::zeros(kernel_size, kernel_size, CV_32F);
 
     // Create Gaussian inhibition disk
-    float sigma = ior_radius / 2.5f; // Standard Gaussian spread
+    float sigma = ior_radius / constants::IOR_SIGMA_FACTOR;  // Standard Gaussian spread
     float sum = 0.0f;
     for (int y = 0; y < kernel_size; ++y)
     {

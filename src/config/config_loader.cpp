@@ -26,22 +26,19 @@ ConfigLoader::Config ConfigLoader::load(const std::string& yaml_path)
     // Load feature weights
     if (yaml["features"])
     {
-      YAML::Node features = yaml["features"];
-      load_features(&features, config.pipeline);
+      load_features(yaml["features"], config.pipeline);
     }
 
     // Load peak detection parameters
     if (yaml["peaks"])
     {
-      YAML::Node peaks = yaml["peaks"];
-      load_peaks(&peaks, config.pipeline);
+      load_peaks(yaml["peaks"], config.pipeline);
     }
 
     // Load output configuration
     if (yaml["output"])
     {
-      YAML::Node output = yaml["output"];
-      load_output(&output, config);
+      load_output(yaml["output"], config);
     }
 
     return config;
@@ -64,9 +61,8 @@ ConfigLoader::Config ConfigLoader::create_default()
   return config;
 }
 
-void ConfigLoader::load_features(const void* yaml_node_ptr, pipeline::PipelineConfig& config)
+void ConfigLoader::load_features(const YAML::Node& features, pipeline::PipelineConfig& config)
 {
-  const YAML::Node& features = *static_cast<const YAML::Node*>(yaml_node_ptr);
 
   // Load individual feature weights
   if (features["color"] && features["color"]["weight"])
@@ -85,9 +81,8 @@ void ConfigLoader::load_features(const void* yaml_node_ptr, pipeline::PipelineCo
   }
 }
 
-void ConfigLoader::load_peaks(const void* yaml_node_ptr, pipeline::PipelineConfig& config)
+void ConfigLoader::load_peaks(const YAML::Node& peaks, pipeline::PipelineConfig& config)
 {
-  const YAML::Node& peaks = *static_cast<const YAML::Node*>(yaml_node_ptr);
 
   if (peaks["min_distance"])
   {
@@ -121,9 +116,8 @@ void ConfigLoader::load_peaks(const void* yaml_node_ptr, pipeline::PipelineConfi
   }
 }
 
-void ConfigLoader::load_output(const void* yaml_node_ptr, Config& config)
+void ConfigLoader::load_output(const YAML::Node& output, Config& config)
 {
-  const YAML::Node& output = *static_cast<const YAML::Node*>(yaml_node_ptr);
 
   if (output["save_features"])
   {

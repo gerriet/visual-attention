@@ -73,10 +73,10 @@ void ColorFeature::compute_opponent_colors(const cv::Mat& rgb, cv::Mat& rg, cv::
   cv::minMaxLoc(rg, &min_rg, &max_rg);
   cv::minMaxLoc(by, &min_by, &max_by);
 
-  // Only normalize if there's actually variation
+  // Only normalize if there's actually variation (use float literals)
   if (max_rg > min_rg)
   {
-    cv::normalize(rg, rg, 0.0, 1.0, cv::NORM_MINMAX);
+    cv::normalize(rg, rg, 0.0f, 1.0f, cv::NORM_MINMAX);
   }
   else
   {
@@ -85,7 +85,7 @@ void ColorFeature::compute_opponent_colors(const cv::Mat& rgb, cv::Mat& rg, cv::
 
   if (max_by > min_by)
   {
-    cv::normalize(by, by, 0.0, 1.0, cv::NORM_MINMAX);
+    cv::normalize(by, by, 0.0f, 1.0f, cv::NORM_MINMAX);
   }
   else
   {
@@ -166,7 +166,7 @@ cv::Mat ColorFeature::compute_center_surround(const std::vector<cv::Mat>& pyrami
   // Final normalization
   if (!accumulated.empty())
   {
-    cv::normalize(accumulated, accumulated, 0.0, 1.0, cv::NORM_MINMAX);
+    cv::normalize(accumulated, accumulated, 0.0f, 1.0f, cv::NORM_MINMAX);
   }
 
   return accumulated;
@@ -187,7 +187,7 @@ cv::Mat ColorFeature::normalize_and_resize(const cv::Mat& feature, const cv::Siz
   }
 
   // Final normalization
-  cv::normalize(result, result, 0.0, 1.0, cv::NORM_MINMAX);
+  cv::normalize(result, result, 0.0f, 1.0f, cv::NORM_MINMAX);
 
   return result;
 }

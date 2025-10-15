@@ -55,7 +55,7 @@ struct FeatureMap
   {
     if (!data.empty())
     {
-      cv::normalize(data, data, 0.0, 1.0, cv::NORM_MINMAX);
+      cv::normalize(data, data, 0.0f, 1.0f, cv::NORM_MINMAX);
     }
   }
 };

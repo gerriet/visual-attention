@@ -103,7 +103,7 @@ cv::Mat IntensityFeature::compute_center_surround(const std::vector<cv::Mat>& py
   // Final normalization
   if (!accumulated.empty())
   {
-    cv::normalize(accumulated, accumulated, 0.0, 1.0, cv::NORM_MINMAX);
+    cv::normalize(accumulated, accumulated, 0.0f, 1.0f, cv::NORM_MINMAX);
   }
 
   return accumulated;
@@ -124,7 +124,7 @@ cv::Mat IntensityFeature::normalize_and_resize(const cv::Mat& feature, const cv:
   }
 
   // Final normalization
-  cv::normalize(result, result, 0.0, 1.0, cv::NORM_MINMAX);
+  cv::normalize(result, result, 0.0f, 1.0f, cv::NORM_MINMAX);
 
   return result;
 }

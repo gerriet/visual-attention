@@ -43,12 +43,12 @@ void process_batch(const std::string& directory, const attention::pipeline::Pipe
 
   attention::pipeline::AttentionPipeline pipeline(config);
 
-  // Statistics tracking
+  // Statistics tracking with overflow prevention
   struct Stats
   {
     long min = LONG_MAX;
     long max = 0;
-    long sum = 0;
+    double sum = 0.0;  // Use double to prevent overflow
     int count = 0;
 
     void add(long value)
@@ -57,11 +57,11 @@ void process_batch(const std::string& directory, const attention::pipeline::Pipe
         min = value;
       if (value > max)
         max = value;
-      sum += value;
+      sum += static_cast<double>(value);
       count++;
     }
 
-    double mean() const { return count > 0 ? static_cast<double>(sum) / count : 0.0; }
+    double mean() const { return count > 0 ? sum / count : 0.0; }
   };
 
   Stats pyramid_stats, integration_stats, peak_stats, total_stats;

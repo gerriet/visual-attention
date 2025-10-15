@@ -220,6 +220,19 @@ void AttentionPipeline::integrate_features()
 
   for (const auto& feature : features_)
   {
+    // Validate feature size matches frame size
+    if (feature.data.empty())
+    {
+      throw std::runtime_error("Feature '" + feature.name + "' has empty data");
+    }
+
+    if (feature.data.size() != frame_.size())
+    {
+      throw std::runtime_error("Feature '" + feature.name + "' size mismatch: expected " +
+                               std::to_string(frame_.width()) + "x" + std::to_string(frame_.height()) +
+                               " but got " + std::to_string(feature.data.cols) + "x" + std::to_string(feature.data.rows));
+    }
+
     // Get weight from config (default to 1.0 if not configured)
     float weight = 1.0f;
     auto it = config_.feature_weights.find(feature.name);
@@ -233,7 +246,7 @@ void AttentionPipeline::integrate_features()
   }
 
   // Normalize to [0, 1]
-  cv::normalize(integrated, integrated, 0.0, 1.0, cv::NORM_MINMAX);
+  cv::normalize(integrated, integrated, 0.0f, 1.0f, cv::NORM_MINMAX);
 
   saliency_ = core::SaliencyMap(integrated);
 }

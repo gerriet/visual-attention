@@ -1,4 +1,5 @@
 #include "attention/visualization/visualizer.h"
+#include "attention/core/constants.h"
 #include <iostream>
 
 namespace attention
@@ -69,8 +70,8 @@ cv::Mat visualize_saliency_map(const core::SaliencyMap& saliency, const cv::Mat&
       cv::cvtColor(original_resized, original_resized, cv::COLOR_GRAY2BGR);
     }
 
-    // Alpha blend: 60% heatmap, 40% original
-    cv::addWeighted(heatmap, 0.6, original_resized, 0.4, 0, vis);
+    // Alpha blend heatmap and original
+    cv::addWeighted(heatmap, constants::HEATMAP_ALPHA, original_resized, constants::ORIGINAL_ALPHA, 0, vis);
   }
   else
   {

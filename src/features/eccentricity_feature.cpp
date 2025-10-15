@@ -1,6 +1,7 @@
 #include "attention/features/eccentricity_feature.h"
 #include <iostream>
 #include <map>
+#include <set>
 
 namespace attention
 {
@@ -18,7 +19,6 @@ core::FeatureMap EccentricityFeature::extract(const core::Frame& frame) const
     throw std::runtime_error("EccentricityFeature: Cannot extract from empty frame");
   }
 
-  // C-2 FIX: Validate pyramid state and bounds check scale index
   if (!frame.pyramids_computed || frame.gray_pyramid.empty())
   {
     throw std::runtime_error("EccentricityFeature: Grayscale pyramid not computed");
@@ -41,7 +41,7 @@ core::FeatureMap EccentricityFeature::extract(const core::Frame& frame) const
   // Compute gradient magnitude
   cv::Mat edges;
   cv::magnitude(grad_x, grad_y, edges);
-  cv::normalize(edges, edges, 0.0, 1.0, cv::NORM_MINMAX);
+  cv::normalize(edges, edges, 0.0f, 1.0f, cv::NORM_MINMAX);
 
   // Segment the image
   cv::Mat labels = segment_image(gray, edges);
@@ -50,26 +50,25 @@ core::FeatureMap EccentricityFeature::extract(const core::Frame& frame) const
   int image_area = gray.rows * gray.cols;
   std::map<int, cv::Moments> valid_segments = filter_segments(labels, image_area);
 
-  // Create eccentricity map
-  cv::Mat eccentricity_map = cv::Mat::zeros(gray.size(), CV_32F);
-
-  // For each valid segment, compute eccentricity and fill the region
+  // Optimize segment iteration from O(N*M) to O(N+M)
+  // Pre-compute eccentricity for all valid segments
+  std::map<int, float> label_to_ecc;
   for (const auto& pair : valid_segments)
   {
-    int label = pair.first;
-    const cv::Moments& m = pair.second;
+    label_to_ecc[pair.first] = compute_eccentricity(pair.second);
+  }
 
-    float ecc = compute_eccentricity(m);
-
-    // Fill all pixels belonging to this segment with eccentricity value
-    for (int y = 0; y < labels.rows; ++y)
+  // Create eccentricity map - single pass over pixels
+  cv::Mat eccentricity_map = cv::Mat::zeros(gray.size(), CV_32F);
+  for (int y = 0; y < labels.rows; ++y)
+  {
+    for (int x = 0; x < labels.cols; ++x)
     {
-      for (int x = 0; x < labels.cols; ++x)
+      int label = labels.at<int>(y, x);
+      auto it = label_to_ecc.find(label);
+      if (it != label_to_ecc.end())
       {
-        if (labels.at<int>(y, x) == label)
-        {
-          eccentricity_map.at<float>(y, x) = ecc;
-        }
+        eccentricity_map.at<float>(y, x) = it->second;
       }
     }
   }
@@ -86,7 +85,7 @@ core::FeatureMap EccentricityFeature::extract(const core::Frame& frame) const
   }
 
   // Normalize to [0, 1]
-  cv::normalize(result, result, 0.0, 1.0, cv::NORM_MINMAX);
+  cv::normalize(result, result, 0.0f, 1.0f, cv::NORM_MINMAX);
 
   // Create feature map
   core::FeatureMap feature;
@@ -133,6 +132,29 @@ cv::Mat EccentricityFeature::segment_image(const cv::Mat& gray, const cv::Mat& e
   cv::cvtColor(gray_8u, gray_bgr, cv::COLOR_GRAY2BGR);
   cv::watershed(gray_bgr, markers);
 
+  // Collect valid labels first, then reassign boundaries
+  std::set<int> valid_labels;
+  for (int y = 0; y < markers.rows; ++y)
+  {
+    for (int x = 0; x < markers.cols; ++x)
+    {
+      int label = markers.at<int>(y, x);
+      if (label > 0)
+      {
+        valid_labels.insert(label);
+      }
+    }
+  }
+
+  // If no valid labels, return empty markers (fallback)
+  if (valid_labels.empty())
+  {
+    return cv::Mat::zeros(markers.size(), CV_32S);
+  }
+
+  // Use first valid label as fallback
+  int fallback_label = *valid_labels.begin();
+
   // Watershed sets boundaries to -1, we need to reassign those to nearest segment
   for (int y = 0; y < markers.rows; ++y)
   {
@@ -161,7 +183,7 @@ cv::Mat EccentricityFeature::segment_image(const cv::Mat& gray, const cv::Mat& e
         }
         if (!found)
         {
-          markers.at<int>(y, x) = 1; // Default to label 1 if no neighbor found
+          markers.at<int>(y, x) = fallback_label; // Use valid label as fallback
         }
       }
     }
@@ -172,7 +194,7 @@ cv::Mat EccentricityFeature::segment_image(const cv::Mat& gray, const cv::Mat& e
 
 float EccentricityFeature::compute_eccentricity(const cv::Moments& m) const
 {
-  // C-3 FIX: Guard against zero or near-zero area
+  // Guard against zero or near-zero area
   if (m.m00 < 1e-10)
   {
     return 0.0f;

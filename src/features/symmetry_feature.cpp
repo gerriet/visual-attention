@@ -1,4 +1,5 @@
 #include "attention/features/symmetry_feature.h"
+#include "attention/core/constants.h"
 #include <cmath>
 #include <stdexcept>
 
@@ -16,6 +17,11 @@ core::FeatureMap SymmetryFeature::extract(const core::Frame& frame) const
     throw std::runtime_error("SymmetryFeature: Cannot extract from empty frame");
   }
 
+  if (!frame.pyramids_computed || frame.gray_pyramid.empty())
+  {
+    throw std::runtime_error("SymmetryFeature: Grayscale pyramid not computed");
+  }
+
   // Ensure Gabor pyramids are computed with sufficient orientations
   const_cast<core::Frame&>(frame).compute_gabor_pyramids(frame.gray_pyramid.size(), config_.num_orientations,
                                                           config_.wavelength, config_.bandwidth);
@@ -25,8 +31,12 @@ core::FeatureMap SymmetryFeature::extract(const core::Frame& frame) const
     throw std::runtime_error("SymmetryFeature: Failed to compute Gabor pyramids");
   }
 
-  // Select the scale to compute at
+  // Select the scale to compute at with bounds checking
   int scale_index = std::min(config_.compute_at_scale, static_cast<int>(frame.gabor_pyramids.size()) - 1);
+  if (scale_index < 0)
+  {
+    throw std::runtime_error("SymmetryFeature: Invalid pyramid configuration");
+  }
   const auto& gabor_level = frame.gabor_pyramids[scale_index];
 
   if (gabor_level.empty())
@@ -39,7 +49,7 @@ core::FeatureMap SymmetryFeature::extract(const core::Frame& frame) const
 
   // Resize to original frame size if needed
   cv::Mat result;
-  if (config_.compute_at_scale > 0)
+  if (scale_index > 0)
   {
     cv::resize(symmetry_map, result, frame.size(), 0, 0, cv::INTER_LINEAR);
   }
@@ -49,7 +59,7 @@ core::FeatureMap SymmetryFeature::extract(const core::Frame& frame) const
   }
 
   // Normalize to [0, 1]
-  cv::normalize(result, result, 0.0, 1.0, cv::NORM_MINMAX);
+  cv::normalize(result, result, 0.0f, 1.0f, cv::NORM_MINMAX);
 
   return core::FeatureMap("symmetry", result, 1.0f);
 }
@@ -66,7 +76,8 @@ cv::Mat SymmetryFeature::compute_gabor_symmetry(const std::vector<cv::Mat>& gabo
   cv::Mat radial = compute_radial_symmetry(gabor_responses);
 
   // Combine both types of symmetry (weighted sum)
-  cv::Mat combined = 0.6f * bilateral + 0.4f * radial;
+  cv::Mat combined = constants::BILATERAL_SYMMETRY_WEIGHT * bilateral +
+                      constants::RADIAL_SYMMETRY_WEIGHT * radial;
 
   // Apply Gaussian smoothing to reduce noise
   cv::GaussianBlur(combined, combined, cv::Size(5, 5), 1.0);
@@ -151,14 +162,14 @@ cv::Mat SymmetryFeature::compute_radial_symmetry(const std::vector<cv::Mat>& gab
 
   // Normalize variance
   cv::Mat variance_norm;
-  cv::normalize(variance, variance_norm, 0.0, 1.0, cv::NORM_MINMAX);
+  cv::normalize(variance, variance_norm, 0.0f, 1.0f, cv::NORM_MINMAX);
 
   // Compute symmetry score
   cv::Mat isotropy = 1.0f - variance_norm;
 
   // Weight by mean response (only consider areas with strong Gabor responses)
   cv::Mat mean_norm;
-  cv::normalize(mean_response, mean_norm, 0.0, 1.0, cv::NORM_MINMAX);
+  cv::normalize(mean_response, mean_norm, 0.0f, 1.0f, cv::NORM_MINMAX);
 
   cv::multiply(isotropy, mean_norm, symmetry);
 

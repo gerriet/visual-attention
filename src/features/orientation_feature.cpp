@@ -84,7 +84,7 @@ core::FeatureMap OrientationFeature::extract(const core::Frame& frame) const
   }
 
   // Normalize to [0, 1]
-  cv::normalize(combined, combined, 0.0, 1.0, cv::NORM_MINMAX);
+  cv::normalize(combined, combined, 0.0f, 1.0f, cv::NORM_MINMAX);
 
   // Create feature map
   core::FeatureMap feature;

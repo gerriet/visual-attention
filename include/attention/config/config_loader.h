@@ -3,6 +3,12 @@
 #include "attention/pipeline/attention_pipeline.h"
 #include <string>
 
+// Forward declare YAML::Node instead of using void*
+namespace YAML
+{
+class Node;
+}
+
 namespace attention
 {
 namespace config
@@ -75,9 +81,9 @@ class ConfigLoader
   static Config create_default();
 
  private:
-  static void load_features(const void* yaml_node, pipeline::PipelineConfig& config);
-  static void load_peaks(const void* yaml_node, pipeline::PipelineConfig& config);
-  static void load_output(const void* yaml_node, Config& config);
+  static void load_features(const YAML::Node& yaml_node, pipeline::PipelineConfig& config);
+  static void load_peaks(const YAML::Node& yaml_node, pipeline::PipelineConfig& config);
+  static void load_output(const YAML::Node& yaml_node, Config& config);
 };
 
 } // namespace config

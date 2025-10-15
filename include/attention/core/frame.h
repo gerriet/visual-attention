@@ -69,59 +69,7 @@ struct Frame
    * Compute and cache multi-scale pyramids.
    * @param levels Number of pyramid levels to compute
    */
-  void compute_pyramids(int levels)
-  {
-    if (pyramids_computed)
-      return; // Already computed
-
-    if (image.empty())
-      return;
-
-    // Compute RGB pyramid (if color image)
-    if (channels() == 3)
-    {
-      cv::Mat rgb_float;
-      image.convertTo(rgb_float, CV_32F, 1.0 / 255.0);
-      rgb_pyramid.clear();
-      rgb_pyramid.push_back(rgb_float.clone());
-
-      cv::Mat current = rgb_float;
-      for (int i = 1; i < levels; ++i)
-      {
-        cv::Mat downsampled;
-        cv::pyrDown(current, downsampled);
-        rgb_pyramid.push_back(downsampled);
-        current = downsampled;
-      }
-    }
-
-    // Compute grayscale pyramid (always)
-    cv::Mat gray;
-    if (channels() == 1)
-    {
-      image.convertTo(gray, CV_32F, 1.0 / 255.0);
-    }
-    else
-    {
-      cv::Mat gray_temp;
-      cv::cvtColor(image, gray_temp, cv::COLOR_BGR2GRAY);
-      gray_temp.convertTo(gray, CV_32F, 1.0 / 255.0);
-    }
-
-    gray_pyramid.clear();
-    gray_pyramid.push_back(gray.clone());
-
-    cv::Mat current = gray;
-    for (int i = 1; i < levels; ++i)
-    {
-      cv::Mat downsampled;
-      cv::pyrDown(current, downsampled);
-      gray_pyramid.push_back(downsampled);
-      current = downsampled;
-    }
-
-    pyramids_computed = true;
-  }
+  void compute_pyramids(int levels);
 
   /**
    * Compute and cache Gabor filter pyramids.
