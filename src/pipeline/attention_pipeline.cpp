@@ -8,6 +8,7 @@
 #include "attention/visualization/visualizer.h"
 #include <algorithm>
 #include <chrono>
+#include <iomanip>
 #include <iostream>
 #include <memory>
 #include <stdexcept>
@@ -85,14 +86,26 @@ void AttentionPipeline::process()
   timing_.peak_detection_ms =
       std::chrono::duration_cast<std::chrono::milliseconds>(t_peaks_end - t_peaks_start).count();
 
-  // Print timing breakdown
-  std::cout << "    Pyramid computation: " << timing_.pyramid_ms << " ms" << std::endl;
+  // Print timing breakdown with aligned columns
+  std::cout << "    Pyramid computation:     " << timing_.pyramid_ms << " ms" << std::endl;
+
+  // Find longest feature name for alignment
+  size_t max_name_length = 0;
   for (const auto& pair : timing_.feature_ms)
   {
-    std::cout << "    Feature '" << pair.first << "': " << pair.second << " ms" << std::endl;
+    max_name_length = std::max(max_name_length, pair.first.length());
   }
-  std::cout << "    Integration: " << timing_.integration_ms << " ms" << std::endl;
-  std::cout << "    Peak detection: " << timing_.peak_detection_ms << " ms" << std::endl;
+
+  for (const auto& pair : timing_.feature_ms)
+  {
+    // Calculate padding needed after feature name
+    size_t padding = max_name_length - pair.first.length();
+    std::string spaces(padding, ' ');
+    std::cout << "    Feature '" << pair.first << "'" << spaces << ": "
+              << pair.second << " ms" << std::endl;
+  }
+  std::cout << "    Integration:             " << timing_.integration_ms << " ms" << std::endl;
+  std::cout << "    Peak detection:          " << timing_.peak_detection_ms << " ms" << std::endl;
 
   processed_ = true;
 }

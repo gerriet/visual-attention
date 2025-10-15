@@ -176,9 +176,19 @@ void process_batch(const std::string& directory, const attention::pipeline::Pipe
     std::cout << "=======================================================" << std::endl;
     std::cout << std::fixed << std::setprecision(1);
 
-    auto print_stats = [](const std::string& label, const Stats& stats)
+    // Find longest label for alignment
+    size_t max_label_length = 0;
+    max_label_length = std::max(max_label_length, std::string("Pyramid:").length());
+    max_label_length = std::max(max_label_length, std::string("Integration:").length());
+    max_label_length = std::max(max_label_length, std::string("Peak detection:").length());
+    for (const auto& pair : feature_stats)
     {
-      std::cout << std::left << std::setw(20) << label << "  min: " << std::setw(6) << std::right << stats.min
+      max_label_length = std::max(max_label_length, std::string("Feature '" + pair.first + "':").length());
+    }
+
+    auto print_stats = [max_label_length](const std::string& label, const Stats& stats)
+    {
+      std::cout << std::left << std::setw(max_label_length) << label << "  min: " << std::setw(6) << std::right << stats.min
                 << "  max: " << std::setw(6) << stats.max << "  mean: " << std::setw(7) << stats.mean() << std::endl;
     };
 
