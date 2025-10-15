@@ -154,7 +154,7 @@ void AttentionPipeline::extract_features()
   extractors.push_back(std::make_unique<features::EccentricityFeature>(ecc_config));
 
   // Add symmetry feature (always)
-  // Use coarser scale for global symmetry detection
+  // Use very coarse scale for global symmetry detection to improve performance
   // Use 12 orientations for better symmetry detection (vs 4 for basic orientation feature)
   features::SymmetryFeature::Config sym_config;
   sym_config.num_orientations = 12;
@@ -162,11 +162,11 @@ void AttentionPipeline::extract_features()
   sym_config.bandwidth = 1.0;
   if (frame_.width() > 640 || frame_.height() > 640)
   {
-    sym_config.compute_at_scale = 3; // 1/8 resolution for large images (coarser scale)
+    sym_config.compute_at_scale = 4; // 1/16 resolution for large images (very coarse for performance)
   }
   else
   {
-    sym_config.compute_at_scale = 1; // Half resolution for small images
+    sym_config.compute_at_scale = 2; // Quarter resolution for small images
   }
   extractors.push_back(std::make_unique<features::SymmetryFeature>(sym_config));
 

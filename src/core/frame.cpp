@@ -7,14 +7,41 @@ namespace core
 
 void Frame::compute_gabor_pyramids(int levels, int num_orientations, double wavelength, double bandwidth)
 {
-  if (gabor_pyramids_computed && num_gabor_orientations == num_orientations)
-    return; // Already computed with same parameters
+  // If already computed with same or more orientations, just return
+  if (gabor_pyramids_computed && num_gabor_orientations >= num_orientations)
+    return; // Already have enough orientations computed
 
   if (image.empty() || !pyramids_computed)
   {
     // Need grayscale pyramid first
     if (!pyramids_computed)
       compute_pyramids(levels);
+  }
+
+  // Only recompute if we need more orientations than before
+  if (gabor_pyramids_computed && num_gabor_orientations < num_orientations)
+  {
+    // Extend existing pyramids with additional orientations
+    int old_orientations = num_gabor_orientations;
+    num_gabor_orientations = num_orientations;
+
+    for (int level = 0; level < levels && level < static_cast<int>(gray_pyramid.size()); ++level)
+    {
+      gabor_pyramids[level].resize(num_orientations);
+
+      // Only compute new orientations
+      for (int orient = old_orientations; orient < num_orientations; ++orient)
+      {
+        const cv::Mat& source = gray_pyramid[level];
+        double theta = M_PI * orient / num_orientations;
+        cv::Mat gabor_kernel = create_gabor_kernel(wavelength, theta, bandwidth);
+        cv::Mat gabor_response;
+        cv::filter2D(source, gabor_response, CV_32F, gabor_kernel);
+        gabor_response = cv::abs(gabor_response);
+        gabor_pyramids[level][orient] = gabor_response;
+      }
+    }
+    return;
   }
 
   num_gabor_orientations = num_orientations;
