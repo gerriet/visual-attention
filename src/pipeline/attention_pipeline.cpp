@@ -2,6 +2,7 @@
 #include "attention/features/color_feature.h"
 #include "attention/features/feature_extractor.h"
 #include "attention/features/intensity_feature.h"
+#include "attention/features/orientation_feature.h"
 #include "attention/features/symmetry_feature.h"
 #include "attention/visualization/visualizer.h"
 #include <algorithm>
@@ -121,6 +122,9 @@ void AttentionPipeline::extract_features()
 
   // Add intensity feature (always)
   extractors.push_back(std::make_unique<features::IntensityFeature>());
+
+  // Add orientation feature (always)
+  extractors.push_back(std::make_unique<features::OrientationFeature>());
 
   // Add symmetry feature (always)
   // Use quarter resolution for large images (>640px in any dimension) for performance

@@ -58,6 +58,7 @@ struct PipelineConfig
     // Default weights
     feature_weights["color"] = 1.0f;
     feature_weights["intensity"] = 1.0f;
+    feature_weights["orientation"] = 1.0f;
     feature_weights["symmetry"] = 1.0f;
   }
 };

@@ -25,6 +25,7 @@ add_executable(attention
     src/pipeline/attention_pipeline.cpp
     src/features/color_feature.cpp
     src/features/intensity_feature.cpp
+    src/features/orientation_feature.cpp
     src/features/symmetry_feature.cpp
     src/config/config_loader.cpp
     src/visualization/visualizer.cpp
