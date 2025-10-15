@@ -12,23 +12,21 @@ namespace features
 {
 
 /**
- * SymmetryFeature detects radial symmetry in images using gradient voting.
+ * SymmetryFeature detects radial and bilateral symmetry using Gabor filter responses.
  *
- * This feature implements the approach from Reisfeld, Wolfson & Yeshurun (1995).
- * For each edge pixel, the gradient direction votes for potential symmetry centers.
- * Regions with converging gradients (faces, circles, symmetric objects) receive
- * high votes and thus high saliency.
+ * This feature uses precomputed Gabor pyramids to detect symmetry patterns by
+ * analyzing orientation relationships. Symmetric regions show characteristic
+ * patterns in Gabor responses across different orientations.
  *
  * The algorithm:
- * 1. Compute gradients at multiple scales
- * 2. For each edge pixel with gradient (gx, gy):
- *    - Project along gradient direction to find candidate centers
- *    - Vote with weight = magnitude * distance_falloff
- * 3. Accumulate votes across scales
+ * 1. Use precomputed Gabor pyramids from Frame (multiple orientations and scales)
+ * 2. For each location, analyze Gabor response patterns across orientations
+ * 3. Detect symmetry by finding opposing/complementary orientation pairs
+ * 4. Accumulate symmetry evidence across scales
  *
- * References:
- * - Reisfeld et al. (1995): Context-free attentional operators
- * - Original dissertation symmetry feature
+ * This approach leverages the existing Gabor computations from the orientation
+ * feature, making it more efficient and consistent with the dissertation's
+ * original Gabor-based symmetry detection.
  */
 class SymmetryFeature : public FeatureExtractor
 {
@@ -38,14 +36,14 @@ class SymmetryFeature : public FeatureExtractor
    */
   struct Config
   {
-    int pyramid_levels;       // Number of pyramid levels (0 = auto-detect)
-    float gradient_threshold; // Minimum gradient magnitude (fraction of max, 0-1)
-    float distance_alpha;     // Distance falloff exponent (1.0 = 1/d, 2.0 = 1/d²)
-    int max_radius_factor;    // Max search radius = min(w,h) / factor
-    int compute_at_scale;     // Pyramid scale to compute at (0=full res, 1=half, 2=quarter, etc.)
+    int num_orientations;         // Number of Gabor orientations to use
+    double wavelength;            // Wavelength for Gabor filters
+    double bandwidth;             // Bandwidth parameter
+    float response_threshold;     // Minimum Gabor response threshold
+    int compute_at_scale;         // Pyramid scale to compute at (0=full res, 1=half, 2=quarter, etc.)
 
     Config()
-      : pyramid_levels(0), gradient_threshold(0.1f), distance_alpha(1.0f), max_radius_factor(4), compute_at_scale(0)
+      : num_orientations(12), wavelength(4.0), bandwidth(1.0), response_threshold(0.1f), compute_at_scale(0)
     {
     }
   };
@@ -68,14 +66,27 @@ class SymmetryFeature : public FeatureExtractor
  private:
   Config config_;
 
-  // Compute radial symmetry contribution map for a single scale
-  cv::Mat compute_radial_symmetry(const cv::Mat& image) const;
+  /**
+   * Compute symmetry from Gabor responses at a single scale.
+   * Analyzes orientation patterns to detect symmetric regions.
+   * @param gabor_responses Vector of Gabor filter responses (one per orientation)
+   * @return Symmetry map
+   */
+  cv::Mat compute_gabor_symmetry(const std::vector<cv::Mat>& gabor_responses) const;
 
-  // Combine multi-scale symmetry
-  cv::Mat combine_scales(const std::vector<cv::Mat>& symmetry_maps) const;
+  /**
+   * Compute bilateral symmetry by comparing opposite orientations.
+   * @param gabor_responses Vector of Gabor filter responses
+   * @return Bilateral symmetry map
+   */
+  cv::Mat compute_bilateral_symmetry(const std::vector<cv::Mat>& gabor_responses) const;
 
-  // Normalize and resize to target size
-  cv::Mat normalize_and_resize(const cv::Mat& feature, const cv::Size& target_size) const;
+  /**
+   * Compute radial symmetry by analyzing all orientations.
+   * @param gabor_responses Vector of Gabor filter responses
+   * @return Radial symmetry map
+   */
+  cv::Mat compute_radial_symmetry(const std::vector<cv::Mat>& gabor_responses) const;
 };
 
 } // namespace features
