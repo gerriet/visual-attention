@@ -125,6 +125,12 @@ int AttentionPipeline::compute_pyramid_levels() const
 
 void AttentionPipeline::extract_features()
 {
+  // Pre-compute Gabor pyramids BEFORE parallel extraction to avoid race conditions
+  // Maximum orientations needed: 12 (for symmetry feature)
+  // This ensures thread-safe access during parallel feature extraction
+  int pyramid_levels = compute_pyramid_levels();
+  frame_.compute_gabor_pyramids(pyramid_levels, 12, 4.0, 1.0);
+
   // Create list of feature extractors to run in parallel
   std::vector<std::unique_ptr<features::FeatureExtractor>> extractors;
 
@@ -173,13 +179,12 @@ void AttentionPipeline::extract_features()
   // Extract features in parallel using threads, with per-feature timing
   features_.resize(extractors.size());
   std::vector<std::thread> threads;
-  std::vector<std::chrono::high_resolution_clock::time_point> start_times(extractors.size());
   std::vector<long> durations(extractors.size());
 
   for (size_t i = 0; i < extractors.size(); ++i)
   {
     threads.emplace_back(
-        [this, i, &extractors, &start_times, &durations]()
+        [this, i, &extractors, &durations]()
         {
           auto t_start = std::chrono::high_resolution_clock::now();
           features_[i] = extractors[i]->extract(frame_);

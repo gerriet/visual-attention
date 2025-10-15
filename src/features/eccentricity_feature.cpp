@@ -18,8 +18,20 @@ core::FeatureMap EccentricityFeature::extract(const core::Frame& frame) const
     throw std::runtime_error("EccentricityFeature: Cannot extract from empty frame");
   }
 
+  // C-2 FIX: Validate pyramid state and bounds check scale index
+  if (!frame.pyramids_computed || frame.gray_pyramid.empty())
+  {
+    throw std::runtime_error("EccentricityFeature: Grayscale pyramid not computed");
+  }
+
+  int scale_index = std::min(config_.compute_at_scale, static_cast<int>(frame.gray_pyramid.size()) - 1);
+  if (scale_index < 0)
+  {
+    throw std::runtime_error("EccentricityFeature: Invalid pyramid configuration");
+  }
+
   // Select the appropriate pyramid level
-  const cv::Mat& gray = frame.gray_pyramid[config_.compute_at_scale];
+  const cv::Mat& gray = frame.gray_pyramid[scale_index];
 
   // Compute edges using Sobel gradient magnitude
   cv::Mat grad_x, grad_y;
@@ -64,7 +76,7 @@ core::FeatureMap EccentricityFeature::extract(const core::Frame& frame) const
 
   // Resize to original frame size if needed
   cv::Mat result;
-  if (config_.compute_at_scale > 0)
+  if (scale_index > 0)
   {
     cv::resize(eccentricity_map, result, frame.size(), 0, 0, cv::INTER_LINEAR);
   }
@@ -160,6 +172,12 @@ cv::Mat EccentricityFeature::segment_image(const cv::Mat& gray, const cv::Mat& e
 
 float EccentricityFeature::compute_eccentricity(const cv::Moments& m) const
 {
+  // C-3 FIX: Guard against zero or near-zero area
+  if (m.m00 < 1e-10)
+  {
+    return 0.0f;
+  }
+
   // Compute central moments
   double mu20 = m.mu20 / m.m00;
   double mu02 = m.mu02 / m.m00;
