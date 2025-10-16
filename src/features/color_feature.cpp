@@ -1,5 +1,6 @@
 #include "attention/features/color_feature.h"
 #include <stdexcept>
+#include <chrono>
 
 namespace attention
 {
@@ -10,23 +11,31 @@ ColorFeature::ColorFeature(const Config& config) : config_(config) {}
 
 core::FeatureMap ColorFeature::extract(const core::Frame& frame) const
 {
+  DebugContext dummy_debug;
+  return extract(frame, dummy_debug);
+}
+
+core::FeatureMap ColorFeature::extract(const core::Frame& frame, DebugContext& debug) const
+{
+  // Timing (only if debugging)
+  auto t_start = std::chrono::high_resolution_clock::now();
+
+  // Validation
   if (frame.empty())
   {
     throw std::runtime_error("ColorFeature: Cannot extract from empty frame");
   }
-
   if (frame.channels() != 3)
   {
     throw std::runtime_error("ColorFeature: Frame must be color (3 channels)");
   }
-
-  // Use precomputed RGB pyramid from frame
   if (!frame.pyramids_computed || frame.rgb_pyramid.empty())
   {
     throw std::runtime_error("ColorFeature: RGB pyramid not computed. Call frame.compute_pyramids() first.");
   }
 
-  // Compute opponent color pyramids from the cached RGB pyramid
+  // Step 1: Compute opponent color pyramids from RGB pyramid
+  auto t_opponent_start = std::chrono::high_resolution_clock::now();
   std::vector<cv::Mat> rg_pyramid, by_pyramid;
   for (const auto& rgb_level : frame.rgb_pyramid)
   {
@@ -35,16 +44,33 @@ core::FeatureMap ColorFeature::extract(const core::Frame& frame) const
     rg_pyramid.push_back(rg);
     by_pyramid.push_back(by);
   }
+  auto t_opponent_end = std::chrono::high_resolution_clock::now();
 
-  // Compute center-surround for each channel
+  // Step 2: Compute center-surround differences for each channel
+  auto t_cs_start = std::chrono::high_resolution_clock::now();
   cv::Mat rg_saliency = compute_center_surround(rg_pyramid);
   cv::Mat by_saliency = compute_center_surround(by_pyramid);
+  auto t_cs_end = std::chrono::high_resolution_clock::now();
 
-  // Combine RG and BY saliencies
+  // Step 3: Combine RG and BY saliencies
   cv::Mat combined = rg_saliency + by_saliency;
 
-  // Normalize and resize to original size
+  // Step 4: Normalize and resize to original size
+  auto t_norm_start = std::chrono::high_resolution_clock::now();
   cv::Mat result = normalize_and_resize(combined, frame.size());
+  auto t_norm_end = std::chrono::high_resolution_clock::now();
+
+  // Capture debug data if requested (keeps algorithm code clean above)
+  if (debug.enabled)
+  {
+    double total_ms = std::chrono::duration<double, std::milli>(t_norm_end - t_start).count();
+    double opponent_ms = std::chrono::duration<double, std::milli>(t_opponent_end - t_opponent_start).count();
+    double cs_ms = std::chrono::duration<double, std::milli>(t_cs_end - t_cs_start).count();
+    double norm_ms = std::chrono::duration<double, std::milli>(t_norm_end - t_norm_start).count();
+
+    capture_debug_data(debug, frame, rg_pyramid, by_pyramid, rg_saliency, by_saliency,
+                      combined, result, total_ms, opponent_ms, cs_ms, norm_ms);
+  }
 
   return core::FeatureMap("color", result, 1.0f);
 }
@@ -190,6 +216,57 @@ cv::Mat ColorFeature::normalize_and_resize(const cv::Mat& feature, const cv::Siz
   cv::normalize(result, result, 0.0f, 1.0f, cv::NORM_MINMAX);
 
   return result;
+}
+
+void ColorFeature::capture_debug_data(DebugContext& debug,
+                                      const core::Frame& frame,
+                                      const std::vector<cv::Mat>& rg_pyramid,
+                                      const std::vector<cv::Mat>& by_pyramid,
+                                      const cv::Mat& rg_saliency,
+                                      const cv::Mat& by_saliency,
+                                      const cv::Mat& combined,
+                                      const cv::Mat& result,
+                                      double total_ms,
+                                      double opponent_ms,
+                                      double center_surround_ms,
+                                      double normalize_ms) const
+{
+  // Annotations
+  debug.add_annotation("pyramid_levels", std::to_string(frame.rgb_pyramid.size()));
+  debug.add_annotation("output_size", std::to_string(result.cols) + "x" + std::to_string(result.rows));
+
+  // Timings
+  debug.add_timing("opponent_color_computation", opponent_ms);
+  debug.add_timing("center_surround_computation", center_surround_ms);
+  debug.add_timing("normalize_and_resize", normalize_ms);
+  debug.add_timing("total_time", total_ms);
+
+  // Basic level: pyramids and final combined result
+  if (debug.is_level(DebugContext::Level::Basic))
+  {
+    debug.add_pyramid("rgb_pyramid", frame.rgb_pyramid);
+    debug.add_pyramid("rg_pyramid", rg_pyramid);
+    debug.add_pyramid("by_pyramid", by_pyramid);
+    debug.add_image("combined_before_resize", combined);
+  }
+
+  // Detailed level: add intermediate processing results
+  if (debug.is_level(DebugContext::Level::Detailed))
+  {
+    // Full resolution opponent colors (level 0)
+    if (!rg_pyramid.empty() && !by_pyramid.empty())
+    {
+      debug.add_image("rg_channel_level0", rg_pyramid[0]);
+      debug.add_image("by_channel_level0", by_pyramid[0]);
+    }
+
+    // Individual channel center-surround results
+    debug.add_image("rg_center_surround", rg_saliency);
+    debug.add_image("by_center_surround", by_saliency);
+  }
+
+  // Verbose level: reserved for future fine-grained debugging
+  // (currently same as Detailed)
 }
 
 } // namespace features

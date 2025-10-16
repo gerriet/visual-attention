@@ -32,6 +32,7 @@ public:
   explicit OrientationFeature(const Config& config);
 
   core::FeatureMap extract(const core::Frame& frame) const override;
+  core::FeatureMap extract(const core::Frame& frame, DebugContext& debug) const override;
   std::string name() const override { return "orientation"; }
 
 private:
@@ -45,6 +46,18 @@ private:
    * @return Center-surround difference map
    */
   cv::Mat compute_center_surround(const std::vector<cv::Mat>& gabor_pyramid, int center_scale, int surround_scale) const;
+
+  // Debug helper: capture intermediate results (keeps algorithm code clean)
+  void capture_debug_data(DebugContext& debug,
+                          const core::Frame& frame,
+                          const std::vector<std::vector<cv::Mat>>& orientation_pyramids,
+                          const cv::Mat& combined,
+                          const cv::Mat& result,
+                          double total_ms,
+                          double gabor_computation_ms,
+                          double center_surround_ms,
+                          double normalize_ms,
+                          int num_maps) const;
 };
 
 } // namespace features

@@ -56,6 +56,7 @@ class SymmetryFeature : public FeatureExtractor
    * @return Symmetry feature map with saliency values [0, 1]
    */
   core::FeatureMap extract(const core::Frame& frame) const override;
+  core::FeatureMap extract(const core::Frame& frame, DebugContext& debug) const override;
 
   /**
    * Get feature name.
@@ -87,6 +88,21 @@ class SymmetryFeature : public FeatureExtractor
    * @return Radial symmetry map
    */
   cv::Mat compute_radial_symmetry(const std::vector<cv::Mat>& gabor_responses) const;
+
+  // Debug helper: capture intermediate results (keeps algorithm code clean)
+  void capture_debug_data(DebugContext& debug,
+                          const core::Frame& frame,
+                          const std::vector<cv::Mat>& gabor_responses,
+                          const cv::Mat& bilateral,
+                          const cv::Mat& radial,
+                          const cv::Mat& symmetry_map,
+                          const cv::Mat& result,
+                          double total_ms,
+                          double gabor_computation_ms,
+                          double bilateral_ms,
+                          double radial_ms,
+                          double smoothing_ms,
+                          double resize_ms) const;
 };
 
 } // namespace features

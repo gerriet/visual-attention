@@ -51,6 +51,14 @@ class IntensityFeature : public FeatureExtractor
   core::FeatureMap extract(const core::Frame& frame) const override;
 
   /**
+   * Extract intensity feature from frame with debug context.
+   * @param frame Input frame (color or grayscale)
+   * @param debug Debug context for capturing intermediate results
+   * @return Intensity feature map with saliency values [0, 1]
+   */
+  core::FeatureMap extract(const core::Frame& frame, DebugContext& debug) const override;
+
+  /**
    * Get feature name.
    * @return "intensity"
    */
@@ -64,6 +72,15 @@ class IntensityFeature : public FeatureExtractor
 
   // Normalize and resize to original size
   cv::Mat normalize_and_resize(const cv::Mat& feature, const cv::Size& target_size) const;
+
+  // Debug helper: capture intermediate results (keeps algorithm code clean)
+  void capture_debug_data(DebugContext& debug,
+                          const core::Frame& frame,
+                          const cv::Mat& saliency,
+                          const cv::Mat& result,
+                          double total_ms,
+                          double center_surround_ms,
+                          double normalize_ms) const;
 };
 
 } // namespace features

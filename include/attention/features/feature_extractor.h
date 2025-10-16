@@ -2,6 +2,7 @@
 
 #include "attention/core/feature_map.h"
 #include "attention/core/frame.h"
+#include "attention/features/debug_context.h"
 #include <memory>
 
 namespace attention
@@ -26,6 +27,18 @@ class FeatureExtractor
    * @return Feature map with saliency values [0, 1]
    */
   virtual core::FeatureMap extract(const core::Frame& frame) const = 0;
+
+  /**
+   * Extract feature from frame with debug context.
+   * @param frame Input frame
+   * @param debug Debug context for capturing intermediate results
+   * @return Feature map with saliency values [0, 1]
+   */
+  virtual core::FeatureMap extract(const core::Frame& frame, DebugContext& debug) const
+  {
+    // Default implementation ignores debug context
+    return extract(frame);
+  }
 
   /**
    * Get the name of this feature extractor.

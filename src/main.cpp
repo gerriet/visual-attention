@@ -204,26 +204,49 @@ void process_batch(const std::string& directory, const attention::pipeline::Pipe
   }
 }
 
+attention::features::DebugContext::Level parse_debug_level(const std::string& level_str)
+{
+  std::string lower = level_str;
+  std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+
+  if (lower == "basic")
+    return attention::features::DebugContext::Level::Basic;
+  else if (lower == "detailed")
+    return attention::features::DebugContext::Level::Detailed;
+  else if (lower == "verbose")
+    return attention::features::DebugContext::Level::Verbose;
+  else
+    return attention::features::DebugContext::Level::Basic; // Default
+}
+
 void print_usage(const char* program_name)
 {
   std::cerr << "Usage:" << std::endl;
-  std::cerr << "  " << program_name << " <image_path> [--no-display]" << std::endl;
+  std::cerr << "  " << program_name << " <image_path> [options]" << std::endl;
   std::cerr << "  " << program_name << " --config <config.yaml>" << std::endl;
-  std::cerr << "  " << program_name << " --batch <directory> [--output <output_dir>]" << std::endl;
+  std::cerr << "  " << program_name << " --batch <directory> [options]" << std::endl;
   std::cerr << std::endl;
   std::cerr << "Examples:" << std::endl;
   std::cerr << "  " << program_name << " data/test_images/input.png" << std::endl;
   std::cerr << "  " << program_name << " data/test_images/input.png --no-display" << std::endl;
+  std::cerr << "  " << program_name << " data/test_images/input.png --debug" << std::endl;
+  std::cerr << "  " << program_name << " data/test_images/input.png --debug=detailed --debug-print" << std::endl;
   std::cerr << "  " << program_name << " --config config.yaml" << std::endl;
   std::cerr << "  " << program_name << " --batch data/test_images/" << std::endl;
   std::cerr << "  " << program_name << " --batch data/test_images/ --output results/" << std::endl;
   std::cerr << std::endl;
   std::cerr << "Options:" << std::endl;
-  std::cerr << "  --no-display  Process without displaying windows (saves to results/)" << std::endl;
-  std::cerr << "  --config      Load configuration from YAML file" << std::endl;
-  std::cerr << "  --batch       Process all images in directory, save features separately" << std::endl;
-  std::cerr << "  --output      Specify output directory for batch mode (default: input_dir/results_batch)"
-            << std::endl;
+  std::cerr << "  --no-display         Process without displaying windows (saves to results/)" << std::endl;
+  std::cerr << "  --config             Load configuration from YAML file" << std::endl;
+  std::cerr << "  --batch              Process all images in directory, save features separately" << std::endl;
+  std::cerr << "  --output <dir>       Specify output directory for batch mode (default: input_dir/results_batch)" << std::endl;
+  std::cerr << std::endl;
+  std::cerr << "Debug Options:" << std::endl;
+  std::cerr << "  --debug[=LEVEL]      Enable debugging (levels: basic, detailed, verbose)" << std::endl;
+  std::cerr << "                       Default: basic if no level specified" << std::endl;
+  std::cerr << "  --debug-output <dir> Debug output directory (default: debug_output/)" << std::endl;
+  std::cerr << "  --debug-print        Print debug info to console" << std::endl;
+  std::cerr << "  --no-debug-save      Don't save debug images to disk" << std::endl;
 }
 
 int main(int argc, char** argv)
@@ -290,10 +313,40 @@ int main(int argc, char** argv)
       config.input_image = argv[1];
       config.display = true;
 
-      // Check for --no-display flag
-      if (argc >= 3 && std::string(argv[2]) == "--no-display")
+      // Parse optional flags
+      for (int i = 2; i < argc; ++i)
       {
-        config.display = false;
+        std::string arg = argv[i];
+
+        if (arg == "--no-display")
+        {
+          config.display = false;
+        }
+        else if (arg == "--debug" || arg.rfind("--debug=", 0) == 0)
+        {
+          // Parse debug level
+          if (arg == "--debug")
+          {
+            config.pipeline.debug_level = attention::features::DebugContext::Level::Basic;
+          }
+          else
+          {
+            std::string level_str = arg.substr(8); // Skip "--debug="
+            config.pipeline.debug_level = parse_debug_level(level_str);
+          }
+        }
+        else if (arg == "--debug-output" && i + 1 < argc)
+        {
+          config.pipeline.debug_output_dir = argv[++i];
+        }
+        else if (arg == "--debug-print")
+        {
+          config.pipeline.debug_print_info = true;
+        }
+        else if (arg == "--no-debug-save")
+        {
+          config.pipeline.debug_save_images = false;
+        }
       }
     }
 

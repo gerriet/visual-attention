@@ -8,6 +8,7 @@
 #include "attention/visualization/visualizer.h"
 #include <algorithm>
 #include <chrono>
+#include <filesystem>
 #include <iomanip>
 #include <iostream>
 #include <memory>
@@ -107,6 +108,48 @@ void AttentionPipeline::process()
   std::cout << "    Integration:             " << timing_.integration_ms << " ms" << std::endl;
   std::cout << "    Peak detection:          " << timing_.peak_detection_ms << " ms" << std::endl;
 
+  // Handle debug output if debugging is enabled
+  if (is_debugging_enabled())
+  {
+    std::cout << "\n  Debug Output:" << std::endl;
+
+    // Print debug info if requested
+    if (config_.debug_print_info)
+    {
+      for (const auto& [feature_name, debug_ctx] : debug_contexts_)
+      {
+        features::DebugVisualizer::print_debug_info(debug_ctx, feature_name);
+      }
+    }
+
+    // Save debug images if requested
+    if (config_.debug_save_images)
+    {
+      // Create debug output directory
+      std::filesystem::create_directories(config_.debug_output_dir);
+
+      for (const auto& [feature_name, debug_ctx] : debug_contexts_)
+      {
+        if (!debug_ctx.empty())
+        {
+          std::cout << "    Saving debug output for '" << feature_name << "'..." << std::endl;
+          features::DebugVisualizer::save_debug_images(debug_ctx, config_.debug_output_dir, feature_name);
+
+          // Create combined visualization
+          cv::Mat combined_viz = features::DebugVisualizer::create_debug_visualization(debug_ctx);
+          if (!combined_viz.empty())
+          {
+            std::string combined_path = config_.debug_output_dir + "/" + feature_name + "_combined.png";
+            cv::imwrite(combined_path, combined_viz);
+            std::cout << "      Saved combined: " << combined_path << std::endl;
+          }
+        }
+      }
+    }
+
+    std::cout << "    ✓ Debug output complete" << std::endl;
+  }
+
   processed_ = true;
 }
 
@@ -176,27 +219,57 @@ void AttentionPipeline::extract_features()
   }
   extractors.push_back(std::make_unique<features::SymmetryFeature>(sym_config));
 
-  // Extract features in parallel using threads, with per-feature timing
+  // Extract features (with optional debugging)
   features_.resize(extractors.size());
-  std::vector<std::thread> threads;
   std::vector<long> durations(extractors.size());
 
-  for (size_t i = 0; i < extractors.size(); ++i)
-  {
-    threads.emplace_back(
-        [this, i, &extractors, &durations]()
-        {
-          auto t_start = std::chrono::high_resolution_clock::now();
-          features_[i] = extractors[i]->extract(frame_);
-          auto t_end = std::chrono::high_resolution_clock::now();
-          durations[i] = std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_start).count();
-        });
-  }
+  // Clear previous debug contexts
+  debug_contexts_.clear();
 
-  // Wait for all threads to complete
-  for (auto& thread : threads)
+  // Check if debugging is enabled
+  bool debugging = is_debugging_enabled();
+
+  if (debugging)
   {
-    thread.join();
+    // Extract serially to preserve debug context
+    std::cout << "  Debug mode: extracting features serially" << std::endl;
+    for (size_t i = 0; i < extractors.size(); ++i)
+    {
+      auto t_start = std::chrono::high_resolution_clock::now();
+
+      // Create debug context for this feature
+      features::DebugContext debug(config_.debug_level);
+      features_[i] = extractors[i]->extract(frame_, debug);
+
+      auto t_end = std::chrono::high_resolution_clock::now();
+      durations[i] = std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_start).count();
+
+      // Store debug context
+      debug_contexts_[features_[i].name] = std::move(debug);
+    }
+  }
+  else
+  {
+    // Extract features in parallel using threads (no debugging)
+    std::vector<std::thread> threads;
+
+    for (size_t i = 0; i < extractors.size(); ++i)
+    {
+      threads.emplace_back(
+          [this, i, &extractors, &durations]()
+          {
+            auto t_start = std::chrono::high_resolution_clock::now();
+            features_[i] = extractors[i]->extract(frame_);
+            auto t_end = std::chrono::high_resolution_clock::now();
+            durations[i] = std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_start).count();
+          });
+    }
+
+    // Wait for all threads to complete
+    for (auto& thread : threads)
+    {
+      thread.join();
+    }
   }
 
   // Store per-feature timing
@@ -205,7 +278,16 @@ void AttentionPipeline::extract_features()
     timing_.feature_ms[features_[i].name] = durations[i];
   }
 
-  std::cout << "  Features extracted: " << features_.size() << " (parallel)" << std::endl;
+  std::cout << "  Features extracted: " << features_.size();
+  if (debugging)
+  {
+    std::cout << " (debug mode)";
+  }
+  else
+  {
+    std::cout << " (parallel)";
+  }
+  std::cout << std::endl;
 }
 
 void AttentionPipeline::integrate_features()

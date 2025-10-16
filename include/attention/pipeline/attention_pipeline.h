@@ -3,6 +3,7 @@
 #include "attention/core/feature_map.h"
 #include "attention/core/frame.h"
 #include "attention/core/saliency_map.h"
+#include "attention/features/debug_context.h"
 #include <map>
 #include <opencv2/opencv.hpp>
 #include <string>
@@ -52,6 +53,12 @@ struct PipelineConfig
   bool enable_ior = false;     // Enable IOR for sequential peak detection
   int ior_radius = 50;         // Radius of inhibition disk (pixels)
   float ior_strength = 0.8f;   // Inhibition strength (0-1, 1 = complete suppression)
+
+  // Debug parameters
+  features::DebugContext::Level debug_level = features::DebugContext::Level::None;
+  std::string debug_output_dir = "debug_output";  // Directory for debug output
+  bool debug_save_images = true;                   // Save debug images to disk
+  bool debug_print_info = false;                   // Print debug info to console
 
   PipelineConfig()
   {
@@ -173,6 +180,18 @@ class AttentionPipeline
    */
   const PipelineConfig& get_config() const { return config_; }
 
+  /**
+   * Get debug contexts for all features (if debugging was enabled).
+   * @return Map of feature name to debug context
+   */
+  const std::map<std::string, features::DebugContext>& get_debug_contexts() const { return debug_contexts_; }
+
+  /**
+   * Check if debugging is enabled.
+   * @return true if debug level is not None
+   */
+  bool is_debugging_enabled() const { return config_.debug_level != features::DebugContext::Level::None; }
+
  private:
   // Configuration
   PipelineConfig config_;
@@ -191,6 +210,9 @@ class AttentionPipeline
 
   // Performance timing
   PipelineTiming timing_;
+
+  // Debug contexts for each feature (if debugging enabled)
+  std::map<std::string, features::DebugContext> debug_contexts_;
 
   // Internal processing methods
   int compute_pyramid_levels() const;

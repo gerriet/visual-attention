@@ -28,6 +28,7 @@ add_executable(attention
     src/features/orientation_feature.cpp
     src/features/eccentricity_feature.cpp
     src/features/symmetry_feature.cpp
+    src/features/debug_context.cpp
     src/config/config_loader.cpp
     src/visualization/visualizer.cpp
 )

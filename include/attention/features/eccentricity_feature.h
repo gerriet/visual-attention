@@ -39,6 +39,7 @@ public:
   explicit EccentricityFeature(const Config& config);
 
   core::FeatureMap extract(const core::Frame& frame) const override;
+  core::FeatureMap extract(const core::Frame& frame, DebugContext& debug) const override;
   std::string name() const override { return "eccentricity"; }
 
 private:
@@ -67,6 +68,21 @@ private:
    * @return Map of valid segment IDs to their properties
    */
   std::map<int, cv::Moments> filter_segments(const cv::Mat& labels, int image_area) const;
+
+  // Debug helper: capture intermediate results (keeps algorithm code clean)
+  void capture_debug_data(DebugContext& debug,
+                          const core::Frame& frame,
+                          const cv::Mat& gray,
+                          const cv::Mat& edges,
+                          const cv::Mat& labels,
+                          const cv::Mat& eccentricity_map,
+                          const cv::Mat& result,
+                          double total_ms,
+                          double edge_computation_ms,
+                          double segmentation_ms,
+                          double eccentricity_computation_ms,
+                          double resize_ms,
+                          int num_segments) const;
 };
 
 } // namespace features

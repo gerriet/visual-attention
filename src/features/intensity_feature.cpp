@@ -1,5 +1,6 @@
 #include "attention/features/intensity_feature.h"
 #include <stdexcept>
+#include <chrono>
 
 namespace attention
 {
@@ -10,22 +11,44 @@ IntensityFeature::IntensityFeature(const Config& config) : config_(config) {}
 
 core::FeatureMap IntensityFeature::extract(const core::Frame& frame) const
 {
+  DebugContext dummy_debug;
+  return extract(frame, dummy_debug);
+}
+
+core::FeatureMap IntensityFeature::extract(const core::Frame& frame, DebugContext& debug) const
+{
+  // Timing (only if debugging)
+  auto t_start = std::chrono::high_resolution_clock::now();
+
+  // Validation
   if (frame.empty())
   {
     throw std::runtime_error("IntensityFeature: Cannot extract from empty frame");
   }
-
-  // Use precomputed grayscale pyramid from frame
   if (!frame.pyramids_computed || frame.gray_pyramid.empty())
   {
     throw std::runtime_error("IntensityFeature: Grayscale pyramid not computed. Call frame.compute_pyramids() first.");
   }
 
-  // Compute center-surround using the cached pyramid
+  // Step 1: Compute center-surround differences using grayscale pyramid
+  auto t_cs_start = std::chrono::high_resolution_clock::now();
   cv::Mat saliency = compute_center_surround(frame.gray_pyramid);
+  auto t_cs_end = std::chrono::high_resolution_clock::now();
 
-  // Normalize and resize to original size
+  // Step 2: Normalize and resize to original size
+  auto t_norm_start = std::chrono::high_resolution_clock::now();
   cv::Mat result = normalize_and_resize(saliency, frame.size());
+  auto t_norm_end = std::chrono::high_resolution_clock::now();
+
+  // Capture debug data if requested (keeps algorithm code clean above)
+  if (debug.enabled)
+  {
+    double total_ms = std::chrono::duration<double, std::milli>(t_norm_end - t_start).count();
+    double cs_ms = std::chrono::duration<double, std::milli>(t_cs_end - t_cs_start).count();
+    double norm_ms = std::chrono::duration<double, std::milli>(t_norm_end - t_norm_start).count();
+
+    capture_debug_data(debug, frame, saliency, result, total_ms, cs_ms, norm_ms);
+  }
 
   return core::FeatureMap("intensity", result, 1.0f);
 }
@@ -127,6 +150,34 @@ cv::Mat IntensityFeature::normalize_and_resize(const cv::Mat& feature, const cv:
   cv::normalize(result, result, 0.0f, 1.0f, cv::NORM_MINMAX);
 
   return result;
+}
+
+void IntensityFeature::capture_debug_data(DebugContext& debug,
+                                         const core::Frame& frame,
+                                         const cv::Mat& saliency,
+                                         const cv::Mat& result,
+                                         double total_ms,
+                                         double center_surround_ms,
+                                         double normalize_ms) const
+{
+  // Annotations
+  debug.add_annotation("pyramid_levels", std::to_string(frame.gray_pyramid.size()));
+  debug.add_annotation("output_size", std::to_string(result.cols) + "x" + std::to_string(result.rows));
+
+  // Timings
+  debug.add_timing("center_surround_computation", center_surround_ms);
+  debug.add_timing("normalize_and_resize", normalize_ms);
+  debug.add_timing("total_time", total_ms);
+
+  // Basic level: grayscale pyramid and center-surround result
+  if (debug.is_level(DebugContext::Level::Basic))
+  {
+    debug.add_pyramid("gray_pyramid", frame.gray_pyramid);
+    debug.add_image("center_surround_saliency", saliency);
+  }
+
+  // Detailed level: same as Basic for IntensityFeature (simpler than ColorFeature)
+  // Could add individual scale differences here if needed in future
 }
 
 } // namespace features

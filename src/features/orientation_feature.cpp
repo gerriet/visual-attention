@@ -1,5 +1,6 @@
 #include "attention/features/orientation_feature.h"
 #include <iostream>
+#include <chrono>
 
 namespace attention
 {
@@ -12,12 +13,23 @@ OrientationFeature::OrientationFeature(const Config& config) : config_(config) {
 
 core::FeatureMap OrientationFeature::extract(const core::Frame& frame) const
 {
+  DebugContext dummy_debug;
+  return extract(frame, dummy_debug);
+}
+
+core::FeatureMap OrientationFeature::extract(const core::Frame& frame, DebugContext& debug) const
+{
+  // Timing (only if debugging)
+  auto t_start = std::chrono::high_resolution_clock::now();
+
+  // Validation
   if (frame.empty())
   {
     throw std::runtime_error("OrientationFeature: Cannot extract from empty frame");
   }
 
-  // Ensure Gabor pyramids are computed with required number of orientations
+  // Step 1: Ensure Gabor pyramids are computed with required number of orientations
+  auto t_gabor_start = std::chrono::high_resolution_clock::now();
   const_cast<core::Frame&>(frame).compute_gabor_pyramids(frame.gray_pyramid.size(), config_.num_orientations,
                                                           config_.wavelength, config_.bandwidth);
 
@@ -25,45 +37,44 @@ core::FeatureMap OrientationFeature::extract(const core::Frame& frame) const
   {
     throw std::runtime_error("OrientationFeature: Failed to compute Gabor pyramids");
   }
+  auto t_gabor_end = std::chrono::high_resolution_clock::now();
 
-  // Itti-Koch style center-surround differences
-  // Use scales: c ∈ {2,3,4} and s = c + δ where δ ∈ {3,4}
-  std::vector<int> center_scales = {2, 3, 4};
-  std::vector<int> delta_scales = {3, 4};
-
-  // Accumulate orientation responses across all orientations and scales
-  cv::Mat combined;
-  int num_maps = 0;
-
-  // For each orientation
+  // Step 2: Extract orientation pyramids (transpose from [level][orientation] to [orientation][level])
+  std::vector<std::vector<cv::Mat>> orientation_pyramids(config_.num_orientations);
   for (int orient = 0; orient < config_.num_orientations; ++orient)
   {
-    // Extract this orientation across all pyramid levels
-    std::vector<cv::Mat> orientation_pyramid;
     for (size_t level = 0; level < frame.gabor_pyramids.size(); ++level)
     {
       if (orient < static_cast<int>(frame.gabor_pyramids[level].size()))
       {
-        orientation_pyramid.push_back(frame.gabor_pyramids[level][orient]);
+        orientation_pyramids[orient].push_back(frame.gabor_pyramids[level][orient]);
       }
     }
+  }
 
-    // Compute center-surround differences for this orientation
+  // Step 3: Compute center-surround differences across orientations and scales
+  auto t_cs_start = std::chrono::high_resolution_clock::now();
+  std::vector<int> center_scales = {2, 3, 4};
+  std::vector<int> delta_scales = {3, 4};
+
+  cv::Mat combined;
+  int num_maps = 0;
+
+  for (int orient = 0; orient < config_.num_orientations; ++orient)
+  {
     for (int c : center_scales)
     {
       for (int delta : delta_scales)
       {
         int s = c + delta;
-        if (s < static_cast<int>(orientation_pyramid.size()))
+        if (s < static_cast<int>(orientation_pyramids[orient].size()))
         {
-          cv::Mat cs_map = compute_center_surround(orientation_pyramid, c, s);
+          cv::Mat cs_map = compute_center_surround(orientation_pyramids[orient], c, s);
           if (!cs_map.empty())
           {
-            // Resize to target frame size
             cv::Mat cs_resized;
             cv::resize(cs_map, cs_resized, frame.size(), 0, 0, cv::INTER_LINEAR);
 
-            // Initialize combined on first map
             if (combined.empty())
             {
               combined = cv::Mat::zeros(frame.size(), CV_32F);
@@ -77,22 +88,31 @@ core::FeatureMap OrientationFeature::extract(const core::Frame& frame) const
     }
   }
 
-  // Normalize by number of maps
   if (num_maps > 0)
   {
     combined /= num_maps;
   }
+  auto t_cs_end = std::chrono::high_resolution_clock::now();
 
-  // Normalize to [0, 1]
-  cv::normalize(combined, combined, 0.0f, 1.0f, cv::NORM_MINMAX);
+  // Step 4: Normalize to [0, 1]
+  auto t_norm_start = std::chrono::high_resolution_clock::now();
+  cv::Mat result;
+  cv::normalize(combined, result, 0.0f, 1.0f, cv::NORM_MINMAX);
+  auto t_norm_end = std::chrono::high_resolution_clock::now();
 
-  // Create feature map
-  core::FeatureMap feature;
-  feature.name = "orientation";
-  feature.data = combined;
-  feature.confidence = 1.0f;
+  // Capture debug data if requested (keeps algorithm code clean above)
+  if (debug.enabled)
+  {
+    double total_ms = std::chrono::duration<double, std::milli>(t_norm_end - t_start).count();
+    double gabor_ms = std::chrono::duration<double, std::milli>(t_gabor_end - t_gabor_start).count();
+    double cs_ms = std::chrono::duration<double, std::milli>(t_cs_end - t_cs_start).count();
+    double norm_ms = std::chrono::duration<double, std::milli>(t_norm_end - t_norm_start).count();
 
-  return feature;
+    capture_debug_data(debug, frame, orientation_pyramids, combined, result,
+                      total_ms, gabor_ms, cs_ms, norm_ms, num_maps);
+  }
+
+  return core::FeatureMap("orientation", result, 1.0f);
 }
 
 cv::Mat OrientationFeature::compute_center_surround(const std::vector<cv::Mat>& gabor_pyramid, int center_scale,
@@ -121,6 +141,58 @@ cv::Mat OrientationFeature::compute_center_surround(const std::vector<cv::Mat>& 
   cv::absdiff(center, surround_resized, diff);
 
   return diff;
+}
+
+void OrientationFeature::capture_debug_data(DebugContext& debug,
+                                           const core::Frame& frame,
+                                           const std::vector<std::vector<cv::Mat>>& orientation_pyramids,
+                                           const cv::Mat& combined,
+                                           const cv::Mat& result,
+                                           double total_ms,
+                                           double gabor_computation_ms,
+                                           double center_surround_ms,
+                                           double normalize_ms,
+                                           int num_maps) const
+{
+  // Annotations
+  debug.add_annotation("num_orientations", std::to_string(config_.num_orientations));
+  debug.add_annotation("pyramid_levels", std::to_string(frame.gabor_pyramids.size()));
+  debug.add_annotation("num_center_surround_maps", std::to_string(num_maps));
+  debug.add_annotation("output_size", std::to_string(result.cols) + "x" + std::to_string(result.rows));
+
+  // Timings
+  debug.add_timing("gabor_computation", gabor_computation_ms);
+  debug.add_timing("center_surround_computation", center_surround_ms);
+  debug.add_timing("normalization", normalize_ms);
+  debug.add_timing("total_time", total_ms);
+
+  // Basic level: Gabor pyramids for each orientation and combined result
+  if (debug.is_level(DebugContext::Level::Basic))
+  {
+    // Save each orientation pyramid
+    for (int orient = 0; orient < config_.num_orientations; ++orient)
+    {
+      if (orient < static_cast<int>(orientation_pyramids.size()))
+      {
+        std::string pyramid_name = "gabor_orientation_" + std::to_string(orient * 180 / config_.num_orientations) + "deg";
+        debug.add_pyramid(pyramid_name, orientation_pyramids[orient]);
+      }
+    }
+    debug.add_image("combined_before_normalize", combined);
+  }
+
+  // Detailed level: Add individual orientation responses at level 0
+  if (debug.is_level(DebugContext::Level::Detailed))
+  {
+    for (int orient = 0; orient < config_.num_orientations; ++orient)
+    {
+      if (orient < static_cast<int>(orientation_pyramids.size()) && !orientation_pyramids[orient].empty())
+      {
+        std::string img_name = "orientation_" + std::to_string(orient * 180 / config_.num_orientations) + "deg_level0";
+        debug.add_image(img_name, orientation_pyramids[orient][0]);
+      }
+    }
+  }
 }
 
 } // namespace features

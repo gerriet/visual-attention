@@ -54,6 +54,14 @@ class ColorFeature : public FeatureExtractor
   core::FeatureMap extract(const core::Frame& frame) const override;
 
   /**
+   * Extract color feature from frame with debug context.
+   * @param frame Input frame (must be color image)
+   * @param debug Debug context for capturing intermediate results
+   * @return Color feature map with saliency values [0, 1]
+   */
+  core::FeatureMap extract(const core::Frame& frame, DebugContext& debug) const override;
+
+  /**
    * Get feature name.
    * @return "color"
    */
@@ -70,6 +78,20 @@ class ColorFeature : public FeatureExtractor
 
   // Normalize and resize to original size
   cv::Mat normalize_and_resize(const cv::Mat& feature, const cv::Size& target_size) const;
+
+  // Debug helper: capture intermediate results (keeps algorithm code clean)
+  void capture_debug_data(DebugContext& debug,
+                          const core::Frame& frame,
+                          const std::vector<cv::Mat>& rg_pyramid,
+                          const std::vector<cv::Mat>& by_pyramid,
+                          const cv::Mat& rg_saliency,
+                          const cv::Mat& by_saliency,
+                          const cv::Mat& combined,
+                          const cv::Mat& result,
+                          double total_ms,
+                          double opponent_ms,
+                          double center_surround_ms,
+                          double normalize_ms) const;
 };
 
 } // namespace features

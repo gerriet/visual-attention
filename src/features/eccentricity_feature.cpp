@@ -2,6 +2,7 @@
 #include <iostream>
 #include <map>
 #include <set>
+#include <chrono>
 
 namespace attention
 {
@@ -14,6 +15,16 @@ EccentricityFeature::EccentricityFeature(const Config& config) : config_(config)
 
 core::FeatureMap EccentricityFeature::extract(const core::Frame& frame) const
 {
+  DebugContext dummy_debug;
+  return extract(frame, dummy_debug);
+}
+
+core::FeatureMap EccentricityFeature::extract(const core::Frame& frame, DebugContext& debug) const
+{
+  // Timing (only if debugging)
+  auto t_start = std::chrono::high_resolution_clock::now();
+
+  // Validation
   if (frame.empty())
   {
     throw std::runtime_error("EccentricityFeature: Cannot extract from empty frame");
@@ -30,28 +41,30 @@ core::FeatureMap EccentricityFeature::extract(const core::Frame& frame) const
     throw std::runtime_error("EccentricityFeature: Invalid pyramid configuration");
   }
 
-  // Select the appropriate pyramid level
   const cv::Mat& gray = frame.gray_pyramid[scale_index];
 
-  // Compute edges using Sobel gradient magnitude
+  // Step 1: Compute edges using Sobel gradient magnitude
+  auto t_edge_start = std::chrono::high_resolution_clock::now();
   cv::Mat grad_x, grad_y;
   cv::Sobel(gray, grad_x, CV_32F, 1, 0, 3);
   cv::Sobel(gray, grad_y, CV_32F, 0, 1, 3);
 
-  // Compute gradient magnitude
   cv::Mat edges;
   cv::magnitude(grad_x, grad_y, edges);
   cv::normalize(edges, edges, 0.0f, 1.0f, cv::NORM_MINMAX);
+  auto t_edge_end = std::chrono::high_resolution_clock::now();
 
-  // Segment the image
+  // Step 2: Segment the image using watershed
+  auto t_segment_start = std::chrono::high_resolution_clock::now();
   cv::Mat labels = segment_image(gray, edges);
+  auto t_segment_end = std::chrono::high_resolution_clock::now();
 
-  // Filter segments by area and compute moments
+  // Step 3: Compute eccentricity for each segment
+  auto t_ecc_start = std::chrono::high_resolution_clock::now();
   int image_area = gray.rows * gray.cols;
   std::map<int, cv::Moments> valid_segments = filter_segments(labels, image_area);
 
-  // Optimize segment iteration from O(N*M) to O(N+M)
-  // Pre-compute eccentricity for all valid segments
+  // Pre-compute eccentricity for all valid segments (O(N+M) optimization)
   std::map<int, float> label_to_ecc;
   for (const auto& pair : valid_segments)
   {
@@ -72,8 +85,10 @@ core::FeatureMap EccentricityFeature::extract(const core::Frame& frame) const
       }
     }
   }
+  auto t_ecc_end = std::chrono::high_resolution_clock::now();
 
-  // Resize to original frame size if needed
+  // Step 4: Resize to original frame size and normalize
+  auto t_resize_start = std::chrono::high_resolution_clock::now();
   cv::Mat result;
   if (scale_index > 0)
   {
@@ -81,19 +96,27 @@ core::FeatureMap EccentricityFeature::extract(const core::Frame& frame) const
   }
   else
   {
-    result = eccentricity_map;
+    result = eccentricity_map.clone();
   }
 
-  // Normalize to [0, 1]
   cv::normalize(result, result, 0.0f, 1.0f, cv::NORM_MINMAX);
+  auto t_resize_end = std::chrono::high_resolution_clock::now();
 
-  // Create feature map
-  core::FeatureMap feature;
-  feature.name = "eccentricity";
-  feature.data = result;
-  feature.confidence = 1.0f;
+  // Capture debug data if requested (keeps algorithm code clean above)
+  if (debug.enabled)
+  {
+    double total_ms = std::chrono::duration<double, std::milli>(t_resize_end - t_start).count();
+    double edge_ms = std::chrono::duration<double, std::milli>(t_edge_end - t_edge_start).count();
+    double segment_ms = std::chrono::duration<double, std::milli>(t_segment_end - t_segment_start).count();
+    double ecc_ms = std::chrono::duration<double, std::milli>(t_ecc_end - t_ecc_start).count();
+    double resize_ms = std::chrono::duration<double, std::milli>(t_resize_end - t_resize_start).count();
 
-  return feature;
+    capture_debug_data(debug, frame, gray, edges, labels, eccentricity_map, result,
+                      total_ms, edge_ms, segment_ms, ecc_ms, resize_ms,
+                      static_cast<int>(valid_segments.size()));
+  }
+
+  return core::FeatureMap("eccentricity", result, 1.0f);
 }
 
 cv::Mat EccentricityFeature::segment_image(const cv::Mat& gray, const cv::Mat& edges) const
@@ -279,6 +302,54 @@ std::map<int, cv::Moments> EccentricityFeature::filter_segments(const cv::Mat& l
   }
 
   return valid_segments;
+}
+
+void EccentricityFeature::capture_debug_data(DebugContext& debug,
+                                             const core::Frame& frame,
+                                             const cv::Mat& gray,
+                                             const cv::Mat& edges,
+                                             const cv::Mat& labels,
+                                             const cv::Mat& eccentricity_map,
+                                             const cv::Mat& result,
+                                             double total_ms,
+                                             double edge_computation_ms,
+                                             double segmentation_ms,
+                                             double eccentricity_computation_ms,
+                                             double resize_ms,
+                                             int num_segments) const
+{
+  // Annotations
+  debug.add_annotation("num_segments", std::to_string(num_segments));
+  debug.add_annotation("compute_scale", std::to_string(config_.compute_at_scale));
+  debug.add_annotation("edge_threshold", std::to_string(config_.edge_threshold));
+  debug.add_annotation("output_size", std::to_string(result.cols) + "x" + std::to_string(result.rows));
+
+  // Timings
+  debug.add_timing("edge_computation", edge_computation_ms);
+  debug.add_timing("segmentation", segmentation_ms);
+  debug.add_timing("eccentricity_computation", eccentricity_computation_ms);
+  debug.add_timing("resize_and_normalize", resize_ms);
+  debug.add_timing("total_time", total_ms);
+
+  // Basic level: Key intermediate results
+  if (debug.is_level(DebugContext::Level::Basic))
+  {
+    debug.add_image("edges", edges);
+    debug.add_image("eccentricity_map_before_resize", eccentricity_map);
+  }
+
+  // Detailed level: Add segmentation labels visualization
+  if (debug.is_level(DebugContext::Level::Detailed))
+  {
+    // Visualize segments by converting labels to colors
+    cv::Mat labels_viz;
+    cv::normalize(labels, labels_viz, 0, 255, cv::NORM_MINMAX, CV_8U);
+    cv::applyColorMap(labels_viz, labels_viz, cv::COLORMAP_JET);
+    debug.add_image("segment_labels", labels_viz);
+
+    // Also save the raw grayscale used for computation
+    debug.add_image("input_grayscale", gray);
+  }
 }
 
 } // namespace features
