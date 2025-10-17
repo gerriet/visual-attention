@@ -3,6 +3,7 @@
 #include <cmath>
 #include <stdexcept>
 #include <chrono>
+#include <algorithm>
 
 namespace attention
 {
@@ -19,7 +20,7 @@ core::FeatureMap SymmetryFeature::extract(const core::Frame& frame) const
 
 core::FeatureMap SymmetryFeature::extract(const core::Frame& frame, DebugContext& debug) const
 {
-  // Timing (only if debugging)
+  // Timing
   auto t_start = std::chrono::high_resolution_clock::now();
 
   // Validation
@@ -33,218 +34,427 @@ core::FeatureMap SymmetryFeature::extract(const core::Frame& frame, DebugContext
     throw std::runtime_error("SymmetryFeature: Grayscale pyramid not computed");
   }
 
-  // Step 1: Ensure Gabor pyramids are computed with sufficient orientations
+  // Step 1: Compute Gabor pyramids if needed
   auto t_gabor_start = std::chrono::high_resolution_clock::now();
-  const_cast<core::Frame&>(frame).compute_gabor_pyramids(frame.gray_pyramid.size(), config_.num_orientations,
-                                                          config_.wavelength, config_.bandwidth);
+
+  // Determine required pyramid levels based on scale configurations
+  int max_pyramid_level = 0;
+  for (const auto& scale_config : config_.scales)
+  {
+    if (scale_config.pyramid_level >= 0)
+    {
+      max_pyramid_level = std::max(max_pyramid_level, scale_config.pyramid_level);
+    }
+  }
+
+  const_cast<core::Frame&>(frame).compute_gabor_pyramids(max_pyramid_level + 1,
+                                                          config_.num_orientations,
+                                                          config_.wavelength,
+                                                          config_.bandwidth);
 
   if (!frame.gabor_pyramids_computed || frame.gabor_pyramids.empty())
   {
     throw std::runtime_error("SymmetryFeature: Failed to compute Gabor pyramids");
   }
 
-  int scale_index = std::min(config_.compute_at_scale, static_cast<int>(frame.gabor_pyramids.size()) - 1);
-  if (scale_index < 0)
-  {
-    throw std::runtime_error("SymmetryFeature: Invalid pyramid configuration");
-  }
-  const auto& gabor_level = frame.gabor_pyramids[scale_index];
-
-  if (gabor_level.empty())
-  {
-    throw std::runtime_error("SymmetryFeature: Gabor level is empty");
-  }
   auto t_gabor_end = std::chrono::high_resolution_clock::now();
 
-  // Step 2: Compute bilateral symmetry (opposite orientations)
-  auto t_bilateral_start = std::chrono::high_resolution_clock::now();
-  cv::Mat bilateral = compute_bilateral_symmetry(gabor_level);
-  auto t_bilateral_end = std::chrono::high_resolution_clock::now();
+  // Step 2: Compute symmetry at each scale
+  std::vector<cv::Mat> scale_results;
+  std::vector<std::vector<cv::Mat>> scale_gabor_responses;
+  std::vector<double> scale_computation_times;
 
-  // Step 3: Compute radial symmetry (all orientations)
-  auto t_radial_start = std::chrono::high_resolution_clock::now();
-  cv::Mat radial = compute_radial_symmetry(gabor_level);
-  auto t_radial_end = std::chrono::high_resolution_clock::now();
-
-  // Step 4: Combine and smooth
-  auto t_smooth_start = std::chrono::high_resolution_clock::now();
-  cv::Mat symmetry_map = constants::BILATERAL_SYMMETRY_WEIGHT * bilateral +
-                         constants::RADIAL_SYMMETRY_WEIGHT * radial;
-  cv::GaussianBlur(symmetry_map, symmetry_map, cv::Size(5, 5), 1.0);
-  auto t_smooth_end = std::chrono::high_resolution_clock::now();
-
-  // Step 5: Resize to original frame size and normalize
-  auto t_resize_start = std::chrono::high_resolution_clock::now();
-  cv::Mat result;
-  if (scale_index > 0)
+  for (size_t scale_idx = 0; scale_idx < config_.scales.size(); ++scale_idx)
   {
-    cv::resize(symmetry_map, result, frame.size(), 0, 0, cv::INTER_LINEAR);
+    const auto& scale_config = config_.scales[scale_idx];
+    auto t_scale_start = std::chrono::high_resolution_clock::now();
+
+    // Use specified pyramid level directly
+    int pyramid_level = scale_config.pyramid_level;
+
+    if (pyramid_level < 0 || pyramid_level >= static_cast<int>(frame.gabor_pyramids.size()))
+    {
+      // Skip this scale if pyramid level is out of range
+      std::cerr << "Warning: Skipping scale " << scale_idx << " - pyramid level " << pyramid_level
+                << " out of range (available: 0-" << (frame.gabor_pyramids.size() - 1) << ")" << std::endl;
+      continue;
+    }
+
+    const auto& gabor_level = frame.gabor_pyramids[pyramid_level];
+    if (gabor_level.empty())
+    {
+      std::cerr << "Warning: Skipping scale " << scale_idx << " - gabor level " << pyramid_level << " is empty" << std::endl;
+      continue;
+    }
+
+    std::cerr << "Processing scale " << scale_idx << " at pyramid level " << pyramid_level
+              << " (size: " << gabor_level[0].cols << "x" << gabor_level[0].rows
+              << ", radii: " << scale_config.min_radius << "-" << scale_config.max_radius << ")" << std::endl;
+
+    // Use gabor responses directly from the pyramid (no resizing needed)
+    // Compute symmetry at this scale using thesis approach
+    cv::Mat scale_symmetry = compute_radial_symmetry_at_scale(gabor_level, scale_config);
+    scale_results.push_back(scale_symmetry);
+    scale_gabor_responses.push_back(gabor_level);
+
+    auto t_scale_end = std::chrono::high_resolution_clock::now();
+    double scale_ms = std::chrono::duration<double, std::milli>(t_scale_end - t_scale_start).count();
+    scale_computation_times.push_back(scale_ms);
+  }
+
+  if (scale_results.empty())
+  {
+    throw std::runtime_error("SymmetryFeature: No valid scales could be computed");
+  }
+
+  // Step 3: Combine scales
+  auto t_combine_start = std::chrono::high_resolution_clock::now();
+
+  cv::Mat combined;
+  if (config_.use_multi_scale && scale_results.size() > 1)
+  {
+    // Resize all scales to the largest size and take maximum
+    int max_size = 0;
+    for (const auto& scale_result : scale_results)
+    {
+      max_size = std::max(max_size, scale_result.cols);
+    }
+
+    combined = cv::Mat::zeros(max_size, max_size, CV_32F);
+    for (size_t i = 0; i < scale_results.size(); ++i)
+    {
+      cv::Mat resized;
+      if (scale_results[i].size() != combined.size())
+      {
+        cv::resize(scale_results[i], resized, combined.size(), 0, 0, cv::INTER_LINEAR);
+      }
+      else
+      {
+        resized = scale_results[i];
+      }
+
+      // Weight by scale factor (as in old code: factor = 0.5 + i*0.5)
+      float scale_weight = 0.5f + i * 0.5f;
+      combined = cv::max(combined, scale_weight * resized);
+    }
   }
   else
   {
-    result = symmetry_map.clone();
+    // Single scale
+    combined = scale_results[0].clone();
+  }
+
+  auto t_combine_end = std::chrono::high_resolution_clock::now();
+
+  // Step 4: Resize to original frame size and normalize
+  auto t_resize_start = std::chrono::high_resolution_clock::now();
+
+  cv::Mat result;
+  if (combined.size() != frame.size())
+  {
+    cv::resize(combined, result, frame.size(), 0, 0, cv::INTER_LINEAR);
+  }
+  else
+  {
+    result = combined.clone();
   }
 
   cv::normalize(result, result, 0.0f, 1.0f, cv::NORM_MINMAX);
+
   auto t_resize_end = std::chrono::high_resolution_clock::now();
 
-  // Capture debug data if requested (keeps algorithm code clean above)
+  // Capture debug data if requested
   if (debug.enabled)
   {
     double total_ms = std::chrono::duration<double, std::milli>(t_resize_end - t_start).count();
     double gabor_ms = std::chrono::duration<double, std::milli>(t_gabor_end - t_gabor_start).count();
-    double bilateral_ms = std::chrono::duration<double, std::milli>(t_bilateral_end - t_bilateral_start).count();
-    double radial_ms = std::chrono::duration<double, std::milli>(t_radial_end - t_radial_start).count();
-    double smooth_ms = std::chrono::duration<double, std::milli>(t_smooth_end - t_smooth_start).count();
+    double combine_ms = std::chrono::duration<double, std::milli>(t_combine_end - t_combine_start).count();
     double resize_ms = std::chrono::duration<double, std::milli>(t_resize_end - t_resize_start).count();
 
-    capture_debug_data(debug, frame, gabor_level, bilateral, radial, symmetry_map, result,
-                      total_ms, gabor_ms, bilateral_ms, radial_ms, smooth_ms, resize_ms);
+    capture_debug_data(debug, frame, scale_gabor_responses, scale_results, result,
+                      total_ms, gabor_ms, scale_computation_times, combine_ms, resize_ms);
   }
 
   return core::FeatureMap("symmetry", result, 1.0f);
 }
 
-cv::Mat SymmetryFeature::compute_bilateral_symmetry(const std::vector<cv::Mat>& gabor_responses) const
+cv::Mat SymmetryFeature::compute_radial_symmetry_at_scale(const std::vector<cv::Mat>& gabor_responses,
+                                                           const ScaleConfig& scale_config) const
 {
   if (gabor_responses.empty())
   {
     return cv::Mat();
   }
 
-  cv::Mat symmetry = cv::Mat::zeros(gabor_responses[0].size(), CV_32F);
-  int num_orientations = static_cast<int>(gabor_responses.size());
+  const int width_px = gabor_responses[0].cols;
+  const int height_px = gabor_responses[0].rows;
+  const int num_orientations = static_cast<int>(gabor_responses.size());
 
-  // For bilateral symmetry, compare opposite orientations
-  // Orientations separated by 180 degrees should have similar responses
-  for (int i = 0; i < num_orientations / 2; ++i)
+  // Generate list of radii to test based on min, max, and step
+  std::vector<int> radii;
+  for (int r = scale_config.min_radius; r <= scale_config.max_radius; r += scale_config.radius_step)
   {
-    int opposite = i + num_orientations / 2;
-    if (opposite < num_orientations)
+    radii.push_back(r);
+  }
+
+  if (radii.empty())
+  {
+    return cv::Mat();
+  }
+
+  const int num_radii = static_cast<int>(radii.size());
+
+  // Create storage for each radius band (similar to symmetrybands in old code)
+  std::vector<cv::Mat> radius_bands(num_radii);
+  for (int i = 0; i < num_radii; ++i)
+  {
+    radius_bands[i] = cv::Mat::zeros(height_px, width_px, CV_32F);
+  }
+
+  // For each orientation
+  // OPTIMIZATION #2: Parallelize across orientations (each is independent)
+  float delta_alpha = 180.0f / num_orientations;
+
+  #pragma omp parallel for schedule(dynamic) if(num_orientations >= 4)
+  for (int orientation = 0; orientation < num_orientations; ++orientation)
+  {
+    float angle = orientation * delta_alpha;
+
+    // For each radius
+    for (int radius_idx = 0; radius_idx < num_radii; ++radius_idx)
     {
-      // Compute correlation between opposite orientations
-      cv::Mat response1 = gabor_responses[i];
-      cv::Mat response2 = gabor_responses[opposite];
+      int radius = radii[radius_idx];
 
-      // Element-wise minimum indicates agreement
-      cv::Mat agreement;
-      cv::min(response1, response2, agreement);
+      // Compute contribution from this orientation and radius
+      cv::Mat contribution = compute_orientation_radius_contribution(
+          gabor_responses[orientation], angle, radius, scale_config.width, num_orientations);
 
-      symmetry += agreement;
+      // Accumulate into the radius band (needs thread-safe access)
+      #pragma omp critical
+      {
+        radius_bands[radius_idx] += contribution;
+      }
     }
   }
 
-  // Normalize by number of orientation pairs
-  if (num_orientations > 0)
+  // Select maximum across radii, but with threshold and consistency
+  // This makes symmetry centers pop out while suppressing weak/broad responses
+  cv::Mat result = cv::Mat::zeros(height_px, width_px, CV_32F);
+
+  // Normalize radius bands first to get consistent threshold values
+  float max_response = 0.0f;
+  for (int i = 0; i < num_radii; ++i)
   {
-    symmetry /= (num_orientations / 2.0f);
+    double min_val, max_val;
+    cv::minMaxLoc(radius_bands[i], &min_val, &max_val);
+    max_response = std::max(max_response, static_cast<float>(max_val));
   }
 
-  return symmetry;
+  if (max_response > 0.0f)
+  {
+    for (int i = 0; i < num_radii; ++i)
+    {
+      radius_bands[i] /= max_response;
+    }
+  }
+
+  // Apply threshold: only consider radii with strong symmetry
+  // Count consecutive radii above threshold (radius consistency)
+  for (int y = 0; y < height_px; ++y)
+  {
+    for (int x = 0; x < width_px; ++x)
+    {
+      float max_val = 0.0f;
+      int num_above_threshold = 0;
+
+      for (int i = 0; i < num_radii; ++i)
+      {
+        float val = radius_bands[i].at<float>(y, x);
+
+        // Count radii above threshold
+        if (val >= scale_config.symmetry_threshold)
+        {
+          num_above_threshold++;
+          max_val = std::max(max_val, val);
+        }
+      }
+
+      // Require at least 2 radii above threshold (consistency)
+      // Weight by number of consistent radii (more = stronger center)
+      if (num_above_threshold >= 2)
+      {
+        float consistency_weight = std::min(1.0f, num_above_threshold / 4.0f);
+        result.at<float>(y, x) = max_val * consistency_weight;
+      }
+      // else: result stays 0 (weak symmetry suppressed)
+    }
+  }
+
+  return result;
 }
 
-cv::Mat SymmetryFeature::compute_radial_symmetry(const std::vector<cv::Mat>& gabor_responses) const
+cv::Mat SymmetryFeature::compute_orientation_radius_contribution(
+    const cv::Mat& gabor_orientation,
+    float orientation_angle,
+    int radius,
+    int width,
+    int num_orientations) const
 {
-  if (gabor_responses.empty())
+  // This implements the core symmetry_intern logic from the old code (lines 109-171)
+
+  const int width_px = gabor_orientation.cols;
+  const int height_px = gabor_orientation.rows;
+  cv::Mat contribution = cv::Mat::zeros(height_px, width_px, CV_32F);
+
+  // Convert angle to radians (note: old code uses 180-alpha)
+  float alpha_rad = (180.0f - orientation_angle) * M_PI / 180.0f;
+  float cos_a = std::cos(alpha_rad);
+  float sin_a = std::sin(alpha_rad);
+
+  // Calculate summation box dimensions
+  int box_length = static_cast<int>(M_PI * (radius + width) / num_orientations);
+  int box_width = width;
+
+  // Center point of summation area (ax, ay)
+  int ax = -static_cast<int>(cos_a * (radius + width / 2.0f));
+  int ay = static_cast<int>(sin_a * (radius + width / 2.0f));
+
+  // Calculate search area size
+  int area = static_cast<int>(std::sqrt((box_length + 1) * (box_length + 1) +
+                                        (box_width + 1) * (box_width + 1)));
+
+  // Build index array of points in summation box (old code lines 131-148)
+  // OPTIMIZATION #1: This is computed once per orientation/radius, not per pixel
+  std::vector<cv::Point> box_points;
+  int max_x = 0, max_y = 0;
+
+  for (int x = -area; x < area; ++x)
   {
-    return cv::Mat();
+    for (int y = -area; y < area; ++y)
+    {
+      float w = sin_a * y + cos_a * x;
+      float l = cos_a * y - sin_a * x;
+
+      if (std::abs(2 * w) <= box_width && std::abs(2 * l) <= box_length)
+      {
+        box_points.push_back(cv::Point(x, y));
+        max_x = std::max(max_x, std::abs(x));
+        max_y = std::max(max_y, std::abs(y));
+      }
+    }
   }
 
-  cv::Mat symmetry = cv::Mat::zeros(gabor_responses[0].size(), CV_32F);
-  int num_orientations = static_cast<int>(gabor_responses.size());
+  // Normalization factor
+  float normalization = static_cast<float>(box_points.size() * num_orientations) / 2.0f;
+  if (normalization < 1.0f) normalization = 1.0f;
 
-  // For radial symmetry, we want all orientations to be equally represented
-  // Compute the variance of responses across orientations
-  // Low variance = all orientations present = radial symmetry
+  // Core loop: for each pixel, sum responses in symmetry box (old code lines 154-169)
+  int margin_y = std::abs(ay) + max_y;
+  int margin_x = std::abs(ax) + max_x;
 
-  // First, compute mean response across orientations at each pixel
-  cv::Mat mean_response = cv::Mat::zeros(gabor_responses[0].size(), CV_32F);
-  for (const auto& response : gabor_responses)
+  // Pre-compute for faster access
+  const int num_box_points = static_cast<int>(box_points.size());
+
+  for (int y = margin_y; y < height_px - margin_y; ++y)
   {
-    mean_response += response;
+    for (int x = margin_x; x < width_px - margin_x; ++x)
+    {
+      float sum = 0.0f;
+
+      // Sample points in both opposite directions
+      int x1_base = x + ax;
+      int y1_base = y + ay;
+      int x2_base = x - ax;
+      int y2_base = y - ay;
+
+      for (int i = 0; i < num_box_points; ++i)
+      {
+        const cv::Point& offset = box_points[i];
+        int x1 = x1_base + offset.x;
+        int y1 = y1_base + offset.y;
+        int x2 = x2_base - offset.x;
+        int y2 = y2_base - offset.y;
+
+        // Bounds checking
+        if (x1 >= 0 && x1 < width_px && y1 >= 0 && y1 < height_px &&
+            x2 >= 0 && x2 < width_px && y2 >= 0 && y2 < height_px)
+        {
+          sum += gabor_orientation.at<float>(y1, x1) + gabor_orientation.at<float>(y2, x2);
+        }
+      }
+
+      contribution.at<float>(y, x) = sum / normalization;
+    }
   }
-  mean_response /= static_cast<float>(num_orientations);
 
-  // Compute variance
-  cv::Mat variance = cv::Mat::zeros(gabor_responses[0].size(), CV_32F);
-  for (const auto& response : gabor_responses)
-  {
-    cv::Mat diff = response - mean_response;
-    cv::Mat diff_sq;
-    cv::multiply(diff, diff, diff_sq);
-    variance += diff_sq;
-  }
-  variance /= static_cast<float>(num_orientations);
-
-  // Convert variance to symmetry: high variance = low symmetry
-  // Symmetry = mean_response * (1 - normalized_variance)
-  // This captures both the presence of edges and their isotropy
-
-  // Normalize variance
-  cv::Mat variance_norm;
-  cv::normalize(variance, variance_norm, 0.0f, 1.0f, cv::NORM_MINMAX);
-
-  // Compute symmetry score
-  cv::Mat isotropy = 1.0f - variance_norm;
-
-  // Weight by mean response (only consider areas with strong Gabor responses)
-  cv::Mat mean_norm;
-  cv::normalize(mean_response, mean_norm, 0.0f, 1.0f, cv::NORM_MINMAX);
-
-  cv::multiply(isotropy, mean_norm, symmetry);
-
-  return symmetry;
+  return contribution;
 }
 
 void SymmetryFeature::capture_debug_data(DebugContext& debug,
                                          const core::Frame& frame,
-                                         const std::vector<cv::Mat>& gabor_responses,
-                                         const cv::Mat& bilateral,
-                                         const cv::Mat& radial,
-                                         const cv::Mat& symmetry_map,
+                                         const std::vector<std::vector<cv::Mat>>& scale_gabor_responses,
+                                         const std::vector<cv::Mat>& scale_results,
                                          const cv::Mat& result,
                                          double total_ms,
                                          double gabor_computation_ms,
-                                         double bilateral_ms,
-                                         double radial_ms,
-                                         double smoothing_ms,
+                                         const std::vector<double>& scale_computation_times,
+                                         double combine_ms,
                                          double resize_ms) const
 {
   // Annotations
   debug.add_annotation("num_orientations", std::to_string(config_.num_orientations));
-  debug.add_annotation("compute_scale", std::to_string(config_.compute_at_scale));
-  debug.add_annotation("bilateral_weight", std::to_string(constants::BILATERAL_SYMMETRY_WEIGHT));
-  debug.add_annotation("radial_weight", std::to_string(constants::RADIAL_SYMMETRY_WEIGHT));
+  debug.add_annotation("num_scales", std::to_string(config_.scales.size()));
+  debug.add_annotation("use_multi_scale", config_.use_multi_scale ? "true" : "false");
   debug.add_annotation("output_size", std::to_string(result.cols) + "x" + std::to_string(result.rows));
+
+  // Scale configurations
+  for (size_t i = 0; i < config_.scales.size(); ++i)
+  {
+    const auto& sc = config_.scales[i];
+    debug.add_annotation("scale_" + std::to_string(i) + "_pyramid_level", std::to_string(sc.pyramid_level));
+    debug.add_annotation("scale_" + std::to_string(i) + "_radius_range",
+                        std::to_string(sc.min_radius) + "-" + std::to_string(sc.max_radius) +
+                        " (step=" + std::to_string(sc.radius_step) + ")");
+    debug.add_annotation("scale_" + std::to_string(i) + "_width", std::to_string(sc.width));
+    debug.add_annotation("scale_" + std::to_string(i) + "_threshold", std::to_string(sc.symmetry_threshold));
+  }
 
   // Timings
   debug.add_timing("gabor_computation", gabor_computation_ms);
-  debug.add_timing("bilateral_symmetry", bilateral_ms);
-  debug.add_timing("radial_symmetry", radial_ms);
-  debug.add_timing("smoothing", smoothing_ms);
+  for (size_t i = 0; i < scale_computation_times.size(); ++i)
+  {
+    debug.add_timing("scale_" + std::to_string(i) + "_computation", scale_computation_times[i]);
+  }
+  debug.add_timing("combine_scales", combine_ms);
   debug.add_timing("resize_and_normalize", resize_ms);
   debug.add_timing("total_time", total_ms);
 
-  // Basic level: Key symmetry components
+  // Basic level: Per-scale results
   if (debug.is_level(DebugContext::Level::Basic))
   {
-    debug.add_image("bilateral_symmetry", bilateral);
-    debug.add_image("radial_symmetry", radial);
-    debug.add_image("combined_before_resize", symmetry_map);
+    for (size_t i = 0; i < scale_results.size(); ++i)
+    {
+      int level = config_.scales[i].pyramid_level;
+      int size = scale_results[i].cols;
+      std::string name = "scale_" + std::to_string(i) + "_level" + std::to_string(level) +
+                         "_symmetry_" + std::to_string(size) + "x" + std::to_string(size);
+      debug.add_image(name, scale_results[i]);
+    }
   }
 
-  // Detailed level: Add individual Gabor orientations
-  if (debug.is_level(DebugContext::Level::Detailed))
+  // Detailed level: Add individual Gabor orientations for first scale
+  if (debug.is_level(DebugContext::Level::Detailed) && !scale_gabor_responses.empty())
   {
-    // Save first 4 orientations (0°, 30°, 60°, 90° for 12 orientations)
-    int max_orientations_to_save = std::min(4, static_cast<int>(gabor_responses.size()));
+    const auto& first_scale_gabor = scale_gabor_responses[0];
+    int max_orientations_to_save = std::min(4, static_cast<int>(first_scale_gabor.size()));
+
     for (int i = 0; i < max_orientations_to_save; ++i)
     {
-      if (!gabor_responses[i].empty())
+      if (!first_scale_gabor[i].empty())
       {
         int angle = (i * 180) / config_.num_orientations;
-        std::string img_name = "gabor_response_" + std::to_string(angle) + "deg";
-        debug.add_image(img_name, gabor_responses[i]);
+        std::string img_name = "scale0_gabor_" + std::to_string(angle) + "deg";
+        debug.add_image(img_name, first_scale_gabor[i]);
       }
     }
   }

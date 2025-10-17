@@ -203,20 +203,36 @@ void AttentionPipeline::extract_features()
   extractors.push_back(std::make_unique<features::EccentricityFeature>(ecc_config));
 
   // Add symmetry feature (always)
-  // Use very coarse scale for global symmetry detection to improve performance
+  // Use multi-scale approach with continuous radius sampling for blob-like responses
   // Use 12 orientations for better symmetry detection (vs 4 for basic orientation feature)
   features::SymmetryFeature::Config sym_config;
   sym_config.num_orientations = 12;
   sym_config.wavelength = 8.0;  // Larger wavelength for coarser features
   sym_config.bandwidth = 1.0;
-  if (frame_.width() > 640 || frame_.height() > 640)
+  sym_config.use_multi_scale = true;
+
+  // Configure scales based on image size
+  // Use existing pyramid levels directly (no resizing)
+  // Only compute on pyramid levels where at least one side < 256px
+  // Note: pyramid level N means downsampled by 2^N
+  sym_config.scales.clear();
+
+  // Find the first pyramid level where at least one side is < 256
+  int start_level = 0;
+  int min_dim = std::min(frame_.width(), frame_.height());
+  while (min_dim >= 256 && start_level < 10)
   {
-    sym_config.compute_at_scale = 4; // 1/16 resolution for large images (very coarse for performance)
+    start_level++;
+    min_dim /= 2;
   }
-  else
-  {
-    sym_config.compute_at_scale = 2; // Quarter resolution for small images
-  }
+
+  // Compute on this level and the next two coarser levels
+  // pyramid_level, min_radius, max_radius, radius_step, width, threshold
+  // Using radius_step=2 for ~2x speedup
+  // Higher thresholds at coarser scales to suppress false positives
+  sym_config.scales.push_back(features::SymmetryFeature::ScaleConfig(start_level, 5, 20, 2, 3, 0.3f));      // Finest scale: threshold 0.3
+  sym_config.scales.push_back(features::SymmetryFeature::ScaleConfig(start_level + 1, 8, 25, 2, 3, 0.5f));  // Coarser: threshold 0.5
+  sym_config.scales.push_back(features::SymmetryFeature::ScaleConfig(start_level + 2, 10, 30, 2, 3, 0.65f)); // Coarsest: threshold 0.65
   extractors.push_back(std::make_unique<features::SymmetryFeature>(sym_config));
 
   // Extract features (with optional debugging)

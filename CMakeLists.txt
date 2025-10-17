@@ -7,6 +7,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Find dependencies
 find_package(OpenCV 4 REQUIRED)
+find_package(OpenMP)
 # find_package(Eigen3 REQUIRED)  # Uncomment when needed
 
 # yaml-cpp (homebrew installation)
@@ -33,6 +34,14 @@ add_executable(attention
     src/visualization/visualizer.cpp
 )
 target_link_libraries(attention ${OpenCV_LIBS} yaml-cpp)
+
+# Enable OpenMP if available
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(attention OpenMP::OpenMP_CXX)
+    message(STATUS "OpenMP enabled for parallel processing")
+else()
+    message(WARNING "OpenMP not found - symmetry feature will run sequentially")
+endif()
 
 # Optional: clang-format targets for code formatting
 find_program(CLANG_FORMAT clang-format)
