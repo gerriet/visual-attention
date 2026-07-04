@@ -2,18 +2,26 @@
 
 Modern C++ reimplementation of neural field-based visual attention system from doctoral dissertation (2003-2005).
 
-## Current Status: Week 4 Complete ✓
+## Current Status: v2 Phase
+
+Development happens on the `v2` branch following `docs/V2_ROADMAP.md`
+(milestones M0–M7: swappable architecture, neural-field selection, stereo,
+motion, ESAB2 system level, modern learned-model comparison).
 
 **Implemented Features:**
 
 - ✅ Color attention (red-green, blue-yellow opponent channels)
 - ✅ Intensity attention (center-surround contrast)
-- ✅ Radial symmetry (gradient voting, Reisfeld et al. 1995)
+- ✅ Orientation (Gabor filter pyramids, Itti-Koch style)
+- ✅ Symmetry (Gabor-based radial symmetry, per thesis specification)
+- ✅ Eccentricity (region segmentation + moments)
 - ✅ Multi-scale processing with cached pyramids
 - ✅ Parallel feature extraction
 - ✅ Winner-take-all peak detection with inhibition of return
 - ✅ YAML configuration system
 - ✅ Batch processing mode
+- ✅ Golden regression tests (characterization + behavioral scanpath)
+- ✅ Result interchange format (`docs/INTERCHANGE_FORMAT.md`)
 
 **Performance:**
 
@@ -45,6 +53,28 @@ make
 
 # Use configuration file
 ./attention --config ../configs/default.yaml
+
+# Emit results in the interchange format (JSON + 16-bit saliency PNG)
+./attention ../data/test_images/input.png --no-display --emit-json out/result.json
+```
+
+### Tests
+
+```bash
+ctest --test-dir build
+```
+
+Two layers, both against golden data in `tests/golden/`:
+
+- **Characterization** (C++/Catch2): feature and saliency maps within tolerance —
+  refactor tripwires, not ground truth.
+- **Behavioral** (CLI + `eval/compare_scanpaths.py`): fixation sequence matches
+  within loose position/order tolerance — the replication bar of the project.
+
+After an *intentional* algorithm change, review and regenerate:
+
+```bash
+ATTENTION_UPDATE_GOLDEN=1 ./build/tests/characterization_tests
 ```
 
 ## Documentation
@@ -64,15 +94,15 @@ make
 
 ```text
 attention-framework/
-├── docs/              # Documentation
-├── reference/         # Old code for reference
-├── data/              # Test images and expected outputs
+├── docs/              # Documentation (see docs/V2_ROADMAP.md for direction)
+├── reference/         # Original thesis code (reference only, not compiled)
+├── data/              # Test images
 ├── configs/           # YAML configuration files
 ├── include/           # C++ headers
 ├── src/               # C++ implementation
-├── tests/             # Unit tests
-├── examples/          # Usage examples
-└── tools/             # Utilities
+├── tests/             # Golden regression tests (Catch2 + CTest)
+├── eval/              # Python evaluation layer (comparators, metrics)
+└── examples/          # Usage examples (built with the project)
 ```
 
 ## Architecture
@@ -95,12 +125,11 @@ Feature Integration → Winner-Take-All → Attention Peaks
 
 ### Current Progress
 
-**Week 1-3:** Core infrastructure, features, pipeline ✓
-**Week 4:** Configuration system, optimization, batch processing ✓
-**Week 5:** Additional features (orientation, motion) - *pending*
-**Week 6+:** Neural field dynamics, 3D stereo attention - *pending*
+Phase 1 (2025, weeks 1–4): core infrastructure, five features, pipeline,
+configuration, optimization — complete. See `docs/PHASE1_ACTION_PLAN.md`.
 
-See `docs/PHASE1_ACTION_PLAN.md` for detailed development phases.
+Phase 2 ("v2", 2026): see `docs/V2_ROADMAP.md` — guardrail tests (M1) done;
+next up: swappable architecture (M2) and neural-field selection (M3).
 
 ### Code Formatting
 

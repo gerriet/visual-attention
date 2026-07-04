@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(AttentionFramework VERSION 1.0.0 LANGUAGES CXX)
+project(AttentionFramework VERSION 2.0.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -8,20 +8,19 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Find dependencies
 find_package(OpenCV 4 REQUIRED)
 find_package(OpenMP)
-# find_package(Eigen3 REQUIRED)  # Uncomment when needed
 
-# yaml-cpp (homebrew installation)
-set(YAML_CPP_DIR "/opt/homebrew/opt/yaml-cpp")
-include_directories(${YAML_CPP_DIR}/include)
-link_directories(${YAML_CPP_DIR}/lib)
+# yaml-cpp: prefer an installed CMake package config; the Homebrew prefix is
+# appended so a plain `brew install yaml-cpp` is found without configuration
+list(APPEND CMAKE_PREFIX_PATH "/opt/homebrew/opt/yaml-cpp")
+find_package(yaml-cpp CONFIG REQUIRED)
+if(TARGET yaml-cpp::yaml-cpp)
+    set(YAML_CPP_TARGET yaml-cpp::yaml-cpp)
+else()
+    set(YAML_CPP_TARGET yaml-cpp)
+endif()
 
-# Include directories
-include_directories(include)
-include_directories(${OpenCV_INCLUDE_DIRS})
-
-# Build main executable
-add_executable(attention
-    src/main.cpp
+# Core library: everything except main(), shared by the CLI, examples, tests
+add_library(attention_core STATIC
     src/core/frame.cpp
     src/pipeline/attention_pipeline.cpp
     src/features/color_feature.cpp
@@ -32,34 +31,52 @@ add_executable(attention
     src/features/debug_context.cpp
     src/config/config_loader.cpp
     src/visualization/visualizer.cpp
+    src/io/result_writer.cpp
 )
-target_link_libraries(attention ${OpenCV_LIBS} yaml-cpp)
+target_include_directories(attention_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_include_directories(attention_core SYSTEM PUBLIC ${OpenCV_INCLUDE_DIRS})
+target_link_libraries(attention_core PUBLIC ${OpenCV_LIBS} ${YAML_CPP_TARGET})
 
-# Enable OpenMP if available
 if(OpenMP_CXX_FOUND)
-    target_link_libraries(attention OpenMP::OpenMP_CXX)
+    target_link_libraries(attention_core PUBLIC OpenMP::OpenMP_CXX)
     message(STATUS "OpenMP enabled for parallel processing")
 else()
     message(WARNING "OpenMP not found - symmetry feature will run sequentially")
 endif()
 
+# Main executable
+add_executable(attention src/main.cpp)
+target_link_libraries(attention PRIVATE attention_core)
+
+# Examples (built by default so they cannot silently rot)
+add_executable(pipeline_test examples/pipeline_test.cpp)
+target_link_libraries(pipeline_test PRIVATE attention_core)
+
+add_executable(debug_color examples/debug_color.cpp)
+target_link_libraries(debug_color PRIVATE attention_core)
+
+# Tests
+include(CTest)
+if(BUILD_TESTING)
+    add_subdirectory(tests)
+endif()
+
 # Optional: clang-format targets for code formatting
 find_program(CLANG_FORMAT clang-format)
 if(CLANG_FORMAT)
-    # Get all C++ source files
     file(GLOB_RECURSE ALL_CXX_SOURCE_FILES
         ${CMAKE_SOURCE_DIR}/include/*.h
         ${CMAKE_SOURCE_DIR}/src/*.cpp
+        ${CMAKE_SOURCE_DIR}/examples/*.cpp
+        ${CMAKE_SOURCE_DIR}/tests/*.cpp
     )
 
-    # Target to check if formatting is needed (CI/CD)
     add_custom_target(format-check
         COMMAND ${CLANG_FORMAT} --dry-run --Werror ${ALL_CXX_SOURCE_FILES}
         COMMENT "Checking code formatting..."
         VERBATIM
     )
 
-    # Target to apply formatting
     add_custom_target(format
         COMMAND ${CLANG_FORMAT} -i ${ALL_CXX_SOURCE_FILES}
         COMMENT "Formatting code with clang-format..."
@@ -67,16 +84,12 @@ if(CLANG_FORMAT)
     )
 
     message(STATUS "clang-format found: ${CLANG_FORMAT}")
-    message(STATUS "  Run 'cmake --build . --target format' to format code")
-    message(STATUS "  Run 'cmake --build . --target format-check' to check formatting (CI mode)")
-    message(STATUS "  Or use 'ninja format' / 'make format' depending on your generator")
 else()
     message(WARNING "clang-format not found. Code formatting targets unavailable.")
 endif()
 
 message(STATUS "")
 message(STATUS "OpenCV version: ${OpenCV_VERSION}")
-message(STATUS "OpenCV libs: ${OpenCV_LIBS}")
-message(STATUS "")
 message(STATUS "Build the project with: cmake --build .")
-message(STATUS "Run with: ./attention <image_path>")
+message(STATUS "Run the tests with:    ctest --test-dir build")
+message(STATUS "")

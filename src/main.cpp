@@ -2,6 +2,7 @@
 // Phase 1: Minimal working system
 
 #include "attention/config/config_loader.h"
+#include "attention/io/result_writer.h"
 #include "attention/pipeline/attention_pipeline.h"
 #include "attention/visualization/visualizer.h"
 #include <algorithm>
@@ -240,6 +241,8 @@ void print_usage(const char* program_name)
   std::cerr << "  --config             Load configuration from YAML file" << std::endl;
   std::cerr << "  --batch              Process all images in directory, save features separately" << std::endl;
   std::cerr << "  --output <dir>       Specify output directory for batch mode (default: input_dir/results_batch)" << std::endl;
+  std::cerr << "  --emit-json <path>   Write result JSON + saliency map in the interchange format" << std::endl;
+  std::cerr << "                       (see docs/INTERCHANGE_FORMAT.md; single-image and config modes)" << std::endl;
   std::cerr << std::endl;
   std::cerr << "Debug Options:" << std::endl;
   std::cerr << "  --debug[=LEVEL]      Enable debugging (levels: basic, detailed, verbose)" << std::endl;
@@ -262,6 +265,7 @@ int main(int argc, char** argv)
   {
     attention::config::ConfigLoader::Config config;
     bool use_config_file = false;
+    std::string emit_json_path;
 
     // Parse command line arguments
     if (std::string(argv[1]) == "--batch")
@@ -299,6 +303,14 @@ int main(int argc, char** argv)
       std::cout << "Loading configuration from: " << config_path << std::endl;
       config = attention::config::ConfigLoader::load(config_path);
       use_config_file = true;
+
+      for (int i = 3; i < argc; ++i)
+      {
+        if (std::string(argv[i]) == "--emit-json" && i + 1 < argc)
+        {
+          emit_json_path = argv[++i];
+        }
+      }
 
       if (config.input_image.empty())
       {
@@ -347,6 +359,10 @@ int main(int argc, char** argv)
         {
           config.pipeline.debug_save_images = false;
         }
+        else if (arg == "--emit-json" && i + 1 < argc)
+        {
+          emit_json_path = argv[++i];
+        }
       }
     }
 
@@ -375,6 +391,12 @@ int main(int argc, char** argv)
     std::cout << "  Processing time: " << duration.count() << " ms" << std::endl;
     std::cout << "✓ Processing complete!" << std::endl;
 
+    if (!emit_json_path.empty())
+    {
+      attention::io::ResultWriter::write(pipeline, emit_json_path);
+      std::cout << "✓ Saved result JSON: " << emit_json_path << std::endl;
+    }
+
     // Visualize results
     std::cout << "\nGenerating visualization..." << std::endl;
     cv::Mat visualization = pipeline.visualize(config.save_features);
@@ -402,6 +424,7 @@ int main(int argc, char** argv)
     else
     {
       // Save to file
+      fs::create_directories(config.output_dir);
       std::string output_path = config.output_dir + "pipeline_output.png";
       cv::imwrite(output_path, visualization);
       std::cout << "✓ Saved visualization: " << output_path << std::endl;

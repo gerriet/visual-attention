@@ -211,29 +211,25 @@ cv::Mat SymmetryFeature::compute_radial_symmetry_at_scale(const std::vector<cv::
     radius_bands[i] = cv::Mat::zeros(height_px, width_px, CV_32F);
   }
 
-  // For each orientation
-  // OPTIMIZATION #2: Parallelize across orientations (each is independent)
+  // OPTIMIZATION #2: Parallelize across radius bands; each band accumulates
+  // its orientations sequentially in fixed order, so no locking is needed and
+  // float summation order is identical on every run (bit-reproducible results)
   float delta_alpha = 180.0f / num_orientations;
 
-  #pragma omp parallel for schedule(dynamic) if(num_orientations >= 4)
-  for (int orientation = 0; orientation < num_orientations; ++orientation)
+  #pragma omp parallel for schedule(dynamic) if(num_radii >= 2)
+  for (int radius_idx = 0; radius_idx < num_radii; ++radius_idx)
   {
-    float angle = orientation * delta_alpha;
+    int radius = radii[radius_idx];
 
-    // For each radius
-    for (int radius_idx = 0; radius_idx < num_radii; ++radius_idx)
+    for (int orientation = 0; orientation < num_orientations; ++orientation)
     {
-      int radius = radii[radius_idx];
+      float angle = orientation * delta_alpha;
 
       // Compute contribution from this orientation and radius
       cv::Mat contribution = compute_orientation_radius_contribution(
           gabor_responses[orientation], angle, radius, scale_config.width, num_orientations);
 
-      // Accumulate into the radius band (needs thread-safe access)
-      #pragma omp critical
-      {
-        radius_bands[radius_idx] += contribution;
-      }
+      radius_bands[radius_idx] += contribution;
     }
   }
 

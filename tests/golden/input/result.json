@@ -1,0 +1,43 @@
+{
+  "schema": "attention-result/v1",
+  "source": {
+    "image": "data/test_images/input.png",
+    "width": 256,
+    "height": 256
+  },
+  "generator": {
+    "name": "attention-framework",
+    "variant": "classic-weighted-sum"
+  },
+  "params": {
+    "feature_weights": {"color": 1, "eccentricity": 1, "intensity": 1, "orientation": 1, "symmetry": 1},
+    "peaks": {
+      "min_distance": 30,
+      "threshold": 0.3,
+      "max_count": 10,
+      "enable_ior": false,
+      "ior_radius": 50,
+      "ior_strength": 0.8
+    }
+  },
+  "saliency_map": "result_saliency.png",
+  "fixations": [
+    {"n": 0, "x": 42, "y": 57, "value": 1},
+    {"n": 1, "x": 206, "y": 50, "value": 0.96492},
+    {"n": 2, "x": 159, "y": 95, "value": 0.934311},
+    {"n": 3, "x": 107, "y": 85, "value": 0.799412},
+    {"n": 4, "x": 135, "y": 120, "value": 0.775321},
+    {"n": 5, "x": 51, "y": 183, "value": 0.655327},
+    {"n": 6, "x": 29, "y": 254, "value": 0.524222},
+    {"n": 7, "x": 197, "y": 230, "value": 0.438855},
+    {"n": 8, "x": 103, "y": 226, "value": 0.431538},
+    {"n": 9, "x": 205, "y": 168, "value": 0.417432}
+  ],
+  "timing_ms": {
+    "pyramid": 0,
+    "features": {"color": 0, "eccentricity": 2, "intensity": 0, "orientation": 0, "symmetry": 5},
+    "integration": 0,
+    "peak_detection": 2,
+    "total": 9
+  }
+}
