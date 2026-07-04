@@ -21,6 +21,8 @@ __pycache__/
 
 # Generated files
 results/
+results_batch/
+debug_output/
 *.log
 
 # Large data files (download separately)
