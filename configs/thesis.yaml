@@ -1,0 +1,36 @@
+# Thesis profile: the feature set of the original dissertation
+# (Backer 2004), loosely equivalent by design (see docs/V2_ROADMAP.md).
+#
+# The original static features were color, eccentricity, and symmetry
+# (stereo and onset follow in roadmap M5). Intensity and orientation are
+# Itti-Koch-style additions of the reimplementation and stay disabled here.
+#
+# Selection: sequential winner-take-all with inhibition of return — the
+# closest available stand-in for the two-stage neural-field selection until
+# roadmap M3 ports the neural-field dynamics.
+
+pipeline:
+  fusion: weighted-sum
+  selection: ior
+
+features:
+  color:
+    weight: 1.0
+  eccentricity:
+    weight: 1.0
+  symmetry:
+    weight: 1.0
+  intensity:
+    enabled: false
+  orientation:
+    enabled: false
+
+peaks:
+  threshold: 0.3
+  max_count: 10
+  ior_radius: 50
+  ior_strength: 0.8
+
+output:
+  output_dir: "results/"
+  display: false

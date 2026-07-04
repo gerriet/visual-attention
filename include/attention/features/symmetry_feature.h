@@ -63,6 +63,8 @@ class SymmetryFeature : public FeatureExtractor
     double bandwidth;                  // Bandwidth parameter
     std::vector<ScaleConfig> scales;   // Configuration for each pyramid level
     bool use_multi_scale;              // Whether to combine multiple scales
+    bool auto_scale_schedule = false;  // Ignore 'scales', derive a size-adaptive
+                                       // 3-scale schedule from the frame instead
 
     Config()
       : num_orientations(12), wavelength(4.0), bandwidth(1.0), use_multi_scale(true)
@@ -97,6 +99,13 @@ class SymmetryFeature : public FeatureExtractor
   Config config_;
 
   /**
+   * Resolve the scale schedule for a frame: the configured scales, or — with
+   * auto_scale_schedule — a size-adaptive schedule starting at the first
+   * pyramid level where one side drops below 256px.
+   */
+  std::vector<ScaleConfig> resolve_scales(const core::Frame& frame) const;
+
+  /**
    * Compute radial symmetry at a single scale using the thesis approach.
    * For each pixel, tests multiple radii and selects the maximum response.
    * @param gabor_responses Vector of Gabor filter responses (one per orientation)
@@ -126,6 +135,7 @@ class SymmetryFeature : public FeatureExtractor
   // Debug helper: capture intermediate results (keeps algorithm code clean)
   void capture_debug_data(DebugContext& debug,
                           const core::Frame& frame,
+                          const std::vector<ScaleConfig>& scales,
                           const std::vector<std::vector<cv::Mat>>& scale_gabor_responses,
                           const std::vector<cv::Mat>& scale_results,
                           const cv::Mat& result,

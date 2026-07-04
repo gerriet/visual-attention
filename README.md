@@ -54,6 +54,10 @@ make
 # Use configuration file
 ./attention --config ../configs/default.yaml
 
+# Run a profile on any image (thesis feature set + IOR, or the modern set)
+./attention --config ../configs/thesis.yaml ../data/test_images/inputc.png --no-display
+./attention --config ../configs/modern.yaml ../data/test_images/inputc.png --no-display
+
 # Emit results in the interchange format (JSON + 16-bit saliency PNG)
 ./attention ../data/test_images/input.png --no-display --emit-json out/result.json
 ```
@@ -128,8 +132,10 @@ Feature Integration → Winner-Take-All → Attention Peaks
 Phase 1 (2025, weeks 1–4): core infrastructure, five features, pipeline,
 configuration, optimization — complete. See `docs/PHASE1_ACTION_PLAN.md`.
 
-Phase 2 ("v2", 2026): see `docs/V2_ROADMAP.md` — guardrail tests (M1) done;
-next up: swappable architecture (M2) and neural-field selection (M3).
+Phase 2 ("v2", 2026): see `docs/V2_ROADMAP.md` — guardrail tests (M1) and the
+swappable architecture (M2: feature registry, fusion/selection strategies,
+stream-oriented pipeline, thesis/modern profiles) are done; next up:
+neural-field selection (M3).
 
 ### Code Formatting
 

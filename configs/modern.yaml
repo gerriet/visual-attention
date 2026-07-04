@@ -1,0 +1,28 @@
+# Modern profile: the full current feature set with default parameters.
+# Baseline for the modern track (roadmap M7) — learned models run Python-side
+# and are compared via the interchange format, not through this config.
+
+pipeline:
+  fusion: weighted-sum
+  selection: nms
+
+features:
+  color:
+    weight: 1.0
+  intensity:
+    weight: 1.0
+  orientation:
+    weight: 1.0
+  eccentricity:
+    weight: 1.0
+  symmetry:
+    weight: 1.0
+
+peaks:
+  min_distance: 30
+  threshold: 0.3
+  max_count: 10
+
+output:
+  output_dir: "results/"
+  display: false

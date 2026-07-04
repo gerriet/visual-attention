@@ -1,4 +1,6 @@
 #include "attention/config/config_loader.h"
+#include "attention/features/feature_registry.h"
+#include <sstream>
 #include <stdexcept>
 #include <yaml-cpp/yaml.h>
 
@@ -23,7 +25,13 @@ ConfigLoader::Config ConfigLoader::load(const std::string& yaml_path)
       }
     }
 
-    // Load feature weights
+    // Load pipeline strategy selection
+    if (yaml["pipeline"])
+    {
+      load_pipeline(yaml["pipeline"], config.pipeline);
+    }
+
+    // Load feature set (overrides/extends the default set)
     if (yaml["features"])
     {
       load_features(yaml["features"], config.pipeline);
@@ -61,23 +69,88 @@ ConfigLoader::Config ConfigLoader::create_default()
   return config;
 }
 
+void ConfigLoader::load_pipeline(const YAML::Node& node, pipeline::PipelineConfig& config)
+{
+  if (node["fusion"])
+  {
+    config.fusion = node["fusion"].as<std::string>();
+  }
+
+  if (node["selection"])
+  {
+    config.selection = node["selection"].as<std::string>();
+  }
+
+  if (node["gabor"])
+  {
+    const YAML::Node& gabor = node["gabor"];
+    if (gabor["num_orientations"])
+    {
+      config.gabor_orientations = gabor["num_orientations"].as<int>();
+    }
+    if (gabor["wavelength"])
+    {
+      config.gabor_wavelength = gabor["wavelength"].as<double>();
+    }
+    if (gabor["bandwidth"])
+    {
+      config.gabor_bandwidth = gabor["bandwidth"].as<double>();
+    }
+  }
+}
+
 void ConfigLoader::load_features(const YAML::Node& features, pipeline::PipelineConfig& config)
 {
+  features::register_builtin_features();
+  const auto& registry = features::FeatureRegistry::instance();
 
-  // Load individual feature weights
-  if (features["color"] && features["color"]["weight"])
+  // Entries override the matching default spec; listed features that are not
+  // in the default set are appended. Features stay enabled unless a config
+  // says `enabled: false` — this keeps v1 config files (weight-only
+  // overrides) working unchanged.
+  for (const auto& entry : features)
   {
-    config.feature_weights["color"] = features["color"]["weight"].as<float>();
-  }
+    const std::string type = entry.first.as<std::string>();
+    const YAML::Node& node = entry.second;
 
-  if (features["intensity"] && features["intensity"]["weight"])
-  {
-    config.feature_weights["intensity"] = features["intensity"]["weight"].as<float>();
-  }
+    if (!registry.has(type))
+    {
+      std::ostringstream msg;
+      msg << "Unknown feature '" << type << "' in config. Available:";
+      for (const auto& name : registry.available())
+      {
+        msg << " " << name;
+      }
+      throw std::runtime_error(msg.str());
+    }
 
-  if (features["symmetry"] && features["symmetry"]["weight"])
-  {
-    config.feature_weights["symmetry"] = features["symmetry"]["weight"].as<float>();
+    pipeline::FeatureSpec* spec = nullptr;
+    for (auto& existing : config.features)
+    {
+      if (existing.type == type)
+      {
+        spec = &existing;
+        break;
+      }
+    }
+    if (spec == nullptr)
+    {
+      config.features.emplace_back(type);
+      spec = &config.features.back();
+    }
+
+    if (node["enabled"])
+    {
+      spec->enabled = node["enabled"].as<bool>();
+    }
+    if (node["weight"])
+    {
+      spec->weight = node["weight"].as<float>();
+    }
+    if (node["params"])
+    {
+      spec->params_yaml = YAML::Dump(node["params"]);
+    }
   }
 }
 
@@ -99,7 +172,7 @@ void ConfigLoader::load_peaks(const YAML::Node& peaks, pipeline::PipelineConfig&
     config.peak_max_count = peaks["max_count"].as<int>();
   }
 
-  // IOR parameters
+  // IOR parameters (enable_ior is the legacy alias for selection: ior)
   if (peaks["enable_ior"])
   {
     config.enable_ior = peaks["enable_ior"].as<bool>();

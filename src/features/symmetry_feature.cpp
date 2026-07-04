@@ -34,12 +34,15 @@ core::FeatureMap SymmetryFeature::extract(const core::Frame& frame, DebugContext
     throw std::runtime_error("SymmetryFeature: Grayscale pyramid not computed");
   }
 
+  // Resolve the scale schedule (size-adaptive when auto_scale_schedule set)
+  const std::vector<ScaleConfig> scales = resolve_scales(frame);
+
   // Step 1: Compute Gabor pyramids if needed
   auto t_gabor_start = std::chrono::high_resolution_clock::now();
 
   // Determine required pyramid levels based on scale configurations
   int max_pyramid_level = 0;
-  for (const auto& scale_config : config_.scales)
+  for (const auto& scale_config : scales)
   {
     if (scale_config.pyramid_level >= 0)
     {
@@ -64,9 +67,9 @@ core::FeatureMap SymmetryFeature::extract(const core::Frame& frame, DebugContext
   std::vector<std::vector<cv::Mat>> scale_gabor_responses;
   std::vector<double> scale_computation_times;
 
-  for (size_t scale_idx = 0; scale_idx < config_.scales.size(); ++scale_idx)
+  for (size_t scale_idx = 0; scale_idx < scales.size(); ++scale_idx)
   {
-    const auto& scale_config = config_.scales[scale_idx];
+    const auto& scale_config = scales[scale_idx];
     auto t_scale_start = std::chrono::high_resolution_clock::now();
 
     // Use specified pyramid level directly
@@ -171,11 +174,37 @@ core::FeatureMap SymmetryFeature::extract(const core::Frame& frame, DebugContext
     double combine_ms = std::chrono::duration<double, std::milli>(t_combine_end - t_combine_start).count();
     double resize_ms = std::chrono::duration<double, std::milli>(t_resize_end - t_resize_start).count();
 
-    capture_debug_data(debug, frame, scale_gabor_responses, scale_results, result,
+    capture_debug_data(debug, frame, scales, scale_gabor_responses, scale_results, result,
                       total_ms, gabor_ms, scale_computation_times, combine_ms, resize_ms);
   }
 
   return core::FeatureMap("symmetry", result, 1.0f);
+}
+
+std::vector<SymmetryFeature::ScaleConfig> SymmetryFeature::resolve_scales(const core::Frame& frame) const
+{
+  if (!config_.auto_scale_schedule)
+  {
+    return config_.scales;
+  }
+
+  // Size-adaptive schedule (moved verbatim from the v1 pipeline): start at the
+  // first pyramid level where one side is below 256px, plus the two coarser
+  // levels, with higher thresholds at coarser scales to suppress false
+  // positives and radius_step=2 for speed
+  int start_level = 0;
+  int min_dim = std::min(frame.width(), frame.height());
+  while (min_dim >= 256 && start_level < 10)
+  {
+    start_level++;
+    min_dim /= 2;
+  }
+
+  std::vector<ScaleConfig> scales;
+  scales.push_back(ScaleConfig(start_level, 5, 20, 2, 3, 0.3f));
+  scales.push_back(ScaleConfig(start_level + 1, 8, 25, 2, 3, 0.5f));
+  scales.push_back(ScaleConfig(start_level + 2, 10, 30, 2, 3, 0.65f));
+  return scales;
 }
 
 cv::Mat SymmetryFeature::compute_radial_symmetry_at_scale(const std::vector<cv::Mat>& gabor_responses,
@@ -388,6 +417,7 @@ cv::Mat SymmetryFeature::compute_orientation_radius_contribution(
 
 void SymmetryFeature::capture_debug_data(DebugContext& debug,
                                          const core::Frame& frame,
+                                         const std::vector<ScaleConfig>& scales,
                                          const std::vector<std::vector<cv::Mat>>& scale_gabor_responses,
                                          const std::vector<cv::Mat>& scale_results,
                                          const cv::Mat& result,
@@ -399,14 +429,14 @@ void SymmetryFeature::capture_debug_data(DebugContext& debug,
 {
   // Annotations
   debug.add_annotation("num_orientations", std::to_string(config_.num_orientations));
-  debug.add_annotation("num_scales", std::to_string(config_.scales.size()));
+  debug.add_annotation("num_scales", std::to_string(scales.size()));
   debug.add_annotation("use_multi_scale", config_.use_multi_scale ? "true" : "false");
   debug.add_annotation("output_size", std::to_string(result.cols) + "x" + std::to_string(result.rows));
 
   // Scale configurations
-  for (size_t i = 0; i < config_.scales.size(); ++i)
+  for (size_t i = 0; i < scales.size(); ++i)
   {
-    const auto& sc = config_.scales[i];
+    const auto& sc = scales[i];
     debug.add_annotation("scale_" + std::to_string(i) + "_pyramid_level", std::to_string(sc.pyramid_level));
     debug.add_annotation("scale_" + std::to_string(i) + "_radius_range",
                         std::to_string(sc.min_radius) + "-" + std::to_string(sc.max_radius) +
@@ -430,7 +460,7 @@ void SymmetryFeature::capture_debug_data(DebugContext& debug,
   {
     for (size_t i = 0; i < scale_results.size(); ++i)
     {
-      int level = config_.scales[i].pyramid_level;
+      int level = i < scales.size() ? scales[i].pyramid_level : -1;
       int size = scale_results[i].cols;
       std::string name = "scale_" + std::to_string(i) + "_level" + std::to_string(level) +
                          "_symmetry_" + std::to_string(size) + "x" + std::to_string(size);

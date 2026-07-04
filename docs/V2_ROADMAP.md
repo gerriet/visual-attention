@@ -41,14 +41,14 @@
 
 ## Milestones
 
-### M0 — Housekeeping (small)
+### M0 — Housekeeping (small) ✓ 2026-07-04
 - Triage untracked files: commit `SYMMETRY_FEATURE_NOTES.md`, `thesis.txt`, the
   `reference/old_code/feature/*.C` sources; delete or relocate `test_debug.cpp`,
   `debug_output/`, `results_batch/` (gitignore generated output).
 - Fix README drift (`tests/`, `tools/`, `expected_outputs/` don't exist).
 - Branch `v2` off `main`.
 
-### M1 — Guardrails (before any refactor)
+### M1 — Guardrails (before any refactor) ✓ 2026-07-04
 - Catch2 + CTest. Two test layers:
   - **Characterization tests**: snapshot current feature/saliency maps on the
     test images with tolerances — pure refactor tripwires, not truth.
@@ -57,7 +57,7 @@
 - Define and document the interchange format (JSON schema + map files).
 - Wire `examples/` into CMake so nothing rots silently.
 
-### M2 — Architecture for swappability
+### M2 — Architecture for swappability ✓ 2026-07-04
 - Registries for `FeatureExtractor`, `FusionStrategy`, `SelectionStrategy`;
   construction fully config-driven.
 - Complete the YAML loader: all feature weights (orientation/eccentricity are
@@ -69,6 +69,13 @@
 - Unify parallelism (currently std::thread-per-feature + OpenMP inside symmetry).
 
 ### M3 — Neural-field selection (the thesis core)
+- Known quirk to resolve here: the shared Gabor bank is computed once per
+  frame (12 orientations, wavelength 4.0) and `Frame::compute_gabor_pyramids`
+  ignores differing wavelength/bandwidth requests, so the symmetry feature's
+  configured wavelength (8.0) never takes effect, and the orientation feature
+  uses the first 4 of 12 orientations (0°–45°) instead of 0°/45°/90°/135°.
+  Both are locked in by the current goldens; fixing them changes behavior and
+  should happen deliberately alongside the M3 golden regeneration.
 - Port `nf2d.h` → 2D neural-field dynamics as a `SelectionStrategy`.
 - Port `nf3d.h` → the two-stage selection model.
 - Spot-check `thesis.yaml` scanpaths against a few thesis figures; behavioral

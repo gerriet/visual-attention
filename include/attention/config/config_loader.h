@@ -22,13 +22,23 @@ namespace config
  * input:
  *   image: "test.jpg"
  *
- * features:
+ * pipeline:
+ *   fusion: weighted-sum        # fusion strategy
+ *   selection: ior              # selection strategy: nms | ior
+ *   gabor:                      # shared Gabor bank
+ *     num_orientations: 12
+ *     wavelength: 4.0
+ *     bandwidth: 1.0
+ *
+ * features:                     # overrides the default set entry-by-entry
  *   color:
  *     weight: 1.2
  *   intensity:
- *     weight: 0.8
+ *     enabled: false            # configured but not run
  *   symmetry:
  *     weight: 1.0
+ *     params:                   # feature-specific, passed to its factory
+ *       num_orientations: 12
  *
  * peaks:
  *   min_distance: 30
@@ -81,6 +91,7 @@ class ConfigLoader
   static Config create_default();
 
  private:
+  static void load_pipeline(const YAML::Node& yaml_node, pipeline::PipelineConfig& config);
   static void load_features(const YAML::Node& yaml_node, pipeline::PipelineConfig& config);
   static void load_peaks(const YAML::Node& yaml_node, pipeline::PipelineConfig& config);
   static void load_output(const YAML::Node& yaml_node, Config& config);

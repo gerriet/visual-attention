@@ -20,23 +20,7 @@ namespace fs = std::filesystem;
 void process_batch(const std::string& directory, const attention::pipeline::PipelineConfig& config,
                    const std::string& output_base = "")
 {
-  std::vector<std::string> image_paths;
-
-  // Collect all image files
-  for (const auto& entry : fs::directory_iterator(directory))
-  {
-    if (entry.is_regular_file())
-    {
-      std::string ext = entry.path().extension().string();
-      std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-      if (ext == ".jpg" || ext == ".jpeg" || ext == ".png" || ext == ".bmp")
-      {
-        image_paths.push_back(entry.path().string());
-      }
-    }
-  }
-
-  std::sort(image_paths.begin(), image_paths.end());
+  std::vector<std::string> image_paths = attention::pipeline::collect_image_paths(directory);
 
   std::cout << "Found " << image_paths.size() << " images in " << directory << std::endl;
   std::cout << "Processing batch..." << std::endl;
@@ -68,104 +52,93 @@ void process_batch(const std::string& directory, const attention::pipeline::Pipe
   Stats pyramid_stats, integration_stats, peak_stats, total_stats;
   std::map<std::string, Stats> feature_stats;
 
-  for (size_t i = 0; i < image_paths.size(); ++i)
-  {
-    const std::string& image_path = image_paths[i];
-    fs::path input_path(image_path);
-    std::string filename = input_path.stem().string();
+  // Process the directory as a stream; per-image output happens in the
+  // callback after each frame
+  attention::pipeline::ImageListSource source(image_paths);
+  size_t processed_count = 0;
 
-    std::cout << "[" << (i + 1) << "/" << image_paths.size() << "] Processing: " << filename << std::endl;
-
-    try
-    {
-      pipeline.load_image(image_path);
-      const auto& frame = pipeline.get_frame();
-      std::cout << "  Size: " << frame.width() << "x" << frame.height() << std::endl;
-
-      auto start = std::chrono::high_resolution_clock::now();
-      pipeline.process();
-      auto end = std::chrono::high_resolution_clock::now();
-      auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-
-      std::cout << "  Time: " << duration.count() << " ms" << std::endl;
-      std::cout << "  Features: " << pipeline.get_features().size()
-                << ", Peaks: " << pipeline.get_saliency_map().peaks.size() << std::endl;
-
-      // Determine output directory
-      fs::path output_dir;
-      if (!output_base.empty())
+  pipeline.process_stream(
+      source,
+      [&](attention::pipeline::AttentionPipeline& p)
       {
-        output_dir = fs::path(output_base) / filename;
-      }
-      else
-      {
-        output_dir = input_path.parent_path() / "results_batch" / filename;
-      }
-      fs::create_directories(output_dir);
+        const auto& frame = p.get_frame();
+        fs::path input_path(frame.source_path);
+        std::string filename = input_path.stem().string();
+        ++processed_count;
 
-      // Save original
-      cv::imwrite((output_dir / "00_original.png").string(), frame.image);
+        const auto& timing = p.get_timing();
+        std::cout << "[" << processed_count << "/" << image_paths.size() << "] " << filename << ": " << frame.width()
+                  << "x" << frame.height() << ", " << p.get_features().size() << " features, "
+                  << p.get_saliency_map().peaks.size() << " peaks, " << timing.total_ms() << " ms" << std::endl;
 
-      // Save each feature
-      int idx = 1;
-      for (const auto& feature : pipeline.get_features())
-      {
-        cv::Mat feature_vis = attention::visualization::visualize_feature_map(feature);
-        std::string feature_filename = "0" + std::to_string(idx) + "_" + feature.name + ".png";
-        cv::imwrite((output_dir / feature_filename).string(), feature_vis);
-        idx++;
-      }
+        // Determine output directory
+        fs::path output_dir;
+        if (!output_base.empty())
+        {
+          output_dir = fs::path(output_base) / filename;
+        }
+        else
+        {
+          output_dir = input_path.parent_path() / "results_batch" / filename;
+        }
+        fs::create_directories(output_dir);
 
-      // Save saliency map
-      cv::Mat saliency_vis =
-          attention::visualization::visualize_saliency_map(pipeline.get_saliency_map(), frame.image, "", true, false);
-      cv::imwrite((output_dir / "99_saliency.png").string(), saliency_vis);
+        // Save original
+        cv::imwrite((output_dir / "00_original.png").string(), frame.image);
 
-      // Save scan path visualization
-      cv::Mat scan_path_vis = attention::visualization::visualize_scan_path(pipeline.get_saliency_map(), frame.image);
-      cv::imwrite((output_dir / "98_scan_path.png").string(), scan_path_vis);
+        // Save each feature
+        int idx = 1;
+        for (const auto& feature : p.get_features())
+        {
+          cv::Mat feature_vis = attention::visualization::visualize_feature_map(feature);
+          std::string feature_filename = "0" + std::to_string(idx) + "_" + feature.name + ".png";
+          cv::imwrite((output_dir / feature_filename).string(), feature_vis);
+          idx++;
+        }
 
-      // Save combined visualization
-      cv::Mat combined = pipeline.visualize(false);
-      cv::imwrite((output_dir / "combined.png").string(), combined);
+        // Save saliency map
+        cv::Mat saliency_vis =
+            attention::visualization::visualize_saliency_map(p.get_saliency_map(), frame.image, "", true, false);
+        cv::imwrite((output_dir / "99_saliency.png").string(), saliency_vis);
 
-      // Save timing information
-      const auto& timing = pipeline.get_timing();
-      std::ofstream timing_file((output_dir / "timing.txt").string());
-      timing_file << "Performance Timing (ms)" << std::endl;
-      timing_file << "======================" << std::endl;
-      timing_file << "Image size: " << frame.width() << "x" << frame.height() << std::endl;
-      timing_file << std::endl;
-      timing_file << "Pyramid computation: " << timing.pyramid_ms << " ms" << std::endl;
-      for (const auto& pair : timing.feature_ms)
-      {
-        timing_file << "Feature '" << pair.first << "': " << pair.second << " ms" << std::endl;
-      }
-      timing_file << "Integration: " << timing.integration_ms << " ms" << std::endl;
-      timing_file << "Peak detection: " << timing.peak_detection_ms << " ms" << std::endl;
-      timing_file << std::endl;
-      timing_file << "Total: " << timing.total_ms() << " ms" << std::endl;
-      timing_file.close();
+        // Save scan path visualization
+        cv::Mat scan_path_vis = attention::visualization::visualize_scan_path(p.get_saliency_map(), frame.image);
+        cv::imwrite((output_dir / "98_scan_path.png").string(), scan_path_vis);
 
-      // Collect statistics
-      pyramid_stats.add(timing.pyramid_ms);
-      integration_stats.add(timing.integration_ms);
-      peak_stats.add(timing.peak_detection_ms);
-      total_stats.add(timing.total_ms());
-      for (const auto& pair : timing.feature_ms)
-      {
-        feature_stats[pair.first].add(pair.second);
-      }
+        // Save combined visualization
+        cv::Mat combined = p.visualize(false);
+        cv::imwrite((output_dir / "combined.png").string(), combined);
 
-      std::cout << "  ✓ Saved to: " << output_dir.string() << std::endl;
-    }
-    catch (const std::exception& e)
-    {
-      std::cerr << "  ✗ Error: " << e.what() << std::endl;
-    }
+        // Save timing information
+        std::ofstream timing_file((output_dir / "timing.txt").string());
+        timing_file << "Performance Timing (ms)" << std::endl;
+        timing_file << "======================" << std::endl;
+        timing_file << "Image size: " << frame.width() << "x" << frame.height() << std::endl;
+        timing_file << std::endl;
+        timing_file << "Pyramid computation: " << timing.pyramid_ms << " ms" << std::endl;
+        for (const auto& pair : timing.feature_ms)
+        {
+          timing_file << "Feature '" << pair.first << "': " << pair.second << " ms" << std::endl;
+        }
+        timing_file << "Integration: " << timing.integration_ms << " ms" << std::endl;
+        timing_file << "Peak detection: " << timing.peak_detection_ms << " ms" << std::endl;
+        timing_file << std::endl;
+        timing_file << "Total: " << timing.total_ms() << " ms" << std::endl;
+        timing_file.close();
 
-    std::cout << std::endl;
-  }
+        // Collect statistics
+        pyramid_stats.add(timing.pyramid_ms);
+        integration_stats.add(timing.integration_ms);
+        peak_stats.add(timing.peak_detection_ms);
+        total_stats.add(timing.total_ms());
+        for (const auto& pair : timing.feature_ms)
+        {
+          feature_stats[pair.first].add(pair.second);
+        }
+
+        std::cout << "  ✓ Saved to: " << output_dir.string() << std::endl;
+        std::cout << std::endl;
+      });
 
   std::cout << "Batch processing complete!" << std::endl;
   std::cout << std::endl;
@@ -224,7 +197,7 @@ void print_usage(const char* program_name)
 {
   std::cerr << "Usage:" << std::endl;
   std::cerr << "  " << program_name << " <image_path> [options]" << std::endl;
-  std::cerr << "  " << program_name << " --config <config.yaml>" << std::endl;
+  std::cerr << "  " << program_name << " --config <config.yaml> [image] [options]" << std::endl;
   std::cerr << "  " << program_name << " --batch <directory> [options]" << std::endl;
   std::cerr << std::endl;
   std::cerr << "Examples:" << std::endl;
@@ -306,9 +279,20 @@ int main(int argc, char** argv)
 
       for (int i = 3; i < argc; ++i)
       {
-        if (std::string(argv[i]) == "--emit-json" && i + 1 < argc)
+        std::string arg = argv[i];
+        if (arg == "--emit-json" && i + 1 < argc)
         {
           emit_json_path = argv[++i];
+        }
+        else if (arg == "--no-display")
+        {
+          config.display = false;
+        }
+        else if (arg.rfind("--", 0) != 0)
+        {
+          // Positional image overrides input.image, so profile configs
+          // (configs/thesis.yaml, configs/modern.yaml) work on any image
+          config.input_image = arg;
         }
       }
 

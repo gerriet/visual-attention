@@ -32,7 +32,9 @@ public:
     float min_area = 0.05f;         // Minimum segment area as fraction of image (0.0005 = 0.05%)
     float max_area = 30.0f;         // Maximum segment area as percentage of image
     float variance_threshold = 1.5f; // Variance ratio threshold for merging
-    int compute_at_scale = 0;       // Pyramid level for computation (0 = full resolution)
+    int compute_at_scale = 0;       // Pyramid level for computation (0 = full
+                                    // resolution, -1 = auto: quarter resolution
+                                    // for images larger than 640px)
   };
 
   EccentricityFeature();

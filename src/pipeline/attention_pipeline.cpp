@@ -1,10 +1,5 @@
 #include "attention/pipeline/attention_pipeline.h"
-#include "attention/features/color_feature.h"
-#include "attention/features/eccentricity_feature.h"
-#include "attention/features/feature_extractor.h"
-#include "attention/features/intensity_feature.h"
-#include "attention/features/orientation_feature.h"
-#include "attention/features/symmetry_feature.h"
+#include "attention/features/feature_registry.h"
 #include "attention/visualization/visualizer.h"
 #include <algorithm>
 #include <chrono>
@@ -15,15 +10,60 @@
 #include <stdexcept>
 #include <thread>
 #include <vector>
+#include <yaml-cpp/yaml.h>
 
 namespace attention
 {
 namespace pipeline
 {
 
-AttentionPipeline::AttentionPipeline() : config_(), processed_(false) {}
+AttentionPipeline::AttentionPipeline() : config_()
+{
+  build_components();
+}
 
-AttentionPipeline::AttentionPipeline(const PipelineConfig& config) : config_(config), processed_(false) {}
+AttentionPipeline::AttentionPipeline(const PipelineConfig& config) : config_(config)
+{
+  build_components();
+}
+
+void AttentionPipeline::set_config(const PipelineConfig& config)
+{
+  config_ = config;
+  build_components();
+}
+
+void AttentionPipeline::build_components()
+{
+  features::register_builtin_features();
+  auto& registry = features::FeatureRegistry::instance();
+
+  extractors_.clear();
+  feature_weights_.clear();
+
+  for (const auto& spec : config_.features)
+  {
+    if (!spec.enabled)
+    {
+      continue;
+    }
+
+    YAML::Node params = spec.params_yaml.empty() ? YAML::Node() : YAML::Load(spec.params_yaml);
+    auto extractor = registry.create(spec.type, params);
+    feature_weights_[extractor->name()] = spec.weight;
+    extractors_.push_back(std::move(extractor));
+  }
+
+  fusion_ = fusion::create_fusion_strategy(config_.fusion);
+
+  selection::SelectionParams selection_params;
+  selection_params.min_distance = config_.peak_min_distance;
+  selection_params.threshold = config_.peak_threshold;
+  selection_params.max_count = config_.peak_max_count;
+  selection_params.ior_radius = config_.ior_radius;
+  selection_params.ior_strength = config_.ior_strength;
+  selection_ = selection::create_selection_strategy(config_.effective_selection(), selection_params);
+}
 
 void AttentionPipeline::load_image(const std::string& image_path)
 {
@@ -61,8 +101,6 @@ void AttentionPipeline::process()
   saliency_ = core::SaliencyMap();
   timing_ = PipelineTiming(); // Reset timing
 
-  auto t_start = std::chrono::high_resolution_clock::now();
-
   // Step 0: Compute pyramids once (shared across features)
   auto t_pyramid_start = std::chrono::high_resolution_clock::now();
   int pyramid_levels = compute_pyramid_levels();
@@ -73,14 +111,14 @@ void AttentionPipeline::process()
   // Step 1: Extract features (with per-feature timing)
   extract_features();
 
-  // Step 2: Integrate features into saliency map
+  // Step 2: Fuse features into a saliency map
   auto t_integrate_start = std::chrono::high_resolution_clock::now();
   integrate_features();
   auto t_integrate_end = std::chrono::high_resolution_clock::now();
   timing_.integration_ms =
       std::chrono::duration_cast<std::chrono::milliseconds>(t_integrate_end - t_integrate_start).count();
 
-  // Step 3: Detect peaks
+  // Step 3: Select peaks
   auto t_peaks_start = std::chrono::high_resolution_clock::now();
   detect_peaks();
   auto t_peaks_end = std::chrono::high_resolution_clock::now();
@@ -151,6 +189,25 @@ void AttentionPipeline::process()
   }
 
   processed_ = true;
+  ++run_state_.frame_index;
+}
+
+void AttentionPipeline::process_stream(FrameSource& source, const FrameCallback& on_frame)
+{
+  reset_state();
+
+  core::Frame frame;
+  while (source.next(frame))
+  {
+    frame_ = std::move(frame);
+    processed_ = false;
+    process();
+
+    if (on_frame)
+    {
+      on_frame(*this);
+    }
+  }
 }
 
 int AttentionPipeline::compute_pyramid_levels() const
@@ -168,76 +225,25 @@ int AttentionPipeline::compute_pyramid_levels() const
 
 void AttentionPipeline::extract_features()
 {
-  // Pre-compute Gabor pyramids BEFORE parallel extraction to avoid race conditions
-  // Maximum orientations needed: 12 (for symmetry feature)
-  // This ensures thread-safe access during parallel feature extraction
+  // Pre-compute the shared Gabor bank BEFORE parallel extraction to avoid
+  // race conditions; features reuse it (see PipelineConfig gabor_* params)
   int pyramid_levels = compute_pyramid_levels();
-  frame_.compute_gabor_pyramids(pyramid_levels, 12, 4.0, 1.0);
+  frame_.compute_gabor_pyramids(pyramid_levels, config_.gabor_orientations, config_.gabor_wavelength,
+                                config_.gabor_bandwidth);
 
-  // Create list of feature extractors to run in parallel
-  std::vector<std::unique_ptr<features::FeatureExtractor>> extractors;
-
-  // Add color feature (if image is color)
-  if (frame_.channels() == 3)
+  // Applicable extractors for this frame (e.g. color is skipped on grayscale)
+  std::vector<features::FeatureExtractor*> active;
+  for (const auto& extractor : extractors_)
   {
-    extractors.push_back(std::make_unique<features::ColorFeature>());
+    if (extractor->applicable(frame_))
+    {
+      active.push_back(extractor.get());
+    }
   }
-
-  // Add intensity feature (always)
-  extractors.push_back(std::make_unique<features::IntensityFeature>());
-
-  // Add orientation feature (always)
-  extractors.push_back(std::make_unique<features::OrientationFeature>());
-
-  // Add eccentricity feature (always)
-  // Use quarter resolution for large images for performance
-  features::EccentricityFeature::Config ecc_config;
-  if (frame_.width() > 640 || frame_.height() > 640)
-  {
-    ecc_config.compute_at_scale = 2; // Quarter resolution for large images
-  }
-  else
-  {
-    ecc_config.compute_at_scale = 0; // Full resolution for small images
-  }
-  extractors.push_back(std::make_unique<features::EccentricityFeature>(ecc_config));
-
-  // Add symmetry feature (always)
-  // Use multi-scale approach with continuous radius sampling for blob-like responses
-  // Use 12 orientations for better symmetry detection (vs 4 for basic orientation feature)
-  features::SymmetryFeature::Config sym_config;
-  sym_config.num_orientations = 12;
-  sym_config.wavelength = 8.0;  // Larger wavelength for coarser features
-  sym_config.bandwidth = 1.0;
-  sym_config.use_multi_scale = true;
-
-  // Configure scales based on image size
-  // Use existing pyramid levels directly (no resizing)
-  // Only compute on pyramid levels where at least one side < 256px
-  // Note: pyramid level N means downsampled by 2^N
-  sym_config.scales.clear();
-
-  // Find the first pyramid level where at least one side is < 256
-  int start_level = 0;
-  int min_dim = std::min(frame_.width(), frame_.height());
-  while (min_dim >= 256 && start_level < 10)
-  {
-    start_level++;
-    min_dim /= 2;
-  }
-
-  // Compute on this level and the next two coarser levels
-  // pyramid_level, min_radius, max_radius, radius_step, width, threshold
-  // Using radius_step=2 for ~2x speedup
-  // Higher thresholds at coarser scales to suppress false positives
-  sym_config.scales.push_back(features::SymmetryFeature::ScaleConfig(start_level, 5, 20, 2, 3, 0.3f));      // Finest scale: threshold 0.3
-  sym_config.scales.push_back(features::SymmetryFeature::ScaleConfig(start_level + 1, 8, 25, 2, 3, 0.5f));  // Coarser: threshold 0.5
-  sym_config.scales.push_back(features::SymmetryFeature::ScaleConfig(start_level + 2, 10, 30, 2, 3, 0.65f)); // Coarsest: threshold 0.65
-  extractors.push_back(std::make_unique<features::SymmetryFeature>(sym_config));
 
   // Extract features (with optional debugging)
-  features_.resize(extractors.size());
-  std::vector<long> durations(extractors.size());
+  features_.resize(active.size());
+  std::vector<long> durations(active.size());
 
   // Clear previous debug contexts
   debug_contexts_.clear();
@@ -249,13 +255,13 @@ void AttentionPipeline::extract_features()
   {
     // Extract serially to preserve debug context
     std::cout << "  Debug mode: extracting features serially" << std::endl;
-    for (size_t i = 0; i < extractors.size(); ++i)
+    for (size_t i = 0; i < active.size(); ++i)
     {
       auto t_start = std::chrono::high_resolution_clock::now();
 
       // Create debug context for this feature
       features::DebugContext debug(config_.debug_level);
-      features_[i] = extractors[i]->extract(frame_, debug);
+      features_[i] = active[i]->extract(frame_, debug);
 
       auto t_end = std::chrono::high_resolution_clock::now();
       durations[i] = std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_start).count();
@@ -266,16 +272,18 @@ void AttentionPipeline::extract_features()
   }
   else
   {
-    // Extract features in parallel using threads (no debugging)
+    // Extract features concurrently, one task thread per feature. Parallelism
+    // model of the pipeline: coarse-grained tasks via std::thread here,
+    // data-parallel loops via OpenMP inside the features (e.g. symmetry).
     std::vector<std::thread> threads;
 
-    for (size_t i = 0; i < extractors.size(); ++i)
+    for (size_t i = 0; i < active.size(); ++i)
     {
       threads.emplace_back(
-          [this, i, &extractors, &durations]()
+          [this, i, &active, &durations]()
           {
             auto t_start = std::chrono::high_resolution_clock::now();
-            features_[i] = extractors[i]->extract(frame_);
+            features_[i] = active[i]->extract(frame_);
             auto t_end = std::chrono::high_resolution_clock::now();
             durations[i] = std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_start).count();
           });
@@ -308,56 +316,15 @@ void AttentionPipeline::extract_features()
 
 void AttentionPipeline::integrate_features()
 {
-  if (features_.empty())
-  {
-    throw std::runtime_error("No features to integrate");
-  }
-
-  // Weighted integration using configured feature weights
-  cv::Mat integrated = cv::Mat::zeros(frame_.size(), CV_32F);
-
-  for (const auto& feature : features_)
-  {
-    // Validate feature size matches frame size
-    if (feature.data.empty())
-    {
-      throw std::runtime_error("Feature '" + feature.name + "' has empty data");
-    }
-
-    if (feature.data.size() != frame_.size())
-    {
-      throw std::runtime_error("Feature '" + feature.name + "' size mismatch: expected " +
-                               std::to_string(frame_.width()) + "x" + std::to_string(frame_.height()) +
-                               " but got " + std::to_string(feature.data.cols) + "x" + std::to_string(feature.data.rows));
-    }
-
-    // Get weight from config (default to 1.0 if not configured)
-    float weight = 1.0f;
-    auto it = config_.feature_weights.find(feature.name);
-    if (it != config_.feature_weights.end())
-    {
-      weight = it->second;
-    }
-
-    // Apply weight and feature confidence
-    integrated += weight * feature.confidence * feature.data;
-  }
-
-  // Normalize to [0, 1]
-  cv::normalize(integrated, integrated, 0.0f, 1.0f, cv::NORM_MINMAX);
-
-  saliency_ = core::SaliencyMap(integrated);
+  saliency_ = core::SaliencyMap(fusion_->fuse(features_, feature_weights_, frame_.size()));
 }
 
 void AttentionPipeline::detect_peaks()
 {
-  // Use the built-in peak detection
-  // Parameters from configuration
-  saliency_.detect_peaks(config_.peak_min_distance, config_.peak_threshold, config_.peak_max_count, config_.enable_ior,
-                         config_.ior_radius, config_.ior_strength);
+  saliency_.peaks = selection_->select(saliency_.map, run_state_);
 
   std::cout << "  Peaks detected: " << saliency_.peaks.size();
-  if (config_.enable_ior)
+  if (selection_->name() == "ior")
   {
     std::cout << " (IOR)";
   }

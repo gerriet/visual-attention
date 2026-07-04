@@ -85,19 +85,23 @@ void ResultWriter::write(const pipeline::AttentionPipeline& pipeline, const std:
   out << "  },\n";
   out << "  \"generator\": {\n";
   out << "    \"name\": \"attention-framework\",\n";
-  out << "    \"variant\": \"classic-weighted-sum\"\n";
+  out << "    \"variant\": \"" << escape_json(config.fusion + "+" + config.effective_selection()) << "\"\n";
   out << "  },\n";
 
   out << "  \"params\": {\n";
   out << "    \"feature_weights\": {";
   bool first = true;
-  for (const auto& pair : config.feature_weights)
+  for (const auto& spec : config.features)
   {
+    if (!spec.enabled)
+    {
+      continue;
+    }
     if (!first)
     {
       out << ", ";
     }
-    out << "\"" << escape_json(pair.first) << "\": " << format_float(pair.second);
+    out << "\"" << escape_json(spec.type) << "\": " << format_float(spec.weight);
     first = false;
   }
   out << "},\n";

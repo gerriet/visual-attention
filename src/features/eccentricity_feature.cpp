@@ -35,7 +35,15 @@ core::FeatureMap EccentricityFeature::extract(const core::Frame& frame, DebugCon
     throw std::runtime_error("EccentricityFeature: Grayscale pyramid not computed");
   }
 
-  int scale_index = std::min(config_.compute_at_scale, static_cast<int>(frame.gray_pyramid.size()) - 1);
+  // Auto scale (-1): quarter resolution for large images, full otherwise
+  // (moved verbatim from the v1 pipeline's size heuristic)
+  int requested_scale = config_.compute_at_scale;
+  if (requested_scale < 0)
+  {
+    requested_scale = (frame.width() > 640 || frame.height() > 640) ? 2 : 0;
+  }
+
+  int scale_index = std::min(requested_scale, static_cast<int>(frame.gray_pyramid.size()) - 1);
   if (scale_index < 0)
   {
     throw std::runtime_error("EccentricityFeature: Invalid pyramid configuration");

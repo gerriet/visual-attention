@@ -62,6 +62,11 @@ class ColorFeature : public FeatureExtractor
   core::FeatureMap extract(const core::Frame& frame, DebugContext& debug) const override;
 
   /**
+   * Color features require a color image.
+   */
+  bool applicable(const core::Frame& frame) const override { return frame.channels() == 3; }
+
+  /**
    * Get feature name.
    * @return "color"
    */

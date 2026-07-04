@@ -45,6 +45,12 @@ class FeatureExtractor
    * @return Feature name (e.g., "color", "intensity", "symmetry")
    */
   virtual std::string name() const = 0;
+
+  /**
+   * Whether this feature applies to the given frame. Inapplicable features
+   * are skipped silently by the pipeline (e.g., color on grayscale input).
+   */
+  virtual bool applicable(const core::Frame& frame) const { return true; }
 };
 
 } // namespace features

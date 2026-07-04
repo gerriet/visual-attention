@@ -23,12 +23,16 @@ endif()
 add_library(attention_core STATIC
     src/core/frame.cpp
     src/pipeline/attention_pipeline.cpp
+    src/pipeline/frame_source.cpp
     src/features/color_feature.cpp
     src/features/intensity_feature.cpp
     src/features/orientation_feature.cpp
     src/features/eccentricity_feature.cpp
     src/features/symmetry_feature.cpp
     src/features/debug_context.cpp
+    src/features/feature_registry.cpp
+    src/fusion/fusion.cpp
+    src/selection/selection.cpp
     src/config/config_loader.cpp
     src/visualization/visualizer.cpp
     src/io/result_writer.cpp

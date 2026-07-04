@@ -13,7 +13,7 @@ if(NOT Catch2_FOUND)
     FetchContent_MakeAvailable(Catch2)
 endif()
 
-add_executable(characterization_tests test_characterization.cpp)
+add_executable(characterization_tests test_characterization.cpp test_config.cpp test_selection.cpp)
 target_link_libraries(characterization_tests PRIVATE attention_core Catch2::Catch2WithMain)
 target_compile_definitions(characterization_tests PRIVATE
     ATTENTION_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
