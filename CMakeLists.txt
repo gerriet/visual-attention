@@ -33,6 +33,7 @@ add_library(attention_core STATIC
     src/features/feature_registry.cpp
     src/fusion/fusion.cpp
     src/selection/selection.cpp
+    src/selection/neural_field_selection.cpp
     src/config/config_loader.cpp
     src/visualization/visualizer.cpp
     src/io/result_writer.cpp

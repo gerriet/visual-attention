@@ -81,21 +81,9 @@ void ConfigLoader::load_pipeline(const YAML::Node& node, pipeline::PipelineConfi
     config.selection = node["selection"].as<std::string>();
   }
 
-  if (node["gabor"])
+  if (node["selection_params"])
   {
-    const YAML::Node& gabor = node["gabor"];
-    if (gabor["num_orientations"])
-    {
-      config.gabor_orientations = gabor["num_orientations"].as<int>();
-    }
-    if (gabor["wavelength"])
-    {
-      config.gabor_wavelength = gabor["wavelength"].as<double>();
-    }
-    if (gabor["bandwidth"])
-    {
-      config.gabor_bandwidth = gabor["bandwidth"].as<double>();
-    }
+    config.selection_params_yaml = YAML::Dump(node["selection_params"]);
   }
 }
 

@@ -66,7 +66,7 @@ TEST_CASE("default config runs all five features with NMS", "[config]")
   CHECK(config.pipeline.fusion == "weighted-sum");
 }
 
-TEST_CASE("thesis profile enables the dissertation feature set with IOR", "[config]")
+TEST_CASE("thesis profile enables the dissertation feature set with neural-field selection", "[config]")
 {
   auto config = ConfigLoader::load((source_dir() / "configs" / "thesis.yaml").string());
 
@@ -76,7 +76,8 @@ TEST_CASE("thesis profile enables the dissertation feature set with IOR", "[conf
   CHECK(find_spec(config.pipeline.features, "symmetry")->enabled);
   CHECK_FALSE(find_spec(config.pipeline.features, "intensity")->enabled);
   CHECK_FALSE(find_spec(config.pipeline.features, "orientation")->enabled);
-  CHECK(config.pipeline.effective_selection() == "ior");
+  CHECK(config.pipeline.effective_selection() == "neural-field");
+  CHECK_FALSE(config.pipeline.selection_params_yaml.empty());
 
   // The profile must actually construct
   attention::pipeline::AttentionPipeline pipeline(config.pipeline);

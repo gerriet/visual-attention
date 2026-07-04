@@ -37,29 +37,10 @@ core::FeatureMap SymmetryFeature::extract(const core::Frame& frame, DebugContext
   // Resolve the scale schedule (size-adaptive when auto_scale_schedule set)
   const std::vector<ScaleConfig> scales = resolve_scales(frame);
 
-  // Step 1: Compute Gabor pyramids if needed
+  // Step 1: Fetch this feature's Gabor bank (precomputed by the pipeline
+  // with the wavelength/bandwidth this config specifies)
   auto t_gabor_start = std::chrono::high_resolution_clock::now();
-
-  // Determine required pyramid levels based on scale configurations
-  int max_pyramid_level = 0;
-  for (const auto& scale_config : scales)
-  {
-    if (scale_config.pyramid_level >= 0)
-    {
-      max_pyramid_level = std::max(max_pyramid_level, scale_config.pyramid_level);
-    }
-  }
-
-  const_cast<core::Frame&>(frame).compute_gabor_pyramids(max_pyramid_level + 1,
-                                                          config_.num_orientations,
-                                                          config_.wavelength,
-                                                          config_.bandwidth);
-
-  if (!frame.gabor_pyramids_computed || frame.gabor_pyramids.empty())
-  {
-    throw std::runtime_error("SymmetryFeature: Failed to compute Gabor pyramids");
-  }
-
+  const auto& gabor_bank = frame.gabor_bank(config_.num_orientations, config_.wavelength, config_.bandwidth);
   auto t_gabor_end = std::chrono::high_resolution_clock::now();
 
   // Step 2: Compute symmetry at each scale
@@ -75,15 +56,15 @@ core::FeatureMap SymmetryFeature::extract(const core::Frame& frame, DebugContext
     // Use specified pyramid level directly
     int pyramid_level = scale_config.pyramid_level;
 
-    if (pyramid_level < 0 || pyramid_level >= static_cast<int>(frame.gabor_pyramids.size()))
+    if (pyramid_level < 0 || pyramid_level >= static_cast<int>(gabor_bank.size()))
     {
       // Skip this scale if pyramid level is out of range
       std::cerr << "Warning: Skipping scale " << scale_idx << " - pyramid level " << pyramid_level
-                << " out of range (available: 0-" << (frame.gabor_pyramids.size() - 1) << ")" << std::endl;
+                << " out of range (available: 0-" << (gabor_bank.size() - 1) << ")" << std::endl;
       continue;
     }
 
-    const auto& gabor_level = frame.gabor_pyramids[pyramid_level];
+    const auto& gabor_level = gabor_bank[pyramid_level];
     if (gabor_level.empty())
     {
       std::cerr << "Warning: Skipping scale " << scale_idx << " - gabor level " << pyramid_level << " is empty" << std::endl;

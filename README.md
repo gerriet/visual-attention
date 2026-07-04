@@ -18,6 +18,8 @@ motion, ESAB2 system level, modern learned-model comparison).
 - ✅ Multi-scale processing with cached pyramids
 - ✅ Parallel feature extraction
 - ✅ Winner-take-all peak detection with inhibition of return
+- ✅ Neural-field selection (2D Amari dynamics from the dissertation, with
+  cluster/Objectfile readout and decaying spatial IOR)
 - ✅ YAML configuration system
 - ✅ Batch processing mode
 - ✅ Golden regression tests (characterization + behavioral scanpath)
@@ -132,10 +134,10 @@ Feature Integration → Winner-Take-All → Attention Peaks
 Phase 1 (2025, weeks 1–4): core infrastructure, five features, pipeline,
 configuration, optimization — complete. See `docs/PHASE1_ACTION_PLAN.md`.
 
-Phase 2 ("v2", 2026): see `docs/V2_ROADMAP.md` — guardrail tests (M1) and the
-swappable architecture (M2: feature registry, fusion/selection strategies,
-stream-oriented pipeline, thesis/modern profiles) are done; next up:
-neural-field selection (M3).
+Phase 2 ("v2", 2026): see `docs/V2_ROADMAP.md` — guardrails (M1), swappable
+architecture (M2), and neural-field selection (M3: the dissertation's 2D
+Amari field with two-stage cluster readout, plus per-feature Gabor banks)
+are done. Next up: the Python evaluation layer (M4) and stereo/motion (M5).
 
 ### Code Formatting
 

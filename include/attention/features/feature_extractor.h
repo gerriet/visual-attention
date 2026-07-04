@@ -53,13 +53,19 @@ class FeatureExtractor
   virtual bool applicable(const core::Frame& frame) const { return true; }
 
   /**
-   * Number of Gabor orientations this feature reads from the shared bank
-   * (0 = does not use Gabor responses). The pipeline sizes the shared bank
-   * to the maximum over all enabled features BEFORE parallel extraction —
-   * features must never trigger a recompute of shared Frame state from
-   * their extraction threads.
+   * The Gabor bank this feature reads (orientations == 0: none). The
+   * pipeline precomputes every required bank BEFORE parallel extraction —
+   * features must never mutate shared Frame state from their extraction
+   * threads; they access their bank via Frame::gabor_bank().
    */
-  virtual int required_gabor_orientations() const { return 0; }
+  struct GaborRequirement
+  {
+    int orientations = 0;
+    double wavelength = 4.0;
+    double bandwidth = 1.0;
+  };
+
+  virtual GaborRequirement gabor_requirement() const { return {}; }
 };
 
 } // namespace features

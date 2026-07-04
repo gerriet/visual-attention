@@ -7,6 +7,11 @@
 #include <string>
 #include <vector>
 
+namespace YAML
+{
+class Node;
+}
+
 namespace attention
 {
 namespace selection
@@ -49,12 +54,17 @@ class SelectionStrategy
 
 /**
  * Create a selection strategy by name.
- * @param name "nms" (dilation-based non-maximum suppression) or
- *             "ior" (sequential winner-take-all with Gaussian inhibition)
+ * @param name "nms" (dilation-based non-maximum suppression),
+ *             "ior" (sequential winner-take-all with Gaussian inhibition), or
+ *             "neural-field" (2D Amari field dynamics, ported from the
+ *             dissertation's nf2d)
+ * @param params Shared selection parameters
+ * @param strategy_params Strategy-specific YAML params (may be a null node);
+ *                        see each strategy's header for its keys
  * @throws std::runtime_error for unknown names
  */
-std::unique_ptr<SelectionStrategy> create_selection_strategy(const std::string& name,
-                                                             const SelectionParams& params);
+std::unique_ptr<SelectionStrategy> create_selection_strategy(const std::string& name, const SelectionParams& params,
+                                                             const YAML::Node& strategy_params);
 
 } // namespace selection
 } // namespace attention

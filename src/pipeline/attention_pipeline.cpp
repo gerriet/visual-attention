@@ -67,7 +67,9 @@ void AttentionPipeline::build_components()
   selection_params.max_count = config_.peak_max_count;
   selection_params.ior_radius = config_.ior_radius;
   selection_params.ior_strength = config_.ior_strength;
-  selection_ = selection::create_selection_strategy(config_.effective_selection(), selection_params);
+  YAML::Node strategy_params =
+      config_.selection_params_yaml.empty() ? YAML::Node() : YAML::Load(config_.selection_params_yaml);
+  selection_ = selection::create_selection_strategy(config_.effective_selection(), selection_params, strategy_params);
 }
 
 void AttentionPipeline::load_image(const std::string& image_path)
@@ -250,25 +252,25 @@ void AttentionPipeline::extract_features(int pyramid_levels)
 {
   // Applicable extractors for this frame (e.g. color is skipped on grayscale)
   std::vector<features::FeatureExtractor*> active;
-  int required_orientations = 0;
   for (const auto& extractor : extractors_)
   {
     if (extractor->applicable(frame_))
     {
       active.push_back(extractor.get());
-      required_orientations = std::max(required_orientations, extractor->required_gabor_orientations());
     }
   }
 
-  // Pre-compute the shared Gabor bank BEFORE parallel extraction: it must
-  // satisfy every active feature's orientation requirement so that no
-  // extraction thread ever triggers a recompute of shared Frame state
-  // (that would be a data race). Skipped entirely when no feature uses it.
-  if (required_orientations > 0)
+  // Pre-compute every Gabor bank the active features require BEFORE parallel
+  // extraction (banks are keyed by parameters and deduplicated); extraction
+  // threads then only read shared Frame state
+  for (const auto* extractor : active)
   {
-    int bank_orientations = std::max(config_.gabor_orientations, required_orientations);
-    frame_.compute_gabor_pyramids(pyramid_levels, bank_orientations, config_.gabor_wavelength,
-                                  config_.gabor_bandwidth);
+    auto requirement = extractor->gabor_requirement();
+    if (requirement.orientations > 0)
+    {
+      frame_.compute_gabor_bank(pyramid_levels, requirement.orientations, requirement.wavelength,
+                                requirement.bandwidth);
+    }
   }
 
   // Extract features (with optional debugging)

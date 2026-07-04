@@ -97,7 +97,10 @@ class SymmetryFeature : public FeatureExtractor
    */
   std::string name() const override { return "symmetry"; }
 
-  int required_gabor_orientations() const override { return config_.num_orientations; }
+  GaborRequirement gabor_requirement() const override
+  {
+    return {config_.num_orientations, config_.wavelength, config_.bandwidth};
+  }
 
  private:
   Config config_;

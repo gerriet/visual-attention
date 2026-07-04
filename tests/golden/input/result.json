@@ -22,22 +22,22 @@
   },
   "saliency_map": "result_saliency.png",
   "fixations": [
-    {"n": 0, "x": 42, "y": 57, "value": 1},
-    {"n": 1, "x": 206, "y": 50, "value": 0.96492},
-    {"n": 2, "x": 159, "y": 95, "value": 0.934311},
-    {"n": 3, "x": 107, "y": 85, "value": 0.799412},
-    {"n": 4, "x": 135, "y": 120, "value": 0.775321},
-    {"n": 5, "x": 51, "y": 183, "value": 0.655327},
-    {"n": 6, "x": 29, "y": 254, "value": 0.524222},
-    {"n": 7, "x": 197, "y": 230, "value": 0.438855},
-    {"n": 8, "x": 103, "y": 226, "value": 0.431538},
-    {"n": 9, "x": 205, "y": 168, "value": 0.417432}
+    {"n": 0, "x": 136, "y": 95, "value": 1},
+    {"n": 1, "x": 55, "y": 56, "value": 0.983956},
+    {"n": 2, "x": 206, "y": 53, "value": 0.938186},
+    {"n": 3, "x": 107, "y": 85, "value": 0.90245},
+    {"n": 4, "x": 136, "y": 140, "value": 0.78595},
+    {"n": 5, "x": 44, "y": 221, "value": 0.66765},
+    {"n": 6, "x": 198, "y": 229, "value": 0.591078},
+    {"n": 7, "x": 104, "y": 226, "value": 0.58938},
+    {"n": 8, "x": 69, "y": 202, "value": 0.576604},
+    {"n": 9, "x": 41, "y": 184, "value": 0.471594}
   ],
   "timing_ms": {
-    "pyramid": 2,
-    "features": {"color": 1, "eccentricity": 5, "intensity": 0, "orientation": 1, "symmetry": 6},
+    "pyramid": 3,
+    "features": {"color": 2, "eccentricity": 4, "intensity": 1, "orientation": 1, "symmetry": 6},
     "integration": 0,
     "peak_detection": 2,
-    "total": 17
+    "total": 19
   }
 }

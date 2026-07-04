@@ -28,26 +28,22 @@ core::FeatureMap OrientationFeature::extract(const core::Frame& frame, DebugCont
     throw std::runtime_error("OrientationFeature: Cannot extract from empty frame");
   }
 
-  // Step 1: Ensure Gabor pyramids are computed with required number of orientations
+  // Step 1: Fetch this feature's Gabor bank (precomputed by the pipeline;
+  // angular spacing matches config_.num_orientations, so orientation index
+  // and assumed angle always agree)
   auto t_gabor_start = std::chrono::high_resolution_clock::now();
-  const_cast<core::Frame&>(frame).compute_gabor_pyramids(frame.gray_pyramid.size(), config_.num_orientations,
-                                                          config_.wavelength, config_.bandwidth);
-
-  if (!frame.gabor_pyramids_computed || frame.gabor_pyramids.empty())
-  {
-    throw std::runtime_error("OrientationFeature: Failed to compute Gabor pyramids");
-  }
+  const auto& bank = frame.gabor_bank(config_.num_orientations, config_.wavelength, config_.bandwidth);
   auto t_gabor_end = std::chrono::high_resolution_clock::now();
 
   // Step 2: Extract orientation pyramids (transpose from [level][orientation] to [orientation][level])
   std::vector<std::vector<cv::Mat>> orientation_pyramids(config_.num_orientations);
   for (int orient = 0; orient < config_.num_orientations; ++orient)
   {
-    for (size_t level = 0; level < frame.gabor_pyramids.size(); ++level)
+    for (size_t level = 0; level < bank.size(); ++level)
     {
-      if (orient < static_cast<int>(frame.gabor_pyramids[level].size()))
+      if (orient < static_cast<int>(bank[level].size()))
       {
-        orientation_pyramids[orient].push_back(frame.gabor_pyramids[level][orient]);
+        orientation_pyramids[orient].push_back(bank[level][orient]);
       }
     }
   }
@@ -156,7 +152,7 @@ void OrientationFeature::capture_debug_data(DebugContext& debug,
 {
   // Annotations
   debug.add_annotation("num_orientations", std::to_string(config_.num_orientations));
-  debug.add_annotation("pyramid_levels", std::to_string(frame.gabor_pyramids.size()));
+  debug.add_annotation("pyramid_levels", std::to_string(frame.gray_pyramid.size()));
   debug.add_annotation("num_center_surround_maps", std::to_string(num_maps));
   debug.add_annotation("output_size", std::to_string(result.cols) + "x" + std::to_string(result.rows));
 

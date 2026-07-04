@@ -71,12 +71,11 @@ struct PipelineConfig
 
   // Strategy names
   std::string fusion = "weighted-sum";
-  std::string selection = ""; // "nms" or "ior"; empty = derive from enable_ior
+  std::string selection = ""; // "nms", "ior", "neural-field"; empty = derive from enable_ior
 
-  // Shared Gabor bank, precomputed once per frame for all features
-  int gabor_orientations = 12;
-  double gabor_wavelength = 4.0;
-  double gabor_bandwidth = 1.0;
+  // Strategy-specific selection parameters as a YAML snippet (empty =
+  // strategy defaults); see the strategy headers for keys
+  std::string selection_params_yaml;
 
   // Peak selection parameters
   int peak_min_distance = 30;  // Minimum distance between peaks (pixels)

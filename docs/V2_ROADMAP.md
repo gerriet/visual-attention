@@ -68,18 +68,24 @@
   `configs/modern.yaml`.
 - Unify parallelism (currently std::thread-per-feature + OpenMP inside symmetry).
 
-### M3 — Neural-field selection (the thesis core)
-- Known quirk to resolve here: the shared Gabor bank is computed once per
-  frame (12 orientations, wavelength 4.0) and `Frame::compute_gabor_pyramids`
-  ignores differing wavelength/bandwidth requests, so the symmetry feature's
-  configured wavelength (8.0) never takes effect, and the orientation feature
-  uses the first 4 of 12 orientations (0°–45°) instead of 0°/45°/90°/135°.
-  Both are locked in by the current goldens; fixing them changes behavior and
-  should happen deliberately alongside the M3 golden regeneration.
-- Port `nf2d.h` → 2D neural-field dynamics as a `SelectionStrategy`.
-- Port `nf3d.h` → the two-stage selection model.
-- Spot-check `thesis.yaml` scanpaths against a few thesis figures; behavioral
-  golden tests then lock in the accepted behavior as the regression baseline.
+### M3 — Neural-field selection (the thesis core) ✓ 2026-07-04
+- ✓ 2D neural-field dynamics (`nf2d.h`) ported as the `neural-field`
+  `SelectionStrategy`: Amari relaxation update, Backer lateral kernel,
+  logistic sigmoid, border suppression, convergence per thesis (≤55 cycles,
+  mean |du| threshold).
+- ✓ Two-stage readout in minimal form (thesis ch. 6/7): field activation
+  clusters → Objectfile-lite (centroid, size, mean saliency) → fixations in
+  priority order. Space-based IOR as decaying inhibition map across stream
+  frames (thesis §8.3, −20 %/frame). The *full* symbolic stage 2 (behavior
+  model, dwell time, object tracking) is M6; the *3D* field (`nf3d.h`) has
+  depth/disparity as its third axis and therefore lands with stereo in M5.
+- ✓ Gabor quirks resolved: `Frame` now caches parameter-keyed Gabor banks;
+  each feature declares its requirement and gets exactly the bank it
+  configured. Symmetry runs on wavelength 8.0 as intended, orientation on
+  true 0°/45°/90°/135°. Goldens deliberately regenerated; scanpath drift was
+  order-shuffling among the same regions (checked before regeneration).
+- `thesis.yaml` = dissertation feature set + neural-field selection with the
+  original code's parameters; locked by a behavioral golden test.
 
 ### M4 — Python evaluation layer
 - `eval/` package: saliency metrics (AUC-Judd, NSS, CC, SIM, KL) and scanpath

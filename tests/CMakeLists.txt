@@ -40,6 +40,21 @@ if(Python3_Interpreter_FOUND)
                     --pos-tol 20 --order-tol 1)
         set_tests_properties(scanpath_${img} PROPERTIES FIXTURES_REQUIRED ${img}_json)
     endforeach()
+
+    # Thesis profile (neural-field selection) behavioral golden
+    add_test(NAME emit_json_thesis_inputc
+        COMMAND attention --config ${CMAKE_SOURCE_DIR}/configs/thesis.yaml
+                ${CMAKE_SOURCE_DIR}/data/test_images/inputc.png
+                --no-display --emit-json ${CMAKE_BINARY_DIR}/behavioral/thesis_inputc.json
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+    set_tests_properties(emit_json_thesis_inputc PROPERTIES FIXTURES_SETUP thesis_inputc_json)
+
+    add_test(NAME scanpath_thesis_inputc
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/eval/compare_scanpaths.py
+                ${CMAKE_SOURCE_DIR}/tests/golden/thesis_inputc/result.json
+                ${CMAKE_BINARY_DIR}/behavioral/thesis_inputc.json
+                --pos-tol 20 --order-tol 1)
+    set_tests_properties(scanpath_thesis_inputc PROPERTIES FIXTURES_REQUIRED thesis_inputc_json)
 else()
     message(WARNING "Python3 not found - behavioral scanpath tests disabled")
 endif()

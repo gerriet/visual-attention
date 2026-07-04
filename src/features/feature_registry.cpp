@@ -122,16 +122,13 @@ void register_builtin_features()
   registry.add("symmetry",
                [](const YAML::Node& params)
                {
-                 // Defaults reproduce the previously hardcoded pipeline setup:
-                 // 12 orientations, multi-scale, size-adaptive scale schedule.
-                 // Note: wavelength/bandwidth currently have NO effect — the
-                 // feature reads the shared pipeline Gabor bank, which is
-                 // built from PipelineConfig gabor_* (see V2_ROADMAP.md, M3
-                 // known quirk). Defaults mirror the bank to avoid implying
-                 // otherwise.
+                 // Defaults: 12 orientations, multi-scale, size-adaptive
+                 // scale schedule, wavelength 8.0 for coarser structures
+                 // (see docs/SYMMETRY_FEATURE_NOTES.md) — the feature gets
+                 // its own Gabor bank with exactly these parameters
                  SymmetryFeature::Config config;
                  config.num_orientations = 12;
-                 config.wavelength = 4.0;
+                 config.wavelength = 8.0;
                  config.bandwidth = 1.0;
                  config.use_multi_scale = true;
                  config.auto_scale_schedule = true;

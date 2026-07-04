@@ -35,7 +35,10 @@ public:
   core::FeatureMap extract(const core::Frame& frame, DebugContext& debug) const override;
   std::string name() const override { return "orientation"; }
 
-  int required_gabor_orientations() const override { return config_.num_orientations; }
+  GaborRequirement gabor_requirement() const override
+  {
+    return {config_.num_orientations, config_.wavelength, config_.bandwidth};
+  }
 
 private:
   Config config_;

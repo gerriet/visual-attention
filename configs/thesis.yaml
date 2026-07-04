@@ -5,13 +5,24 @@
 # (stereo and onset follow in roadmap M5). Intensity and orientation are
 # Itti-Koch-style additions of the reimplementation and stay disabled here.
 #
-# Selection: sequential winner-take-all with inhibition of return — the
-# closest available stand-in for the two-stage neural-field selection until
-# roadmap M3 ports the neural-field dynamics.
+# Selection: two-stage neural-field selection (roadmap M3) — 2D Amari field
+# dynamics ported from the dissertation's nf2d, with the cluster/Objectfile
+# readout of thesis chapters 6/7 in minimal form. Parameters are the original
+# code defaults; the thesis itself is qualitative about most of them.
 
 pipeline:
   fusion: weighted-sum
-  selection: ior
+  selection: neural-field
+  selection_params:
+    alpha: 0.5
+    beta: 30.0
+    resting: -0.25
+    global_mult: 1.0
+    kernel_s: 5.0
+    kernel_k: 0.06
+    max_cycles: 55        # thesis: cutoff 55 cycles, ~10 typical
+    change_thresh: 0.02   # thesis: mean |du| < 0.02
+    ior_decay: 0.8        # thesis: inhibition reduced 20% per frame
 
 features:
   color:

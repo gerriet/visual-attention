@@ -24,11 +24,9 @@ namespace config
  *
  * pipeline:
  *   fusion: weighted-sum        # fusion strategy
- *   selection: ior              # selection strategy: nms | ior
- *   gabor:                      # shared Gabor bank
- *     num_orientations: 12
- *     wavelength: 4.0
- *     bandwidth: 1.0
+ *   selection: neural-field     # selection strategy: nms | ior | neural-field
+ *   selection_params:           # strategy-specific (see strategy headers)
+ *     alpha: 0.5
  *
  * features:                     # overrides the default set entry-by-entry
  *   color:

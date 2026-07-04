@@ -1,5 +1,6 @@
 #include "attention/core/frame.h"
 #include "attention/core/constants.h"
+#include <stdexcept>
 
 namespace attention
 {
@@ -60,60 +61,60 @@ void Frame::compute_pyramids(int levels)
   pyramids_computed = true;
 }
 
-void Frame::compute_gabor_pyramids(int levels, int num_orientations, double wavelength, double bandwidth)
+void Frame::compute_gabor_bank(int levels, int num_orientations, double wavelength, double bandwidth)
 {
-  if (image.empty() || !pyramids_computed)
+  if (!pyramids_computed)
   {
-    // Need grayscale pyramid first
-    if (!pyramids_computed)
-      compute_pyramids(levels);
+    compute_pyramids(levels);
   }
 
-  // Check if already computed with same parameters (orientations AND levels)
   int actual_levels = std::min(levels, static_cast<int>(gray_pyramid.size()));
+  GaborBankKey key{num_orientations, wavelength, bandwidth};
 
-  if (gabor_pyramids_computed &&
-      num_gabor_orientations >= num_orientations &&
-      static_cast<int>(gabor_pyramids.size()) >= actual_levels)
+  auto it = gabor_banks.find(key);
+  if (it != gabor_banks.end() && static_cast<int>(it->second.size()) >= actual_levels)
   {
-    return; // Already have enough
+    return; // Already have this bank with enough levels
   }
 
   // Note: no incremental "extend with more orientations" path. Orientation
-  // angles are spaced 180°/num_orientations, so adding orientations changes
-  // the spacing of ALL entries — extending in place would mix two spacings
-  // in one bank. A larger request always triggers a full recompute.
+  // angles are spaced 180°/num_orientations, so a bank with a different
+  // count is a different bank (see GaborBankKey).
+  GaborBank bank(actual_levels);
 
-  // Full recompute needed
-  num_gabor_orientations = num_orientations;
-  gabor_pyramids.clear();
-  gabor_pyramids.resize(actual_levels);
-
-  // For each pyramid level
   for (int level = 0; level < actual_levels; ++level)
   {
     const cv::Mat& source = gray_pyramid[level];
-    gabor_pyramids[level].resize(num_orientations);
+    bank[level].resize(num_orientations);
 
-    // For each orientation
     for (int orient = 0; orient < num_orientations; ++orient)
     {
       double theta = M_PI * orient / num_orientations; // Orientation angle
 
-      // Create Gabor kernel
       cv::Mat gabor_kernel = create_gabor_kernel(wavelength, theta, bandwidth);
 
-      // Apply Gabor filter
       cv::Mat gabor_response;
       cv::filter2D(source, gabor_response, CV_32F, gabor_kernel);
 
       // Store magnitude
-      gabor_response = cv::abs(gabor_response);
-      gabor_pyramids[level][orient] = gabor_response;
+      bank[level][orient] = cv::abs(gabor_response);
     }
   }
 
-  gabor_pyramids_computed = true;
+  gabor_banks[key] = std::move(bank);
+}
+
+const Frame::GaborBank& Frame::gabor_bank(int num_orientations, double wavelength, double bandwidth) const
+{
+  auto it = gabor_banks.find(GaborBankKey{num_orientations, wavelength, bandwidth});
+  if (it == gabor_banks.end())
+  {
+    throw std::runtime_error("Frame: no Gabor bank for " + std::to_string(num_orientations) + " orientations, " +
+                             "wavelength " + std::to_string(wavelength) +
+                             " — it must be precomputed via compute_gabor_bank() (the pipeline does this from "
+                             "FeatureExtractor::gabor_requirement())");
+  }
+  return it->second;
 }
 
 cv::Mat Frame::create_gabor_kernel(double wavelength, double theta, double bandwidth) const
