@@ -39,7 +39,9 @@ class SymmetryFeature : public FeatureExtractor
    */
   struct ScaleConfig
   {
-    int pyramid_level;            // Which pyramid level to use (-1 = auto-select)
+    int pyramid_level;            // Which pyramid level to use (negative levels
+                                  // are skipped; for size-adaptive scales use
+                                  // Config::auto_scale_schedule instead)
     int min_radius;               // Minimum radius to test (e.g., 3)
     int max_radius;               // Maximum radius to test (e.g., 20)
     int radius_step;              // Step between radii (1 = all radii, 2 = every other, etc.)
@@ -94,6 +96,8 @@ class SymmetryFeature : public FeatureExtractor
    * @return "symmetry"
    */
   std::string name() const override { return "symmetry"; }
+
+  int required_gabor_orientations() const override { return config_.num_orientations; }
 
  private:
   Config config_;

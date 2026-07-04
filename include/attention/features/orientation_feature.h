@@ -35,6 +35,8 @@ public:
   core::FeatureMap extract(const core::Frame& frame, DebugContext& debug) const override;
   std::string name() const override { return "orientation"; }
 
+  int required_gabor_orientations() const override { return config_.num_orientations; }
+
 private:
   Config config_;
 

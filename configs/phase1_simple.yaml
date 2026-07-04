@@ -5,25 +5,18 @@ input:
   image: "../data/test_images/test.jpg"
 
 features:
-  - name: "color"
-    enabled: true
+  color:
     weight: 1.2
-
-  - name: "intensity"
-    enabled: true
+  intensity:
     weight: 0.8
-
-integration:
-  method: "weighted_sum"  # Simple for Phase 1
+  orientation:
+    enabled: false
+  eccentricity:
+    enabled: false
+  symmetry:
+    enabled: false
 
 output:
   save_features: true
   save_saliency: true
   output_dir: "results/"
-
-visualization:
-  show_windows: true
-  colormap: "jet"
-  alpha: 0.6
-  mark_peaks: true
-  num_peaks: 3

@@ -1,6 +1,9 @@
 // Selection strategies: turn a saliency map into an ordered fixation
-// sequence. The algorithms were moved verbatim from core::SaliencyMap
-// (v1) so behavior is locked by the characterization tests.
+// sequence. NMS was moved verbatim from core::SaliencyMap (v1) and is locked
+// by the characterization tests. IOR deliberately deviates from v1: the v1
+// inhibition kernel was normalized to unit sum, which made the suppression
+// negligible and re-selected the same peak repeatedly; behavior here is
+// covered by test_selection.cpp instead.
 
 #include "attention/selection/selection_strategy.h"
 #include "attention/core/constants.h"
@@ -138,7 +141,30 @@ class NmsSelection : public SelectionStrategy
 class IorSelection : public SelectionStrategy
 {
  public:
-  explicit IorSelection(const SelectionParams& params) : params_(params) {}
+  explicit IorSelection(const SelectionParams& params) : params_(params)
+  {
+    // Pre-compute the attenuation mask once: (1 - strength * gauss(dist)),
+    // gaussian 1.0 at the center so ior_strength is the actual suppression
+    // applied at the selected peak. (The v1 code normalized the kernel to
+    // unit sum, which made the inhibition negligible — the same peak won
+    // repeatedly.)
+    const int radius = params_.ior_radius;
+    const int kernel_size = radius * 2 + 1;
+    const float sigma = radius / attention::constants::IOR_SIGMA_FACTOR;
+
+    attenuation_ = cv::Mat(kernel_size, kernel_size, CV_32F);
+    for (int y = 0; y < kernel_size; ++y)
+    {
+      for (int x = 0; x < kernel_size; ++x)
+      {
+        int dx = x - radius;
+        int dy = y - radius;
+        float dist_sq = dx * dx + dy * dy;
+        float gauss = std::exp(-dist_sq / (2.0f * sigma * sigma));
+        attenuation_.at<float>(y, x) = 1.0f - params_.ior_strength * gauss;
+      }
+    }
+  }
 
   std::string name() const override { return "ior"; }
 
@@ -153,29 +179,10 @@ class IorSelection : public SelectionStrategy
     const float threshold = params_.threshold;
     const int max_peaks = params_.max_count;
     const int ior_radius = params_.ior_radius;
-    const float ior_strength = params_.ior_strength;
 
     // Working copy of the saliency map for sequential inhibition
     cv::Mat working_map = map.clone();
-
-    // Pre-compute Gaussian inhibition kernel: 1.0 at the peak center falling
-    // off with distance, so ior_strength is the actual suppression applied at
-    // the selected peak. (The v1 code normalized this kernel to unit sum,
-    // which made the inhibition negligible — the same peak won repeatedly.)
-    int kernel_size = ior_radius * 2 + 1;
-    cv::Mat ior_kernel = cv::Mat::zeros(kernel_size, kernel_size, CV_32F);
-
-    float sigma = ior_radius / attention::constants::IOR_SIGMA_FACTOR;
-    for (int y = 0; y < kernel_size; ++y)
-    {
-      for (int x = 0; x < kernel_size; ++x)
-      {
-        int dx = x - ior_radius;
-        int dy = y - ior_radius;
-        float dist_sq = dx * dx + dy * dy;
-        ior_kernel.at<float>(y, x) = std::exp(-dist_sq / (2.0f * sigma * sigma));
-      }
-    }
+    const cv::Rect map_rect(0, 0, working_map.cols, working_map.rows);
 
     // Sequential peak detection with IOR
     for (int i = 0; i < max_peaks; ++i)
@@ -191,23 +198,16 @@ class IorSelection : public SelectionStrategy
 
       peaks.push_back(core::Peak(max_loc, static_cast<float>(max_val)));
 
-      // Inhibit region around the detected peak
-      for (int dy = -ior_radius; dy <= ior_radius; ++dy)
+      // Inhibit region around the detected peak: multiply the map ROI by the
+      // matching sub-rect of the precomputed attenuation mask
+      cv::Rect kernel_rect(max_loc.x - ior_radius, max_loc.y - ior_radius, attenuation_.cols, attenuation_.rows);
+      cv::Rect roi = kernel_rect & map_rect;
+      if (roi.empty())
       {
-        for (int dx = -ior_radius; dx <= ior_radius; ++dx)
-        {
-          int x = max_loc.x + dx;
-          int y = max_loc.y + dy;
-
-          if (x >= 0 && x < working_map.cols && y >= 0 && y < working_map.rows)
-          {
-            int kx = dx + ior_radius;
-            int ky = dy + ior_radius;
-            float inhibition = ior_kernel.at<float>(ky, kx) * ior_strength;
-            working_map.at<float>(y, x) *= (1.0f - inhibition);
-          }
-        }
+        continue;
       }
+      cv::Rect kernel_roi(roi.x - kernel_rect.x, roi.y - kernel_rect.y, roi.width, roi.height);
+      cv::multiply(working_map(roi), attenuation_(kernel_roi), working_map(roi));
     }
 
     return peaks;
@@ -215,6 +215,7 @@ class IorSelection : public SelectionStrategy
 
  private:
   SelectionParams params_;
+  cv::Mat attenuation_; // (2r+1)^2 mask: 1 - strength * gaussian
 };
 
 } // namespace

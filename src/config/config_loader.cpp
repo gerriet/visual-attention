@@ -104,6 +104,12 @@ void ConfigLoader::load_features(const YAML::Node& features, pipeline::PipelineC
   features::register_builtin_features();
   const auto& registry = features::FeatureRegistry::instance();
 
+  if (!features.IsMap())
+  {
+    throw std::runtime_error("'features' must be a map of feature-name -> settings "
+                             "(e.g. \"features:\\n  color:\\n    weight: 1.0\"), not a list");
+  }
+
   // Entries override the matching default spec; listed features that are not
   // in the default set are appended. Features stay enabled unless a config
   // says `enabled: false` — this keeps v1 config files (weight-only

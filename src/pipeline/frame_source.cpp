@@ -20,7 +20,12 @@ bool ImageListSource::next(core::Frame& frame)
     return false;
   }
 
-  const std::string& path = paths_[index_];
+  // Advance before loading so a throwing entry is not retried when the
+  // caller's error handler continues the stream
+  const std::string path = paths_[index_];
+  const int frame_number = static_cast<int>(index_);
+  ++index_;
+
   cv::Mat image = cv::imread(path, cv::IMREAD_COLOR);
   if (image.empty())
   {
@@ -28,8 +33,7 @@ bool ImageListSource::next(core::Frame& frame)
   }
 
   frame = core::Frame(image, path);
-  frame.frame_number = static_cast<int>(index_);
-  ++index_;
+  frame.frame_number = frame_number;
   return true;
 }
 

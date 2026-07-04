@@ -1,52 +1,50 @@
 # Classic Parameters from Dissertation
-# These values were validated in the original research
+# These values were validated in the original research.
+#
+# Blocks for not-yet-ported subsystems are kept below as commented reference:
+# the neural-field parameters are consumed starting roadmap M3, stereo in M5.
 
 input:
   image: "../data/test_images/test.jpg"
 
-neural_field_2d:
-  alpha: 0.5              # Time constant
-  beta: 30.0              # Sigmoid steepness
-  rest_value: -0.25       # Resting activity level
-  global_mult: 1.0        # Global interaction strength
-  convergence:
-    max_iterations: 50
-    threshold: 0.01
-
-  kernel:
-    type: "difference_of_gaussians"
-    sigma_exc: 2.0        # Excitatory spread
-    sigma_inh: 10.0       # Inhibitory spread
-    A_exc: 1.5            # Excitatory amplitude
-    A_inh: 0.5            # Inhibitory amplitude
-
 features:
   color:
     weight: 1.2           # From readargs.h:89
-    num_scales: 3
-    threshold: 8.0
-    method: "opponent_colors"
-
   intensity:
     weight: 0.35          # From readargs.h:90
-    num_scales: 3
-
   symmetry:
     weight: 1.6           # From readargs.h:91
-    num_orientations: 6
-    scales: [1, 2, 4]
 
-  stereo:
-    weight: 0.7           # From readargs.h:92
-    min_disparity: -25    # From experiments
-    max_disparity: 0
-    block_size: 15
-    correlation_method: "sgbm"
+pipeline:
+  selection: ior          # Closest stand-in for two-stage neural-field
+                          # selection until M3
 
-selection:
-  method: "wta"           # Winner-take-all
-  ior:
-    enabled: true
-    radius: 20
-    strength: 0.5
-    decay: 0.95
+peaks:
+  ior_radius: 20
+  ior_strength: 0.5
+
+# --- Reference: dissertation parameters for subsystems not yet ported ------
+#
+# neural_field_2d:        # consumed starting roadmap M3
+#   alpha: 0.5            # Time constant
+#   beta: 30.0            # Sigmoid steepness
+#   rest_value: -0.25     # Resting activity level
+#   global_mult: 1.0      # Global interaction strength
+#   convergence:
+#     max_iterations: 50
+#     threshold: 0.01
+#   kernel:
+#     type: "difference_of_gaussians"
+#     sigma_exc: 2.0      # Excitatory spread
+#     sigma_inh: 10.0     # Inhibitory spread
+#     A_exc: 1.5          # Excitatory amplitude
+#     A_inh: 0.5          # Inhibitory amplitude
+#
+# features.stereo:        # consumed starting roadmap M5
+#   weight: 0.7           # From readargs.h:92
+#   min_disparity: -25    # From experiments
+#   max_disparity: 0
+#   block_size: 15
+#   correlation_method: "sgbm"
+#
+# ior decay: 0.95         # cross-frame IOR decay, relevant for streams (M5/M6)

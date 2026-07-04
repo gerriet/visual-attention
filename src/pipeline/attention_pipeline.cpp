@@ -54,6 +54,11 @@ void AttentionPipeline::build_components()
     extractors_.push_back(std::move(extractor));
   }
 
+  if (extractors_.empty())
+  {
+    throw std::runtime_error("PipelineConfig: no enabled features — enable at least one");
+  }
+
   fusion_ = fusion::create_fusion_strategy(config_.fusion);
 
   selection::SelectionParams selection_params;
@@ -109,7 +114,7 @@ void AttentionPipeline::process()
   timing_.pyramid_ms = std::chrono::duration_cast<std::chrono::milliseconds>(t_pyramid_end - t_pyramid_start).count();
 
   // Step 1: Extract features (with per-feature timing)
-  extract_features();
+  extract_features(pyramid_levels);
 
   // Step 2: Fuse features into a saliency map
   auto t_integrate_start = std::chrono::high_resolution_clock::now();
@@ -192,20 +197,38 @@ void AttentionPipeline::process()
   ++run_state_.frame_index;
 }
 
-void AttentionPipeline::process_stream(FrameSource& source, const FrameCallback& on_frame)
+void AttentionPipeline::process_stream(FrameSource& source, const FrameCallback& on_frame,
+                                       const ErrorCallback& on_error)
 {
   reset_state();
 
-  core::Frame frame;
-  while (source.next(frame))
+  while (true)
   {
-    frame_ = std::move(frame);
-    processed_ = false;
-    process();
-
-    if (on_frame)
+    core::Frame frame;
+    try
     {
-      on_frame(*this);
+      if (!source.next(frame))
+      {
+        break;
+      }
+      frame_ = std::move(frame);
+      processed_ = false;
+      process();
+
+      if (on_frame)
+      {
+        on_frame(*this);
+      }
+    }
+    catch (const std::exception& e)
+    {
+      // The error callback decides whether the stream continues (e.g. batch
+      // mode logs and skips a corrupt image) or the error propagates
+      if (on_error && on_error(e))
+      {
+        continue;
+      }
+      throw;
     }
   }
 }
@@ -223,22 +246,29 @@ int AttentionPipeline::compute_pyramid_levels() const
   return std::max(9, levels); // At least 9 levels for Itti-Koch
 }
 
-void AttentionPipeline::extract_features()
+void AttentionPipeline::extract_features(int pyramid_levels)
 {
-  // Pre-compute the shared Gabor bank BEFORE parallel extraction to avoid
-  // race conditions; features reuse it (see PipelineConfig gabor_* params)
-  int pyramid_levels = compute_pyramid_levels();
-  frame_.compute_gabor_pyramids(pyramid_levels, config_.gabor_orientations, config_.gabor_wavelength,
-                                config_.gabor_bandwidth);
-
   // Applicable extractors for this frame (e.g. color is skipped on grayscale)
   std::vector<features::FeatureExtractor*> active;
+  int required_orientations = 0;
   for (const auto& extractor : extractors_)
   {
     if (extractor->applicable(frame_))
     {
       active.push_back(extractor.get());
+      required_orientations = std::max(required_orientations, extractor->required_gabor_orientations());
     }
+  }
+
+  // Pre-compute the shared Gabor bank BEFORE parallel extraction: it must
+  // satisfy every active feature's orientation requirement so that no
+  // extraction thread ever triggers a recompute of shared Frame state
+  // (that would be a data race). Skipped entirely when no feature uses it.
+  if (required_orientations > 0)
+  {
+    int bank_orientations = std::max(config_.gabor_orientations, required_orientations);
+    frame_.compute_gabor_pyramids(pyramid_levels, bank_orientations, config_.gabor_wavelength,
+                                  config_.gabor_bandwidth);
   }
 
   // Extract features (with optional debugging)

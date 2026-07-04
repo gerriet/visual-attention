@@ -139,6 +139,7 @@ class AttentionPipeline
 {
  public:
   using FrameCallback = std::function<void(AttentionPipeline&)>;
+  using ErrorCallback = std::function<bool(const std::exception&)>;
 
   AttentionPipeline();
   explicit AttentionPipeline(const PipelineConfig& config);
@@ -178,8 +179,11 @@ class AttentionPipeline
    * frame by frame, invoking the callback after each.
    * @param source Frame source (single image = stream of length 1)
    * @param on_frame Called after each processed frame (may be empty)
+   * @param on_error Called when a frame fails to load or process; return
+   *                 true to skip the frame and continue the stream, false
+   *                 to rethrow. Without a callback, errors propagate.
    */
-  void process_stream(FrameSource& source, const FrameCallback& on_frame = {});
+  void process_stream(FrameSource& source, const FrameCallback& on_frame = {}, const ErrorCallback& on_error = {});
 
   /**
    * Reset per-run state (frame index, future cross-frame state).
@@ -295,7 +299,7 @@ class AttentionPipeline
   // Internal processing methods
   void build_components();
   int compute_pyramid_levels() const;
-  void extract_features();
+  void extract_features(int pyramid_levels);
   void integrate_features();
   void detect_peaks();
 };

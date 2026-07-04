@@ -79,33 +79,10 @@ void Frame::compute_gabor_pyramids(int levels, int num_orientations, double wave
     return; // Already have enough
   }
 
-  // If extending orientations with same or more levels, can optimize
-  if (gabor_pyramids_computed &&
-      static_cast<int>(gabor_pyramids.size()) >= actual_levels &&
-      num_gabor_orientations < num_orientations)
-  {
-    // Extend existing pyramids with additional orientations
-    int old_orientations = num_gabor_orientations;
-    num_gabor_orientations = num_orientations;
-
-    for (int level = 0; level < actual_levels; ++level)
-    {
-      gabor_pyramids[level].resize(num_orientations);
-
-      // Only compute new orientations
-      for (int orient = old_orientations; orient < num_orientations; ++orient)
-      {
-        const cv::Mat& source = gray_pyramid[level];
-        double theta = M_PI * orient / num_orientations;
-        cv::Mat gabor_kernel = create_gabor_kernel(wavelength, theta, bandwidth);
-        cv::Mat gabor_response;
-        cv::filter2D(source, gabor_response, CV_32F, gabor_kernel);
-        gabor_response = cv::abs(gabor_response);
-        gabor_pyramids[level][orient] = gabor_response;
-      }
-    }
-    return;
-  }
+  // Note: no incremental "extend with more orientations" path. Orientation
+  // angles are spaced 180°/num_orientations, so adding orientations changes
+  // the spacing of ALL entries — extending in place would mix two spacings
+  // in one bank. A larger request always triggers a full recompute.
 
   // Full recompute needed
   num_gabor_orientations = num_orientations;

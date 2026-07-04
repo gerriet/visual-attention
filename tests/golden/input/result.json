@@ -7,15 +7,15 @@
   },
   "generator": {
     "name": "attention-framework",
-    "variant": "classic-weighted-sum"
+    "variant": "weighted-sum+nms"
   },
   "params": {
-    "feature_weights": {"color": 1, "eccentricity": 1, "intensity": 1, "orientation": 1, "symmetry": 1},
+    "feature_weights": {"color": 1, "intensity": 1, "orientation": 1, "eccentricity": 1, "symmetry": 1},
     "peaks": {
       "min_distance": 30,
       "threshold": 0.3,
       "max_count": 10,
-      "enable_ior": false,
+      "selection": "nms",
       "ior_radius": 50,
       "ior_strength": 0.8
     }
@@ -34,10 +34,10 @@
     {"n": 9, "x": 205, "y": 168, "value": 0.417432}
   ],
   "timing_ms": {
-    "pyramid": 0,
-    "features": {"color": 0, "eccentricity": 2, "intensity": 0, "orientation": 0, "symmetry": 5},
+    "pyramid": 2,
+    "features": {"color": 1, "eccentricity": 5, "intensity": 0, "orientation": 1, "symmetry": 6},
     "integration": 0,
     "peak_detection": 2,
-    "total": 9
+    "total": 17
   }
 }

@@ -1,52 +1,37 @@
-# Classic Parameters from Dissertation
-# These values were validated in the original research
+# Default configuration: mirrors the built-in defaults (all five features,
+# weighted-sum fusion, NMS selection).
+#
+# See also:
+#   configs/thesis.yaml  - dissertation feature set with IOR selection
+#   configs/modern.yaml  - full modern baseline
+#   configs/classic_parameters.yaml - dissertation parameter values (reference)
 
 input:
   image: "../data/test_images/test.jpg"
 
-neural_field_2d:
-  alpha: 0.5              # Time constant
-  beta: 30.0              # Sigmoid steepness
-  rest_value: -0.25       # Resting activity level
-  global_mult: 1.0        # Global interaction strength
-  convergence:
-    max_iterations: 50
-    threshold: 0.01
-
-  kernel:
-    type: "difference_of_gaussians"
-    sigma_exc: 2.0        # Excitatory spread
-    sigma_inh: 10.0       # Inhibitory spread
-    A_exc: 1.5            # Excitatory amplitude
-    A_inh: 0.5            # Inhibitory amplitude
+pipeline:
+  fusion: weighted-sum
+  selection: nms
 
 features:
   color:
-    weight: 1.2           # From readargs.h:89
-    num_scales: 3
-    threshold: 8.0
-    method: "opponent_colors"
-
+    weight: 1.0
   intensity:
-    weight: 0.75          # From readargs.h:90
-    num_scales: 3
-
+    weight: 1.0
+  orientation:
+    weight: 1.0
+  eccentricity:
+    weight: 1.0
   symmetry:
-    weight: 0.6           
-    num_orientations: 6
-    scales: [1, 2, 4]
+    weight: 1.0
 
-  stereo:
-    weight: 0.7           # From readargs.h:92
-    min_disparity: -25    # From experiments
-    max_disparity: 0
-    block_size: 15
-    correlation_method: "sgbm"
+peaks:
+  min_distance: 30
+  threshold: 0.3
+  max_count: 10
 
-selection:
-  method: "wta"           # Winner-take-all
-  ior:
-    enabled: true
-    radius: 20
-    strength: 0.5
-    decay: 0.95
+output:
+  save_features: true
+  save_saliency: true
+  output_dir: "results/"
+  display: false

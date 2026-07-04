@@ -51,6 +51,15 @@ class FeatureExtractor
    * are skipped silently by the pipeline (e.g., color on grayscale input).
    */
   virtual bool applicable(const core::Frame& frame) const { return true; }
+
+  /**
+   * Number of Gabor orientations this feature reads from the shared bank
+   * (0 = does not use Gabor responses). The pipeline sizes the shared bank
+   * to the maximum over all enabled features BEFORE parallel extraction —
+   * features must never trigger a recompute of shared Frame state from
+   * their extraction threads.
+   */
+  virtual int required_gabor_orientations() const { return 0; }
 };
 
 } // namespace features

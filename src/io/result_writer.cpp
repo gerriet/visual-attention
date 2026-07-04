@@ -109,7 +109,7 @@ void ResultWriter::write(const pipeline::AttentionPipeline& pipeline, const std:
   out << "      \"min_distance\": " << config.peak_min_distance << ",\n";
   out << "      \"threshold\": " << format_float(config.peak_threshold) << ",\n";
   out << "      \"max_count\": " << config.peak_max_count << ",\n";
-  out << "      \"enable_ior\": " << (config.enable_ior ? "true" : "false") << ",\n";
+  out << "      \"selection\": \"" << escape_json(config.effective_selection()) << "\",\n";
   out << "      \"ior_radius\": " << config.ior_radius << ",\n";
   out << "      \"ior_strength\": " << format_float(config.ior_strength) << "\n";
   out << "    }\n";

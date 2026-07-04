@@ -89,6 +89,22 @@ TEST_CASE("modern profile enables all features", "[config]")
   CHECK(config.pipeline.effective_selection() == "nms");
 }
 
+TEST_CASE("every shipped config loads and constructs a pipeline", "[config]")
+{
+  for (const auto& entry : fs::directory_iterator(source_dir() / "configs"))
+  {
+    if (entry.path().extension() != ".yaml")
+    {
+      continue;
+    }
+    DYNAMIC_SECTION("config: " << entry.path().filename().string())
+    {
+      auto config = ConfigLoader::load(entry.path().string());
+      attention::pipeline::AttentionPipeline pipeline(config.pipeline);
+    }
+  }
+}
+
 TEST_CASE("all feature weights are parsed, none silently dropped", "[config]")
 {
   auto path = write_temp_config(R"(

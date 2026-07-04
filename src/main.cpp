@@ -138,6 +138,12 @@ void process_batch(const std::string& directory, const attention::pipeline::Pipe
 
         std::cout << "  ✓ Saved to: " << output_dir.string() << std::endl;
         std::cout << std::endl;
+      },
+      [](const std::exception& e)
+      {
+        // Log and continue with the remaining images (v1 batch semantics)
+        std::cerr << "  ✗ Error: " << e.what() << std::endl << std::endl;
+        return true;
       });
 
   std::cout << "Batch processing complete!" << std::endl;
@@ -237,7 +243,6 @@ int main(int argc, char** argv)
   try
   {
     attention::config::ConfigLoader::Config config;
-    bool use_config_file = false;
     std::string emit_json_path;
 
     // Parse command line arguments
@@ -275,7 +280,6 @@ int main(int argc, char** argv)
       std::string config_path = argv[2];
       std::cout << "Loading configuration from: " << config_path << std::endl;
       config = attention::config::ConfigLoader::load(config_path);
-      use_config_file = true;
 
       for (int i = 3; i < argc; ++i)
       {
