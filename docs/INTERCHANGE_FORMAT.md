@@ -52,8 +52,11 @@ A result is two files side by side:
 Field notes:
 
 - **`fixations`** is the scanpath: ordered by attention sequence (`n`
-  ascending). `x`/`y` are pixel coordinates in the source image, `value` is
-  the saliency at selection time. This is the field consumers rely on.
+  ascending). `x`/`y` are pixel coordinates in the source image. `value` is
+  the generator's salience measure for that fixation — the map value at the
+  peak for nms/ior, the cluster mean for neural-field. Comparators must rank
+  by it, not interpret its absolute scale. This is the field consumers rely
+  on.
 - **`saliency_map`** is a path relative to the JSON file.
 - **`source.image`** is informational; comparators must not interpret it
   (golden files may contain paths from another machine).

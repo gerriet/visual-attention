@@ -16,11 +16,14 @@ features:
     weight: 1.6           # From readargs.h:91
 
 pipeline:
-  selection: ior          # Closest stand-in for two-stage neural-field
-                          # selection until M3
+  selection: neural-field # Two-stage neural-field selection (M3)
+  selection_params:
+    alpha: 0.5
+    beta: 30.0
+    resting: -0.25
+    global_mult: 1.0
 
 peaks:
-  ior_radius: 20
   ior_strength: 0.5
 
 # --- Reference: dissertation parameters for subsystems not yet ported ------

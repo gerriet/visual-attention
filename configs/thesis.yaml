@@ -36,10 +36,10 @@ features:
   orientation:
     enabled: false
 
+# Note: neural-field selection reads only max_count and ior_strength (the
+# space-based IOR level); the field itself decides what is salient enough
 peaks:
-  threshold: 0.3
   max_count: 10
-  ior_radius: 50
   ior_strength: 0.8
 
 output:

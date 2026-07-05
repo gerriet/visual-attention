@@ -6,6 +6,7 @@
 // covered by test_selection.cpp instead.
 
 #include "attention/selection/selection_strategy.h"
+#include "attention/config/yaml_reader.h"
 #include "attention/core/constants.h"
 #include "attention/selection/neural_field_selection.h"
 #include <algorithm>
@@ -222,20 +223,7 @@ class IorSelection : public SelectionStrategy
 
 } // namespace
 
-namespace
-{
-
-// Read a scalar param if present, else keep the default
-template <typename T>
-void read(const YAML::Node& params, const char* key, T& value)
-{
-  if (params && params[key])
-  {
-    value = params[key].as<T>();
-  }
-}
-
-} // namespace
+using config::read_param;
 
 std::unique_ptr<SelectionStrategy> create_selection_strategy(const std::string& name, const SelectionParams& params,
                                                              const YAML::Node& strategy_params)
@@ -251,20 +239,20 @@ std::unique_ptr<SelectionStrategy> create_selection_strategy(const std::string& 
   if (name == "neural-field")
   {
     NeuralFieldSelection::Params nf;
-    read(strategy_params, "alpha", nf.alpha);
-    read(strategy_params, "beta", nf.beta);
-    read(strategy_params, "resting", nf.resting);
-    read(strategy_params, "global_mult", nf.global_mult);
-    read(strategy_params, "input_mult", nf.input_mult);
-    read(strategy_params, "kernel_s", nf.kernel_s);
-    read(strategy_params, "kernel_k", nf.kernel_k);
-    read(strategy_params, "kernel_size", nf.kernel_size);
-    read(strategy_params, "max_cycles", nf.max_cycles);
-    read(strategy_params, "change_thresh", nf.change_thresh);
-    read(strategy_params, "field_max_size", nf.field_max_size);
-    read(strategy_params, "border_margin", nf.border_margin);
-    read(strategy_params, "min_cluster_size", nf.min_cluster_size);
-    read(strategy_params, "ior_decay", nf.ior_decay);
+    read_param(strategy_params, "alpha", nf.alpha);
+    read_param(strategy_params, "beta", nf.beta);
+    read_param(strategy_params, "resting", nf.resting);
+    read_param(strategy_params, "global_mult", nf.global_mult);
+    read_param(strategy_params, "input_mult", nf.input_mult);
+    read_param(strategy_params, "kernel_s", nf.kernel_s);
+    read_param(strategy_params, "kernel_k", nf.kernel_k);
+    read_param(strategy_params, "kernel_size", nf.kernel_size);
+    read_param(strategy_params, "max_cycles", nf.max_cycles);
+    read_param(strategy_params, "change_thresh", nf.change_thresh);
+    read_param(strategy_params, "field_max_size", nf.field_max_size);
+    read_param(strategy_params, "border_margin", nf.border_margin);
+    read_param(strategy_params, "min_cluster_size", nf.min_cluster_size);
+    read_param(strategy_params, "ior_decay", nf.ior_decay);
     return std::make_unique<NeuralFieldSelection>(params, nf);
   }
   throw std::runtime_error("Unknown selection strategy '" + name + "'. Available: nms, ior, neural-field");

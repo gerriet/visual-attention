@@ -1,4 +1,5 @@
 #include "attention/features/feature_registry.h"
+#include "attention/config/yaml_reader.h"
 #include "attention/features/color_feature.h"
 #include "attention/features/eccentricity_feature.h"
 #include "attention/features/intensity_feature.h"
@@ -50,20 +51,7 @@ std::vector<std::string> FeatureRegistry::available() const
   return names;
 }
 
-namespace
-{
-
-// Read a scalar param if present, else keep the default
-template <typename T>
-void read(const YAML::Node& params, const char* key, T& value)
-{
-  if (params && params[key])
-  {
-    value = params[key].as<T>();
-  }
-}
-
-} // namespace
+using config::read_param;
 
 void register_builtin_features()
 {
@@ -80,8 +68,8 @@ void register_builtin_features()
                [](const YAML::Node& params)
                {
                  ColorFeature::Config config;
-                 read(params, "pyramid_levels", config.pyramid_levels);
-                 read(params, "normalize_channels", config.normalize_channels);
+                 read_param(params, "pyramid_levels", config.pyramid_levels);
+                 read_param(params, "normalize_channels", config.normalize_channels);
                  return std::make_unique<ColorFeature>(config);
                });
 
@@ -89,7 +77,7 @@ void register_builtin_features()
                [](const YAML::Node& params)
                {
                  IntensityFeature::Config config;
-                 read(params, "pyramid_levels", config.pyramid_levels);
+                 read_param(params, "pyramid_levels", config.pyramid_levels);
                  return std::make_unique<IntensityFeature>(config);
                });
 
@@ -97,10 +85,10 @@ void register_builtin_features()
                [](const YAML::Node& params)
                {
                  OrientationFeature::Config config;
-                 read(params, "num_orientations", config.num_orientations);
-                 read(params, "wavelength", config.wavelength);
-                 read(params, "bandwidth", config.bandwidth);
-                 read(params, "compute_at_scale", config.compute_at_scale);
+                 read_param(params, "num_orientations", config.num_orientations);
+                 read_param(params, "wavelength", config.wavelength);
+                 read_param(params, "bandwidth", config.bandwidth);
+                 read_param(params, "compute_at_scale", config.compute_at_scale);
                  return std::make_unique<OrientationFeature>(config);
                });
 
@@ -111,11 +99,11 @@ void register_builtin_features()
                  // Auto scale selection by image size, as the pipeline
                  // previously hardcoded (full res <= 640px, else quarter res)
                  config.compute_at_scale = -1;
-                 read(params, "edge_threshold", config.edge_threshold);
-                 read(params, "min_area", config.min_area);
-                 read(params, "max_area", config.max_area);
-                 read(params, "variance_threshold", config.variance_threshold);
-                 read(params, "compute_at_scale", config.compute_at_scale);
+                 read_param(params, "edge_threshold", config.edge_threshold);
+                 read_param(params, "min_area", config.min_area);
+                 read_param(params, "max_area", config.max_area);
+                 read_param(params, "variance_threshold", config.variance_threshold);
+                 read_param(params, "compute_at_scale", config.compute_at_scale);
                  return std::make_unique<EccentricityFeature>(config);
                });
 
@@ -134,10 +122,10 @@ void register_builtin_features()
                  config.auto_scale_schedule = true;
                  config.scales.clear();
 
-                 read(params, "num_orientations", config.num_orientations);
-                 read(params, "wavelength", config.wavelength);
-                 read(params, "bandwidth", config.bandwidth);
-                 read(params, "use_multi_scale", config.use_multi_scale);
+                 read_param(params, "num_orientations", config.num_orientations);
+                 read_param(params, "wavelength", config.wavelength);
+                 read_param(params, "bandwidth", config.bandwidth);
+                 read_param(params, "use_multi_scale", config.use_multi_scale);
 
                  if (params && params["scales"])
                  {
@@ -146,16 +134,11 @@ void register_builtin_features()
                    {
                      SymmetryFeature::ScaleConfig sc;
                      sc.pyramid_level = scale["level"].as<int>();
-                     if (scale["min_radius"])
-                       sc.min_radius = scale["min_radius"].as<int>();
-                     if (scale["max_radius"])
-                       sc.max_radius = scale["max_radius"].as<int>();
-                     if (scale["radius_step"])
-                       sc.radius_step = scale["radius_step"].as<int>();
-                     if (scale["width"])
-                       sc.width = scale["width"].as<int>();
-                     if (scale["threshold"])
-                       sc.symmetry_threshold = scale["threshold"].as<float>();
+                     read_param(scale, "min_radius", sc.min_radius);
+                     read_param(scale, "max_radius", sc.max_radius);
+                     read_param(scale, "radius_step", sc.radius_step);
+                     read_param(scale, "width", sc.width);
+                     read_param(scale, "threshold", sc.symmetry_threshold);
                      config.scales.push_back(sc);
                    }
                  }

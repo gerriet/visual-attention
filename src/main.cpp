@@ -138,6 +138,10 @@ void process_batch(const std::string& directory, const attention::pipeline::Pipe
 
         std::cout << "  ✓ Saved to: " << output_dir.string() << std::endl;
         std::cout << std::endl;
+
+        // Batch images are independent stills, not a temporal stream: clear
+        // per-run state (neural-field activity, IOR map) between images
+        p.reset_state();
       },
       [](const std::exception& e)
       {
