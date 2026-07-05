@@ -3,7 +3,9 @@
 
 #include "attention/config/config_loader.h"
 #include "attention/io/result_writer.h"
+#include "attention/io/scanpath_writer.h"
 #include "attention/pipeline/attention_pipeline.h"
+#include "attention/system/attention_system.h"
 #include "attention/visualization/visualizer.h"
 #include <algorithm>
 #include <chrono>
@@ -103,6 +105,90 @@ void process_sequence(const std::string& path, attention::pipeline::PipelineConf
       });
 
   std::cout << "Sequence processing complete (" << processed << " frames)." << std::endl;
+}
+
+// Draw the object files annotated as in the thesis figures: white = current
+// focus, red = never selected, blue = previously selected; plus the focus box.
+cv::Mat annotate_objects(const attention::system::AttentionSystem& sys)
+{
+  const auto& frame = sys.pipeline().get_frame();
+  cv::Mat vis;
+  if (frame.image.channels() == 1)
+  {
+    cv::cvtColor(frame.image, vis, cv::COLOR_GRAY2BGR);
+  }
+  else
+  {
+    vis = frame.image.clone();
+  }
+  const auto* focus = sys.current_focus();
+  for (const auto& obj : sys.active_files())
+  {
+    cv::Scalar color = obj.ever_selected() ? cv::Scalar(255, 0, 0) : cv::Scalar(0, 0, 255); // BGR: blue / red
+    if (focus && obj.label == focus->label)
+    {
+      color = cv::Scalar(255, 255, 255); // white = current focus
+    }
+    cv::rectangle(vis, obj.bbox, color, 2);
+    cv::putText(vis, std::to_string(obj.label), obj.centroid, cv::FONT_HERSHEY_SIMPLEX, 0.5, color, 1);
+  }
+  return vis;
+}
+
+// Run the AttentionSystem (second stage + behavior) over a temporal sequence
+// (image directory or video) and emit its scanpath.
+void process_attend(const std::string& path, attention::pipeline::PipelineConfig& pipeline_config,
+                    const std::string& output_base, const std::string& emit_scanpath, bool user_config)
+{
+  if (!user_config)
+  {
+    enable_feature(pipeline_config, "onset", 1.0f); // motion helps track objects
+  }
+
+  attention::system::AttentionSystem::Config cfg;
+  cfg.pipeline = pipeline_config;
+  attention::system::AttentionSystem sys(cfg);
+
+  std::unique_ptr<attention::pipeline::FrameSource> source;
+  if (fs::is_directory(path))
+  {
+    std::vector<std::string> frames = attention::pipeline::collect_image_paths(path);
+    std::cout << "Attend: " << frames.size() << " frames from directory " << path << std::endl;
+    source = std::make_unique<attention::pipeline::ImageListSource>(frames);
+  }
+  else
+  {
+    std::cout << "Attend: video " << path << std::endl;
+    source = std::make_unique<attention::pipeline::VideoFrameSource>(path);
+  }
+
+  const std::string out_base = output_base.empty() ? "results/attend" : output_base;
+  sys.process_stream(
+      *source,
+      [&](attention::system::AttentionSystem& s)
+      {
+        std::ostringstream name;
+        name << "frame_" << std::setw(4) << std::setfill('0') << s.frame_index();
+        fs::path dir = fs::path(out_base) / name.str();
+        fs::create_directories(dir);
+        cv::imwrite((dir / "objects.png").string(), annotate_objects(s));
+        const auto* focus = s.current_focus();
+        std::cout << "  " << name.str() << ": " << s.active_files().size() << " objects";
+        if (focus)
+        {
+          std::cout << ", focus #" << focus->label << " at (" << focus->location.x << "," << focus->location.y << ")";
+        }
+        std::cout << std::endl;
+      });
+
+  std::cout << "Attend complete: " << sys.scanpath().size() << " foci over " << sys.frame_index() << " frames."
+            << std::endl;
+
+  if (!emit_scanpath.empty())
+  {
+    attention::io::ScanpathWriter::write(sys, emit_scanpath);
+    std::cout << "✓ Saved scanpath: " << emit_scanpath << std::endl;
+  }
 }
 
 void process_batch(const std::string& directory, const attention::pipeline::PipelineConfig& config,
@@ -299,6 +385,8 @@ void print_usage(const char* program_name)
   std::cerr << "  " << program_name << " --batch <directory> [options]" << std::endl;
   std::cerr << "  " << program_name << " --stereo <left> <right> [options]" << std::endl;
   std::cerr << "  " << program_name << " --sequence <dir|video> [--output dir] [--config yaml]" << std::endl;
+  std::cerr << "  " << program_name << " --attend <dir|video> [--output dir] [--emit-scanpath path] [--config yaml]"
+            << std::endl;
   std::cerr << std::endl;
   std::cerr << "Examples:" << std::endl;
   std::cerr << "  " << program_name << " data/test_images/input.png" << std::endl;
@@ -315,6 +403,8 @@ void print_usage(const char* program_name)
   std::cerr << "  --batch              Process all images in directory, save features separately" << std::endl;
   std::cerr << "  --stereo <l> <r>     Process a stereo pair (adds a disparity/depth channel)" << std::endl;
   std::cerr << "  --sequence <path>    Process a directory or video as a temporal stream (onset/motion)" << std::endl;
+  std::cerr << "  --attend <path>      Run the full attention system (object files + behavior) over a stream" << std::endl;
+  std::cerr << "  --emit-scanpath <p>  Write the scanpath JSON (with --attend)" << std::endl;
   std::cerr << "  --output <dir>       Specify output directory for batch/sequence mode (default: input_dir/results_batch)" << std::endl;
   std::cerr << "  --emit-json <path>   Write result JSON + saliency map in the interchange format" << std::endl;
   std::cerr << "                       (see docs/INTERCHANGE_FORMAT.md; single-image and config modes)" << std::endl;
@@ -390,6 +480,41 @@ int main(int argc, char** argv)
         }
       }
       process_sequence(seq_path, config.pipeline, output_dir);
+      return 0;
+    }
+    else if (std::string(argv[1]) == "--attend")
+    {
+      // Full active-vision system: second stage (object files) + behavior
+      // (Exploration) over a temporal stream, emitting a scanpath.
+      if (argc < 3)
+      {
+        std::cerr << "Error: --attend requires a directory or video path" << std::endl;
+        print_usage(argv[0]);
+        return 1;
+      }
+      std::string seq_path = argv[2];
+      std::string output_dir;
+      std::string scanpath_path;
+      bool user_config = false;
+      config = attention::config::ConfigLoader::create_default();
+      for (int i = 3; i < argc; ++i)
+      {
+        std::string arg = argv[i];
+        if (arg == "--output" && i + 1 < argc)
+        {
+          output_dir = argv[++i];
+        }
+        else if (arg == "--config" && i + 1 < argc)
+        {
+          config = attention::config::ConfigLoader::load(argv[++i]);
+          user_config = true;
+        }
+        else if (arg == "--emit-scanpath" && i + 1 < argc)
+        {
+          scanpath_path = argv[++i];
+        }
+      }
+      process_attend(seq_path, config.pipeline, output_dir, scanpath_path, user_config);
       return 0;
     }
     else if (std::string(argv[1]) == "--stereo")

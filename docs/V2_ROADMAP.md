@@ -133,9 +133,31 @@
 - Deferred: multi-scale stereo (`StereoMultiFeature`), cross-frame 3D-field
   volume persistence, real stereo-video / own captures (fold into M7 runs).
 
-### M6 — ESAB2 system level
-- Object files, tracking across frames, scanpath maintenance, action modes
-  (camera movement simulated on video sequences).
+### M6 — AttentionSystem (system level) ✓ 2026-07-05
+*(the original code called this class ESAB2, after the DFG project "Entwicklung
+von Systembausteinen der Aktiven Bildanalyse II"; renamed to AttentionSystem as
+the name carried no meaning outside the project.)*
+- ✓ Object files (thesis §7.2): `ObjectFile` (label, centroid, bbox, size,
+  current + leaky-averaged saliency, created/last-seen/last-selected frames,
+  active flag, trajectory) + `ObjectFileStore` — correspondence by centroid
+  proximity with a global minimal-distance assignment, new files beyond 2× the
+  radius, an inactive stack that later clusters can revive, and aging out.
+- ✓ Behavior model (thesis §8.5): `Behavior` interface + `Exploration` —
+  priority classes (never-selected first, then longest-unselected), within a
+  class by mean saliency, with a 3-frame dwell and object-based inhibition of
+  return via the last-selected ordering. Visual search / MOT / search-and-track
+  slot in behind the same interface.
+- ✓ `AttentionSystem` orchestrator: per stream frame, segment the fused
+  saliency into candidate clusters, correspond to object files, run the
+  behavior to pick the focus, maintain the scanpath. Action modes: Feature
+  (saliency only) and Scanpath (full second stage). move_sensor (overt gaze
+  shift + field displacement) needs a controllable source and is deferred.
+- ✓ CLI `--attend <dir|video>` with per-frame object annotations (focus/never/
+  previously-selected coloring, as in thesis Fig. 8.2) and a scanpath JSON
+  (`attention-scanpath/v1`); behavioral golden on the motion sequence.
+- Deferred: the further behaviors (visual search, MOT, search-and-track),
+  overt sensor control / field displacement, and the seeded-region-growing
+  object segmentation refinement (thesis §7.3.2).
 
 ### M7 — Modern track
 - Python-side learned models (DeepGaze IIE or successor) emitting the

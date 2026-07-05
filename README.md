@@ -23,6 +23,8 @@ motion, ESAB2 system level, modern learned-model comparison).
 - ✅ Neural-field selection (2D Amari dynamics from the dissertation, with
   cluster/Objectfile readout and decaying spatial IOR)
 - ✅ 3D neural-field selection (depth-aware, cross-depth inhibition, thesis §6.4)
+- ✅ AttentionSystem: symbolic second stage — object files tracked across
+  frames, Exploration behavior with dwell + object-based IOR, scanpaths
 - ✅ YAML configuration system
 - ✅ Batch processing mode
 - ✅ Golden regression tests (characterization + behavioral scanpath)
@@ -62,6 +64,10 @@ make
 
 # Temporal sequence (directory of frames or a video) — onset/motion
 ./attention --sequence ../data/test_images/motion_seq --output ../results/seq
+
+# Full attention system: object files + Exploration behavior + scanpath
+./attention --attend ../data/test_images/motion_seq \
+    --output ../results/attend --emit-scanpath ../results/scanpath.json
 
 # Use configuration file
 ./attention --config ../configs/default.yaml
@@ -148,9 +154,11 @@ Phase 2 ("v2", 2026): see `docs/V2_ROADMAP.md` — guardrails (M1), swappable
 architecture (M2), neural-field selection (M3: the dissertation's 2D Amari
 field with two-stage cluster readout, plus per-feature Gabor banks), the
 Python evaluation layer core (M4: metrics, scanpath comparison, report
-generator — see `eval/README.md`), and stereo + motion/onset (M5: the
-disparity feature, onset/motion on the stream pipeline, and the 3D
-neural field) are done. Next up: the ESAB2 system level (M6).
+generator — see `eval/README.md`), stereo + motion/onset (M5: the disparity
+feature, onset/motion on the stream pipeline, and the 3D neural field), and
+the AttentionSystem (M6: the symbolic second stage — object files tracked
+across frames, the Exploration behavior with dwell and object-based IOR, and
+scanpaths over a stream) are done. Next up: the modern track (M7).
 
 ### Code Formatting
 

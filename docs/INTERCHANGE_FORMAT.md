@@ -64,3 +64,32 @@ Field notes:
   comparison contract.
 - Schema changes bump the version (`attention-result/v2`); consumers check the
   prefix.
+
+## Scanpath format (`attention-scanpath/v1`)
+
+The AttentionSystem (M6) runs the second selection stage and a behavior over a
+*stream* and emits a scanpath — a sibling schema to the single-frame result
+above, written by `--attend --emit-scanpath`:
+
+```json
+{
+  "schema": "attention-scanpath/v1",
+  "generator": { "name": "attention-framework", "behavior": "exploration" },
+  "frames": 3,
+  "scanpath": [
+    { "frame": 0, "label": 1, "x": 29, "y": 142, "saliency": 0.62,
+      "bbox": [x, y, w, h] }
+  ],
+  "objects": [
+    { "label": 1, "x": 29, "y": 142, "size": 640, "saliency": 0.62,
+      "avg_saliency": 0.60, "created_frame": 0, "last_selected_frame": 2 }
+  ]
+}
+```
+
+- **`scanpath`** is the ordered sequence of foci, one per frame that produced
+  one. `label` is the object file focused; `x`/`y` its centroid. Comparators
+  should match by frame + position within a tolerance — object-file `label`s
+  are creation-order dependent and not stable across algorithm changes.
+- **`objects`** is the final active world model (object files at stream end).
+- Compared by `eval/compare_scanpath_json.py` (focus position per frame).

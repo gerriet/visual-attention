@@ -37,9 +37,13 @@ add_library(attention_core STATIC
     src/selection/selection.cpp
     src/selection/neural_field_selection.cpp
     src/selection/neural_field_3d.cpp
+    src/system/object_file.cpp
+    src/system/behavior.cpp
+    src/system/attention_system.cpp
     src/config/config_loader.cpp
     src/visualization/visualizer.cpp
     src/io/result_writer.cpp
+    src/io/scanpath_writer.cpp
 )
 target_include_directories(attention_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_include_directories(attention_core SYSTEM PUBLIC ${OpenCV_INCLUDE_DIRS})

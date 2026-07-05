@@ -13,7 +13,7 @@ if(NOT Catch2_FOUND)
     FetchContent_MakeAvailable(Catch2)
 endif()
 
-add_executable(characterization_tests test_characterization.cpp test_config.cpp test_selection.cpp test_stereo_onset.cpp)
+add_executable(characterization_tests test_characterization.cpp test_config.cpp test_selection.cpp test_stereo_onset.cpp test_system.cpp)
 target_link_libraries(characterization_tests PRIVATE attention_core Catch2::Catch2WithMain)
 target_compile_definitions(characterization_tests PRIVATE
     ATTENTION_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
@@ -75,6 +75,22 @@ if(Python3_Interpreter_FOUND)
                 ${CMAKE_BINARY_DIR}/behavioral/stereo.json
                 --pos-tol 20 --order-tol 1)
     set_tests_properties(scanpath_stereo PROPERTIES FIXTURES_REQUIRED stereo_json)
+
+    # AttentionSystem (M6): second stage + Exploration behavior over the
+    # synthetic motion sequence, compared by focus position per frame.
+    add_test(NAME emit_scanpath_attend
+        COMMAND attention --attend ${CMAKE_SOURCE_DIR}/data/test_images/motion_seq
+                --output ${CMAKE_BINARY_DIR}/attend
+                --emit-scanpath ${CMAKE_BINARY_DIR}/attend/scanpath.json
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+    set_tests_properties(emit_scanpath_attend PROPERTIES FIXTURES_SETUP attend_scanpath)
+
+    add_test(NAME scanpath_attend
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/eval/compare_scanpath_json.py
+                ${CMAKE_SOURCE_DIR}/tests/golden/attend/scanpath.json
+                ${CMAKE_BINARY_DIR}/attend/scanpath.json
+                --pos-tol 20)
+    set_tests_properties(scanpath_attend PROPERTIES FIXTURES_REQUIRED attend_scanpath)
 
     # Thesis profile (neural-field selection) behavioral golden
     add_test(NAME emit_json_thesis_inputc

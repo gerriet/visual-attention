@@ -1,0 +1,38 @@
+# AttentionSystem profile (roadmap M6): the classic feature set feeding the
+# symbolic second stage. Use with --attend on a temporal sequence:
+#
+#   ./attention --attend <dir|video> --config configs/attend.yaml \
+#       --output results/attend --emit-scanpath results/scanpath.json
+#
+# --attend runs the full system: features → fusion → saliency (this config),
+# then object files + the Exploration behavior maintain the scanpath. The
+# second-stage / behavior parameters (dwell, correspondence radius, action
+# mode) are AttentionSystem::Config defaults; the pipeline part is below.
+#
+# Without --config, --attend uses the default feature set plus onset (motion
+# helps object correspondence).
+
+pipeline:
+  fusion: weighted-sum
+  # A cheap selection: under --attend the system segments the fused saliency
+  # itself, so the pipeline's own peak selection is unused. nms avoids the
+  # neural field's cross-frame IOR fighting the object-file tracking.
+  selection: nms
+
+features:
+  color:
+    weight: 1.0
+  eccentricity:
+    weight: 1.0
+  symmetry:
+    weight: 1.0
+  onset:
+    weight: 1.0
+  intensity:
+    enabled: false
+  orientation:
+    enabled: false
+
+output:
+  output_dir: "results/"
+  display: false
