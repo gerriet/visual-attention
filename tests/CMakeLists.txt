@@ -41,6 +41,23 @@ if(Python3_Interpreter_FOUND)
         set_tests_properties(scanpath_${img} PROPERTIES FIXTURES_REQUIRED ${img}_json)
     endforeach()
 
+    # Python eval-layer unit tests + report smoke test (need the eval venv:
+    # python3 -m venv eval/.venv && eval/.venv/bin/pip install -r eval/requirements.txt)
+    set(EVAL_PYTHON ${CMAKE_SOURCE_DIR}/eval/.venv/bin/python)
+    if(EXISTS ${EVAL_PYTHON})
+        add_test(NAME eval_unit
+            COMMAND ${EVAL_PYTHON} -m unittest discover -s tests
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/eval)
+        add_test(NAME eval_report_smoke
+            COMMAND ${EVAL_PYTHON} -m attention_eval.report
+                    ${CMAKE_SOURCE_DIR}/tests/golden/inputc/result.json
+                    ${CMAKE_SOURCE_DIR}/tests/golden/thesis_inputc/result.json
+                    --names modern-default thesis-profile
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/eval)
+    else()
+        message(STATUS "eval/.venv not found - Python eval tests disabled")
+    endif()
+
     # Thesis profile (neural-field selection) behavioral golden
     add_test(NAME emit_json_thesis_inputc
         COMMAND attention --config ${CMAKE_SOURCE_DIR}/configs/thesis.yaml

@@ -135,9 +135,10 @@ Phase 1 (2025, weeks 1–4): core infrastructure, five features, pipeline,
 configuration, optimization — complete. See `docs/PHASE1_ACTION_PLAN.md`.
 
 Phase 2 ("v2", 2026): see `docs/V2_ROADMAP.md` — guardrails (M1), swappable
-architecture (M2), and neural-field selection (M3: the dissertation's 2D
-Amari field with two-stage cluster readout, plus per-feature Gabor banks)
-are done. Next up: the Python evaluation layer (M4) and stereo/motion (M5).
+architecture (M2), neural-field selection (M3: the dissertation's 2D Amari
+field with two-stage cluster readout, plus per-feature Gabor banks), and the
+Python evaluation layer core (M4: metrics, scanpath comparison, report
+generator — see `eval/README.md`) are done. Next up: stereo/motion (M5).
 
 ### Code Formatting
 

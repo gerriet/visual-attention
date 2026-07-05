@@ -87,11 +87,17 @@
 - `thesis.yaml` = dissertation feature set + neural-field selection with the
   original code's parameters; locked by a behavioral golden test.
 
-### M4 — Python evaluation layer
-- `eval/` package: saliency metrics (AUC-Judd, NSS, CC, SIM, KL) and scanpath
-  metrics (Levenshtein on gridded fixations, MultiMatch/ScanMatch).
-- Dataset adapters (MIT1003, CAT2000, Toronto) with download/cache scripts.
-- Report generator: given N result directories, produce comparison tables/plots.
+### M4 — Python evaluation layer ✓ core 2026-07-05
+- ✓ `eval/attention_eval` package (numpy/pillow venv, wired into CTest):
+  saliency metrics (AUC-Judd, NSS, CC, SIM, KL), scanpath metrics (greedy
+  match stats, gridded Levenshtein), interchange-format loader.
+- ✓ Report generator (`python -m attention_eval.report`): markdown comparison
+  of N results against a reference. First classic-vs-modern numbers (inputc):
+  thesis profile vs modern default — CC 0.69, SIM 0.82, NSS@ref 2.31,
+  70 % scanpath agreement.
+- ✓ MIT1003 adapter (fixation maps/points; download steps in the module).
+- Pending: dataset downloads + benchmark runs (with M7), MultiMatch/ScanMatch,
+  per-observer scanpaths (needs scipy), plots, CAT2000/Toronto adapters.
 
 ### M5 — Stereo + motion/onset
 - Port `stereo.C` / `stereomulti` as feature extractors; acquire stereo test

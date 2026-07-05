@@ -35,3 +35,6 @@ data/middlebury/
 
 # Editor backup
 *.bak
+
+# Python eval layer
+eval/.venv/
