@@ -167,6 +167,13 @@ class AttentionPipeline
   void load_image(const cv::Mat& image, const std::string& source_name = "");
 
   /**
+   * Load a stereo pair for single-shot processing: the left image becomes the
+   * frame, the right is attached as Frame::stereo_right so the stereo feature
+   * runs. @throws std::runtime_error if either image cannot be loaded.
+   */
+  void load_stereo(const std::string& left_path, const std::string& right_path);
+
+  /**
    * Process the loaded image through the attention pipeline.
    * Extracts features, fuses them, and selects peaks.
    * @throws std::runtime_error if no image loaded

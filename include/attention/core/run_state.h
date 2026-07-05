@@ -29,6 +29,17 @@ struct RunState
   // (thesis §8.3: static inhibition map, ~20% decay per frame).
   cv::Mat inhibition_map;
 
+  // Previous frame's grayscale (CV_8U), carried across the frames of a
+  // temporal stream so the onset/motion feature can compute a temporal
+  // difference. Empty on the first frame and for independent stills.
+  cv::Mat previous_gray;
+
+  // Per-pixel depth cue at full resolution (CV_32F, [0,1]) published by a
+  // depth-producing feature (StereoFeature) during extraction; the 3D
+  // neural-field selection (M5) lifts the 2D saliency into a depth volume
+  // with it. Empty when no depth feature ran.
+  cv::Mat depth_map;
+
   void reset() { *this = RunState(); }
 };
 

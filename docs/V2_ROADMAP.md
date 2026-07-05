@@ -12,6 +12,11 @@
    strategies (including learned saliency models) without code changes.
 3. **Quantitative comparison** — the thesis model evaluated head-to-head against
    modern approaches on standard metrics and datasets.
+4. **Live demonstrator** — the pipeline running live on video, object files
+   displayed as tracked annotations at their image positions, with a plugin
+   mechanism that applies downstream processing (classification, measurement,
+   …) to attended regions only — attention as a front-end for selective
+   processing.
 
 ## Decisions (locked)
 
@@ -99,10 +104,34 @@
 - Pending: dataset downloads + benchmark runs (with M7), MultiMatch/ScanMatch,
   per-observer scanpaths (needs scipy), plots, CAT2000/Toronto adapters.
 
-### M5 — Stereo + motion/onset
-- Port `stereo.C` / `stereomulti` as feature extractors; acquire stereo test
-  data (Middlebury pairs + a few own captures).
-- Port `onset.h` on the stream pipeline from M2; add video/frame-dir input.
+### M5 — Stereo + motion/onset ✓ 2026-07-05
+- ✓ Stereo disparity feature (`stereo`, thesis §5.4): dedicated near-vertical
+  Gabor magnitude responses, windowed normalized cross-correlation over a
+  disparity range (eq. 5.13) with variance gating, confidence accumulation +
+  spatial blur (eq. 5.14), per-pixel WTA (eq. 5.15), normalized-disparity
+  depth saliency (eq. 5.16). Single-scale core; the multi-scale
+  `StereoMultiFeature` and multi-hypothesis/exclusivity machinery are not
+  ported (loose-equivalence bar). Runs only when the frame carries a right
+  image; publishes its map as a depth cue for the 3D field.
+- ✓ Onset/motion feature (`onset`): rectified positive temporal change in edge
+  energy (structure appearing since the previous frame), on the stream
+  pipeline. A principled reconstruction — the original `onset.C` was not
+  preserved, only an empty header stub. Runs only inside a temporal stream.
+- ✓ 3D neural field (`nf3d`, thesis §6.4): `NeuralField3D` core (stack of 2D
+  Amari fields with cross-depth inhibition) + `neural-field-3d` selection that
+  lifts the fused 2D saliency into a depth volume via the disparity cue and
+  reads out clusters with a dominant depth. Field re-initializes per frame
+  (no cross-frame volume persistence yet); uses the 2D space-based IOR map.
+- ✓ Input plumbing: `Frame::stereo_right` / `previous_gray`, `RunState`
+  `previous_gray` / `depth_map`; CLI `--stereo <l> <r>` (single pair) and
+  `--sequence <dir|video>` (temporal stream, no per-frame reset);
+  `StereoImageSource` + `VideoFrameSource`.
+- ✓ Test data + eval: deterministic synthetic stereo pair
+  (`tools/make_synthetic_stereo.py` → `data/test_images/stereo/`), stereo
+  behavioral golden, C++ tests for stereo/onset/3D-field, and a Middlebury
+  adapter (`eval/datasets/middlebury.py`, download steps in the module).
+- Deferred: multi-scale stereo (`StereoMultiFeature`), cross-frame 3D-field
+  volume persistence, real stereo-video / own captures (fold into M7 runs).
 
 ### M6 — ESAB2 system level
 - Object files, tracking across frames, scanpath maintenance, action modes
@@ -115,6 +144,29 @@
   optionally GBVS/BMS).
 - Deliverable: an evaluation report — thesis model vs. modern models on the
   thesis images *and* a public fixation dataset. "The thesis, 20 years later."
+
+### M8 — Live demonstrator: annotated video + object-file plugins
+*(depends on M5 video input and M6 object files; independent of M7)*
+
+- `VideoSource : FrameSource` (`cv::VideoCapture`, webcam or file) plus a live
+  display loop. **Processing and display resolution are decoupled**: capture at
+  native resolution, process at ≤VGA, draw annotations on the native frame with
+  coordinates scaled back up. Feasibility per PERFORMANCE.md: with symmetry at
+  quarter resolution the frame budget is ~15–30 ms at 640×480 → 25+ fps.
+- `configs/live.yaml` profile: symmetry forced to `compute_at_scale: 2`, and a
+  fixed number of field iterations per frame instead of per-frame
+  re-convergence — the field state in `RunState` carries over, so attention
+  shifts emerge from the continuous dynamics (closer to the thesis intent for
+  streams, and deterministic per-frame cost).
+- Annotation overlay: one marker per object file (stable ID from M6 tracking,
+  centroid, extent, optional scanpath trail), rendered by the visualizer.
+- **Object-file plugin processes**: a processor interface that receives an
+  object file plus its image region (ROI at native resolution) and returns
+  annotation content (label, measurement, crop, …). Registry + config-driven,
+  like features/fusion/selection. This is the attention premise made visible:
+  expensive analysis runs only on attended areas. First plugins: a timing/ROI
+  probe (proves the mechanism) and one real example (e.g. a small classifier
+  or OCR on attended regions).
 
 ## Working agreement for this phase
 

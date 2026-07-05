@@ -11,11 +11,99 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <memory>
 #include <opencv2/opencv.hpp>
+#include <sstream>
 #include <string>
 #include <vector>
 
 namespace fs = std::filesystem;
+
+// Enable a feature in the config so the CLI modes can switch on stereo/onset
+// without a config file. If the feature is already configured, only enable it
+// (a user-set weight from --config is preserved); otherwise append it with the
+// given default weight.
+void enable_feature(attention::pipeline::PipelineConfig& config, const std::string& type, float weight)
+{
+  for (auto& spec : config.features)
+  {
+    if (spec.type == type)
+    {
+      spec.enabled = true; // keep the user's weight
+      return;
+    }
+  }
+  attention::pipeline::FeatureSpec spec(type, weight);
+  config.features.push_back(spec);
+}
+
+// Save the per-frame outputs of a stream (saliency, scan path) into a
+// per-frame subdirectory. Shared by batch and sequence modes.
+void save_frame_outputs(attention::pipeline::AttentionPipeline& p, const fs::path& output_dir)
+{
+  fs::create_directories(output_dir);
+  const auto& frame = p.get_frame();
+  cv::imwrite((output_dir / "00_original.png").string(), frame.image);
+  int idx = 1;
+  for (const auto& feature : p.get_features())
+  {
+    cv::Mat feature_vis = attention::visualization::visualize_feature_map(feature);
+    cv::imwrite((output_dir / ("0" + std::to_string(idx) + "_" + feature.name + ".png")).string(), feature_vis);
+    idx++;
+  }
+  cv::Mat saliency_vis =
+      attention::visualization::visualize_saliency_map(p.get_saliency_map(), frame.image, "", true, false);
+  cv::imwrite((output_dir / "99_saliency.png").string(), saliency_vis);
+  cv::Mat scan_path_vis = attention::visualization::visualize_scan_path(p.get_saliency_map(), frame.image);
+  cv::imwrite((output_dir / "98_scan_path.png").string(), scan_path_vis);
+}
+
+// Process a temporal sequence (image directory or video file). Unlike batch
+// mode, RunState is NOT reset between frames — onset/motion and neural-field
+// dynamics carry across the stream (M5).
+void process_sequence(const std::string& path, attention::pipeline::PipelineConfig& config,
+                      const std::string& output_base)
+{
+  enable_feature(config, "onset", 1.0f);
+  attention::pipeline::AttentionPipeline pipeline(config);
+
+  std::unique_ptr<attention::pipeline::FrameSource> source;
+  std::vector<std::string> image_paths;
+  if (fs::is_directory(path))
+  {
+    image_paths = attention::pipeline::collect_image_paths(path);
+    std::cout << "Sequence: " << image_paths.size() << " frames from directory " << path << std::endl;
+    source = std::make_unique<attention::pipeline::ImageListSource>(image_paths);
+  }
+  else
+  {
+    std::cout << "Sequence: video " << path << std::endl;
+    source = std::make_unique<attention::pipeline::VideoFrameSource>(path);
+  }
+
+  const std::string out_base = output_base.empty() ? "results/sequence" : output_base;
+  size_t processed = 0;
+  pipeline.process_stream(
+      *source,
+      [&](attention::pipeline::AttentionPipeline& p)
+      {
+        std::ostringstream name;
+        name << "frame_" << std::setw(4) << std::setfill('0') << p.get_frame().frame_number;
+        fs::path output_dir = fs::path(out_base) / name.str();
+        save_frame_outputs(p, output_dir);
+        ++processed;
+        std::cout << "  [" << processed << "] " << name.str() << ": " << p.get_saliency_map().peaks.size()
+                  << " peaks -> " << output_dir.string() << std::endl;
+        // NOTE: no reset_state() — this is a temporal stream.
+      },
+      [](const std::exception& e)
+      {
+        std::cerr << "  ✗ Error: " << e.what() << std::endl;
+        return true;
+      });
+
+  std::cout << "Sequence processing complete (" << processed << " frames)." << std::endl;
+}
 
 void process_batch(const std::string& directory, const attention::pipeline::PipelineConfig& config,
                    const std::string& output_base = "")
@@ -209,6 +297,8 @@ void print_usage(const char* program_name)
   std::cerr << "  " << program_name << " <image_path> [options]" << std::endl;
   std::cerr << "  " << program_name << " --config <config.yaml> [image] [options]" << std::endl;
   std::cerr << "  " << program_name << " --batch <directory> [options]" << std::endl;
+  std::cerr << "  " << program_name << " --stereo <left> <right> [options]" << std::endl;
+  std::cerr << "  " << program_name << " --sequence <dir|video> [--output dir] [--config yaml]" << std::endl;
   std::cerr << std::endl;
   std::cerr << "Examples:" << std::endl;
   std::cerr << "  " << program_name << " data/test_images/input.png" << std::endl;
@@ -223,7 +313,9 @@ void print_usage(const char* program_name)
   std::cerr << "  --no-display         Process without displaying windows (saves to results/)" << std::endl;
   std::cerr << "  --config             Load configuration from YAML file" << std::endl;
   std::cerr << "  --batch              Process all images in directory, save features separately" << std::endl;
-  std::cerr << "  --output <dir>       Specify output directory for batch mode (default: input_dir/results_batch)" << std::endl;
+  std::cerr << "  --stereo <l> <r>     Process a stereo pair (adds a disparity/depth channel)" << std::endl;
+  std::cerr << "  --sequence <path>    Process a directory or video as a temporal stream (onset/motion)" << std::endl;
+  std::cerr << "  --output <dir>       Specify output directory for batch/sequence mode (default: input_dir/results_batch)" << std::endl;
   std::cerr << "  --emit-json <path>   Write result JSON + saliency map in the interchange format" << std::endl;
   std::cerr << "                       (see docs/INTERCHANGE_FORMAT.md; single-image and config modes)" << std::endl;
   std::cerr << std::endl;
@@ -270,6 +362,86 @@ int main(int argc, char** argv)
 
       config = attention::config::ConfigLoader::create_default();
       process_batch(directory, config.pipeline, output_dir);
+      return 0;
+    }
+    else if (std::string(argv[1]) == "--sequence")
+    {
+      // Temporal stream (image directory or video): onset/motion + carried
+      // neural-field/IOR state, no per-frame reset.
+      if (argc < 3)
+      {
+        std::cerr << "Error: --sequence requires a directory or video path" << std::endl;
+        print_usage(argv[0]);
+        return 1;
+      }
+      std::string seq_path = argv[2];
+      std::string output_dir = "";
+      config = attention::config::ConfigLoader::create_default();
+      for (int i = 3; i < argc; ++i)
+      {
+        std::string arg = argv[i];
+        if (arg == "--output" && i + 1 < argc)
+        {
+          output_dir = argv[++i];
+        }
+        else if (arg == "--config" && i + 1 < argc)
+        {
+          config = attention::config::ConfigLoader::load(argv[++i]);
+        }
+      }
+      process_sequence(seq_path, config.pipeline, output_dir);
+      return 0;
+    }
+    else if (std::string(argv[1]) == "--stereo")
+    {
+      // Single stereo pair: left + right, stereo feature adds a depth channel.
+      if (argc < 4)
+      {
+        std::cerr << "Error: --stereo requires a left and a right image path" << std::endl;
+        print_usage(argv[0]);
+        return 1;
+      }
+      std::string left_path = argv[2];
+      std::string right_path = argv[3];
+      bool have_config = false;
+      config = attention::config::ConfigLoader::create_default();
+      config.display = false;
+      for (int i = 4; i < argc; ++i)
+      {
+        std::string arg = argv[i];
+        if (arg == "--config" && i + 1 < argc)
+        {
+          config = attention::config::ConfigLoader::load(argv[++i]);
+          have_config = true;
+        }
+        else if (arg == "--emit-json" && i + 1 < argc)
+        {
+          emit_json_path = argv[++i];
+        }
+        else if (arg == "--no-display")
+        {
+          config.display = false;
+        }
+      }
+      if (!have_config)
+      {
+        enable_feature(config.pipeline, "stereo", 1.5f);
+      }
+
+      attention::pipeline::AttentionPipeline pipeline(config.pipeline);
+      std::cout << "Loading stereo pair: " << left_path << " | " << right_path << std::endl;
+      pipeline.load_stereo(left_path, right_path);
+      pipeline.process();
+      std::cout << "  Peaks detected: " << pipeline.get_saliency_map().peaks.size() << std::endl;
+      if (!emit_json_path.empty())
+      {
+        attention::io::ResultWriter::write(pipeline, emit_json_path);
+        std::cout << "✓ Saved result JSON: " << emit_json_path << std::endl;
+      }
+      fs::create_directories(config.output_dir);
+      cv::Mat vis = pipeline.visualize(false);
+      cv::imwrite(config.output_dir + "stereo_output.png", vis);
+      std::cout << "✓ Saved visualization: " << config.output_dir << "stereo_output.png" << std::endl;
       return 0;
     }
     else if (std::string(argv[1]) == "--config")

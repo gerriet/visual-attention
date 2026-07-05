@@ -45,6 +45,43 @@ class ImageListSource : public FrameSource
 };
 
 /**
+ * StereoImageSource yields left/right image pairs: each produced frame has its
+ * left image in Frame::image and the matching right image in
+ * Frame::stereo_right, so the stereo feature runs on a sequence of pairs. The
+ * two path lists must be the same length.
+ */
+class StereoImageSource : public FrameSource
+{
+ public:
+  StereoImageSource(std::vector<std::string> left_paths, std::vector<std::string> right_paths);
+
+  bool next(core::Frame& frame) override;
+
+ private:
+  std::vector<std::string> left_paths_;
+  std::vector<std::string> right_paths_;
+  size_t index_ = 0;
+};
+
+/**
+ * VideoFrameSource yields the frames of a video file (via cv::VideoCapture) as
+ * a temporal stream — the input for onset/motion. The caller keeps RunState
+ * across frames (no per-frame reset) so temporal features see the predecessor.
+ */
+class VideoFrameSource : public FrameSource
+{
+ public:
+  explicit VideoFrameSource(const std::string& path);
+
+  bool next(core::Frame& frame) override;
+
+ private:
+  cv::VideoCapture capture_;
+  std::string path_;
+  int index_ = 0;
+};
+
+/**
  * Collect all image files (jpg/jpeg/png/bmp) in a directory, sorted by path.
  * Feed the result to ImageListSource.
  */

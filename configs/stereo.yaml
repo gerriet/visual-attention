@@ -1,0 +1,55 @@
+# Stereo profile: depth-aware attention on a rectified stereo pair (roadmap M5).
+#
+# Adds the disparity/depth feature (thesis §5.4) to the classic static set and
+# selects with the 3D neural field (thesis §6.4, ported from nf3d), which lifts
+# the fused saliency into a depth volume using the per-pixel disparity and lets
+# structures at different depths compete.
+#
+# Run with a stereo pair:
+#   ./attention --stereo left.png right.png --config configs/stereo.yaml
+# (Without --config, --stereo just augments the default 2D set with a stereo
+#  channel and keeps the ordinary selection.)
+
+pipeline:
+  fusion: weighted-sum
+  selection: neural-field-3d
+  selection_params:
+    alpha: 0.5
+    beta: 30.0
+    resting: -0.25
+    global_mult: 1.0
+    kernel_s: 5.0
+    kernel_k: 0.06
+    plane_inhibition: 5.0   # per-plane inhibition factor (nf3d.h)
+    max_cycles: 55
+    change_thresh: 0.02
+    depth_layers: 11        # thesis: 11 depth planes
+    field_max_size: 96      # 3D field resolution (depth_layers× the 2D work)
+    ior_decay: 0.8
+
+features:
+  stereo:
+    weight: 1.5
+    params:
+      num_orientations: 3   # vertical + ±30° (thesis §5.4.2)
+      min_disparity: -16
+      max_disparity: 0
+      window_size: 15
+  color:
+    weight: 1.0
+  eccentricity:
+    weight: 1.0
+  symmetry:
+    weight: 1.0
+  intensity:
+    enabled: false
+  orientation:
+    enabled: false
+
+peaks:
+  max_count: 10
+  ior_strength: 0.8
+
+output:
+  output_dir: "results/"
+  display: false

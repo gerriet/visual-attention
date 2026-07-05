@@ -3,6 +3,7 @@
 #include "attention/visualization/visualizer.h"
 #include <algorithm>
 #include <chrono>
+#include <exception>
 #include <filesystem>
 #include <iomanip>
 #include <iostream>
@@ -96,6 +97,24 @@ void AttentionPipeline::load_image(const cv::Mat& image, const std::string& sour
   processed_ = false; // Reset processing state
 }
 
+void AttentionPipeline::load_stereo(const std::string& left_path, const std::string& right_path)
+{
+  cv::Mat left = cv::imread(left_path, cv::IMREAD_COLOR);
+  if (left.empty())
+  {
+    throw std::runtime_error("Failed to load left image: " + left_path);
+  }
+  cv::Mat right = cv::imread(right_path, cv::IMREAD_COLOR);
+  if (right.empty())
+  {
+    throw std::runtime_error("Failed to load right image: " + right_path);
+  }
+
+  frame_ = core::Frame(left, left_path);
+  frame_.stereo_right = right;
+  processed_ = false;
+}
+
 void AttentionPipeline::process()
 {
   if (!has_image())
@@ -107,6 +126,11 @@ void AttentionPipeline::process()
   features_.clear();
   saliency_ = core::SaliencyMap();
   timing_ = PipelineTiming(); // Reset timing
+
+  // Inject the previous frame's grayscale (carried in RunState) so temporal
+  // features (onset) can compute a difference. Empty on the first frame and
+  // for independent stills — those features declare themselves inapplicable.
+  frame_.previous_gray = run_state_.previous_gray;
 
   // Step 0: Compute pyramids once (shared across features)
   auto t_pyramid_start = std::chrono::high_resolution_clock::now();
@@ -193,6 +217,18 @@ void AttentionPipeline::process()
     }
 
     std::cout << "    ✓ Debug output complete" << std::endl;
+  }
+
+  // Remember this frame's grayscale for the next frame's temporal features.
+  // Independent stills reset RunState between frames (main.cpp batch mode), so
+  // this only chains within a temporal stream.
+  if (frame_.image.channels() == 3)
+  {
+    cv::cvtColor(frame_.image, run_state_.previous_gray, cv::COLOR_BGR2GRAY);
+  }
+  else
+  {
+    run_state_.previous_gray = frame_.image.clone();
   }
 
   processed_ = true;
@@ -308,16 +344,28 @@ void AttentionPipeline::extract_features(int pyramid_levels)
     // model of the pipeline: coarse-grained tasks via std::thread here,
     // data-parallel loops via OpenMP inside the features (e.g. symmetry).
     std::vector<std::thread> threads;
+    std::vector<std::exception_ptr> errors(active.size());
 
     for (size_t i = 0; i < active.size(); ++i)
     {
       threads.emplace_back(
-          [this, i, &active, &durations]()
+          [this, i, &active, &durations, &errors]()
           {
-            auto t_start = std::chrono::high_resolution_clock::now();
-            features_[i] = active[i]->extract(frame_);
-            auto t_end = std::chrono::high_resolution_clock::now();
-            durations[i] = std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_start).count();
+            // Capture any feature exception instead of letting it escape the
+            // thread (which would call std::terminate). It is rethrown after
+            // join, so process_stream's on_error handler can skip the frame —
+            // matching the serial/debug path's behavior.
+            try
+            {
+              auto t_start = std::chrono::high_resolution_clock::now();
+              features_[i] = active[i]->extract(frame_);
+              auto t_end = std::chrono::high_resolution_clock::now();
+              durations[i] = std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_start).count();
+            }
+            catch (...)
+            {
+              errors[i] = std::current_exception();
+            }
           });
     }
 
@@ -326,12 +374,34 @@ void AttentionPipeline::extract_features(int pyramid_levels)
     {
       thread.join();
     }
+
+    // Propagate the first feature exception (if any) now that every thread has
+    // joined — no thread outlives this scope.
+    for (const auto& error : errors)
+    {
+      if (error)
+      {
+        std::rethrow_exception(error);
+      }
+    }
   }
 
   // Store per-feature timing
   for (size_t i = 0; i < features_.size(); ++i)
   {
     timing_.feature_ms[features_[i].name] = durations[i];
+  }
+
+  // Publish the depth cue (if a depth-producing feature ran) so the 3D
+  // neural-field selection can lift the fused saliency into a depth volume.
+  // Reset first so a stale map never survives a frame without depth.
+  run_state_.depth_map.release();
+  for (size_t i = 0; i < active.size(); ++i)
+  {
+    if (active[i]->produces_depth() && !features_[i].data.empty())
+    {
+      run_state_.depth_map = features_[i].data.clone();
+    }
   }
 
   std::cout << "  Features extracted: " << features_.size();

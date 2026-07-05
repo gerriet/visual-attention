@@ -13,7 +13,7 @@ if(NOT Catch2_FOUND)
     FetchContent_MakeAvailable(Catch2)
 endif()
 
-add_executable(characterization_tests test_characterization.cpp test_config.cpp test_selection.cpp)
+add_executable(characterization_tests test_characterization.cpp test_config.cpp test_selection.cpp test_stereo_onset.cpp)
 target_link_libraries(characterization_tests PRIVATE attention_core Catch2::Catch2WithMain)
 target_compile_definitions(characterization_tests PRIVATE
     ATTENTION_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
@@ -57,6 +57,24 @@ if(Python3_Interpreter_FOUND)
     else()
         message(STATUS "eval/.venv not found - Python eval tests disabled")
     endif()
+
+    # Stereo profile (disparity feature + 3D neural-field selection) behavioral
+    # golden, on the deterministic synthetic stereo pair (M5).
+    add_test(NAME emit_json_stereo
+        COMMAND attention --stereo
+                ${CMAKE_SOURCE_DIR}/data/test_images/stereo/left.png
+                ${CMAKE_SOURCE_DIR}/data/test_images/stereo/right.png
+                --config ${CMAKE_SOURCE_DIR}/configs/stereo.yaml
+                --emit-json ${CMAKE_BINARY_DIR}/behavioral/stereo.json
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+    set_tests_properties(emit_json_stereo PROPERTIES FIXTURES_SETUP stereo_json)
+
+    add_test(NAME scanpath_stereo
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/eval/compare_scanpaths.py
+                ${CMAKE_SOURCE_DIR}/tests/golden/stereo/result.json
+                ${CMAKE_BINARY_DIR}/behavioral/stereo.json
+                --pos-tol 20 --order-tol 1)
+    set_tests_properties(scanpath_stereo PROPERTIES FIXTURES_REQUIRED stereo_json)
 
     # Thesis profile (neural-field selection) behavioral golden
     add_test(NAME emit_json_thesis_inputc

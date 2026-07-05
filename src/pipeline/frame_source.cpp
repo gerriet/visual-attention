@@ -37,6 +37,67 @@ bool ImageListSource::next(core::Frame& frame)
   return true;
 }
 
+StereoImageSource::StereoImageSource(std::vector<std::string> left_paths, std::vector<std::string> right_paths)
+  : left_paths_(std::move(left_paths)), right_paths_(std::move(right_paths))
+{
+  if (left_paths_.size() != right_paths_.size())
+  {
+    throw std::runtime_error("StereoImageSource: left and right path lists differ in length");
+  }
+}
+
+bool StereoImageSource::next(core::Frame& frame)
+{
+  if (index_ >= left_paths_.size())
+  {
+    return false;
+  }
+
+  // Advance before loading so a throwing entry is not retried on continue.
+  const std::string left_path = left_paths_[index_];
+  const std::string right_path = right_paths_[index_];
+  const int frame_number = static_cast<int>(index_);
+  ++index_;
+
+  cv::Mat left = cv::imread(left_path, cv::IMREAD_COLOR);
+  if (left.empty())
+  {
+    throw std::runtime_error("Failed to load left image: " + left_path);
+  }
+  cv::Mat right = cv::imread(right_path, cv::IMREAD_COLOR);
+  if (right.empty())
+  {
+    throw std::runtime_error("Failed to load right image: " + right_path);
+  }
+
+  frame = core::Frame(left, left_path);
+  frame.stereo_right = right;
+  frame.frame_number = frame_number;
+  return true;
+}
+
+VideoFrameSource::VideoFrameSource(const std::string& path) : path_(path)
+{
+  if (!capture_.open(path))
+  {
+    throw std::runtime_error("Failed to open video: " + path);
+  }
+}
+
+bool VideoFrameSource::next(core::Frame& frame)
+{
+  cv::Mat image;
+  if (!capture_.read(image) || image.empty())
+  {
+    return false; // end of stream
+  }
+
+  frame = core::Frame(image, path_ + "#" + std::to_string(index_));
+  frame.frame_number = index_;
+  ++index_;
+  return true;
+}
+
 std::vector<std::string> collect_image_paths(const std::string& directory)
 {
   std::vector<std::string> image_paths;

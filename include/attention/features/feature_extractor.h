@@ -66,6 +66,14 @@ class FeatureExtractor
   };
 
   virtual GaborRequirement gabor_requirement() const { return {}; }
+
+  /**
+   * Whether this feature's map doubles as a per-pixel depth cue. When true,
+   * the pipeline captures the extracted map into RunState::depth_map so the
+   * 3D neural-field selection (M5) can lift the fused 2D saliency into a
+   * depth volume. Only the stereo/disparity feature sets this.
+   */
+  virtual bool produces_depth() const { return false; }
 };
 
 } // namespace features

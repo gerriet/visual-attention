@@ -43,6 +43,15 @@ struct Frame
   // Image data
   cv::Mat image;
 
+  // Optional companion inputs for multi-image / temporal features (M5). Both
+  // are empty for a plain monocular still; a feature that needs one declares
+  // itself inapplicable (FeatureExtractor::applicable) when its input is absent.
+  //   stereo_right  — the right image of a stereo pair (StereoFeature)
+  //   previous_gray — the previous frame's grayscale (OnsetFeature); the
+  //                   pipeline injects it from RunState before extraction
+  cv::Mat stereo_right;
+  cv::Mat previous_gray;
+
   // Cached pyramids (computed once, shared across features)
   std::vector<cv::Mat> rgb_pyramid;                       // RGB color pyramid
   std::vector<cv::Mat> gray_pyramid;                      // Grayscale intensity pyramid

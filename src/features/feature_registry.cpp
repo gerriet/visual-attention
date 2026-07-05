@@ -3,7 +3,9 @@
 #include "attention/features/color_feature.h"
 #include "attention/features/eccentricity_feature.h"
 #include "attention/features/intensity_feature.h"
+#include "attention/features/onset_feature.h"
 #include "attention/features/orientation_feature.h"
+#include "attention/features/stereo_feature.h"
 #include "attention/features/symmetry_feature.h"
 #include <sstream>
 #include <stdexcept>
@@ -144,6 +146,32 @@ void register_builtin_features()
                  }
 
                  return std::make_unique<SymmetryFeature>(config);
+               });
+
+  registry.add("stereo",
+               [](const YAML::Node& params)
+               {
+                 StereoFeature::Config config;
+                 read_param(params, "num_orientations", config.num_orientations);
+                 read_param(params, "min_disparity", config.min_disparity);
+                 read_param(params, "max_disparity", config.max_disparity);
+                 read_param(params, "window_size", config.window_size);
+                 read_param(params, "variance_threshold", config.variance_threshold);
+                 read_param(params, "gabor_wavelength", config.gabor_wavelength);
+                 read_param(params, "gabor_bandwidth", config.gabor_bandwidth);
+                 read_param(params, "confidence_blur", config.confidence_blur);
+                 read_param(params, "max_working_size", config.max_working_size);
+                 return std::make_unique<StereoFeature>(config);
+               });
+
+  registry.add("onset",
+               [](const YAML::Node& params)
+               {
+                 OnsetFeature::Config config;
+                 read_param(params, "use_edges", config.use_edges);
+                 read_param(params, "threshold", config.threshold);
+                 read_param(params, "blur_size", config.blur_size);
+                 return std::make_unique<OnsetFeature>(config);
                });
 }
 

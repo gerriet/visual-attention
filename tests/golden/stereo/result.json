@@ -1,0 +1,42 @@
+{
+  "schema": "attention-result/v1",
+  "source": {
+    "image": "data/test_images/stereo/left.png",
+    "width": 256,
+    "height": 256
+  },
+  "generator": {
+    "name": "attention-framework",
+    "variant": "weighted-sum+neural-field-3d"
+  },
+  "params": {
+    "feature_weights": {"color": 1, "eccentricity": 1, "symmetry": 1, "stereo": 1.5},
+    "peaks": {
+      "min_distance": 30,
+      "threshold": 0.3,
+      "max_count": 10,
+      "selection": "neural-field-3d",
+      "ior_radius": 50,
+      "ior_strength": 0.8
+    }
+  },
+  "saliency_map": "result_saliency.png",
+  "fixations": [
+    {"n": 0, "x": 168, "y": 171, "value": 0.637158},
+    {"n": 1, "x": 136, "y": 173, "value": 0.626706},
+    {"n": 2, "x": 173, "y": 136, "value": 0.615701},
+    {"n": 3, "x": 176, "y": 96, "value": 0.601103},
+    {"n": 4, "x": 88, "y": 69, "value": 0.57617},
+    {"n": 5, "x": 85, "y": 155, "value": 0.562812},
+    {"n": 6, "x": 171, "y": 64, "value": 0.550096},
+    {"n": 7, "x": 157, "y": 64, "value": 0.524265},
+    {"n": 8, "x": 133, "y": 64, "value": 0.512092}
+  ],
+  "timing_ms": {
+    "pyramid": 2,
+    "features": {"color": 1, "eccentricity": 14, "stereo": 31, "symmetry": 7},
+    "integration": 0,
+    "peak_detection": 20,
+    "total": 75
+  }
+}

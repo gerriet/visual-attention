@@ -15,11 +15,14 @@ motion, ESAB2 system level, modern learned-model comparison).
 - ✅ Orientation (Gabor filter pyramids, Itti-Koch style)
 - ✅ Symmetry (Gabor-based radial symmetry, per thesis specification)
 - ✅ Eccentricity (region segmentation + moments)
+- ✅ Stereo/disparity (depth saliency from a rectified pair, thesis §5.4)
+- ✅ Onset/motion (rectified temporal change of edge energy, on the stream)
 - ✅ Multi-scale processing with cached pyramids
 - ✅ Parallel feature extraction
 - ✅ Winner-take-all peak detection with inhibition of return
 - ✅ Neural-field selection (2D Amari dynamics from the dissertation, with
   cluster/Objectfile readout and decaying spatial IOR)
+- ✅ 3D neural-field selection (depth-aware, cross-depth inhibition, thesis §6.4)
 - ✅ YAML configuration system
 - ✅ Batch processing mode
 - ✅ Golden regression tests (characterization + behavioral scanpath)
@@ -52,6 +55,13 @@ make
 
 # Batch process directory
 ./attention --batch ../data/test_images/ --output ../results
+
+# Stereo pair (adds a disparity/depth channel; 3D field with the stereo config)
+./attention --stereo ../data/test_images/stereo/left.png ../data/test_images/stereo/right.png \
+    --config ../configs/stereo.yaml --no-display
+
+# Temporal sequence (directory of frames or a video) — onset/motion
+./attention --sequence ../data/test_images/motion_seq --output ../results/seq
 
 # Use configuration file
 ./attention --config ../configs/default.yaml
@@ -136,9 +146,11 @@ configuration, optimization — complete. See `docs/PHASE1_ACTION_PLAN.md`.
 
 Phase 2 ("v2", 2026): see `docs/V2_ROADMAP.md` — guardrails (M1), swappable
 architecture (M2), neural-field selection (M3: the dissertation's 2D Amari
-field with two-stage cluster readout, plus per-feature Gabor banks), and the
+field with two-stage cluster readout, plus per-feature Gabor banks), the
 Python evaluation layer core (M4: metrics, scanpath comparison, report
-generator — see `eval/README.md`) are done. Next up: stereo/motion (M5).
+generator — see `eval/README.md`), and stereo + motion/onset (M5: the
+disparity feature, onset/motion on the stream pipeline, and the 3D
+neural field) are done. Next up: the ESAB2 system level (M6).
 
 ### Code Formatting
 

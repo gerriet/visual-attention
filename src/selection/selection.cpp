@@ -8,6 +8,7 @@
 #include "attention/selection/selection_strategy.h"
 #include "attention/config/yaml_reader.h"
 #include "attention/core/constants.h"
+#include "attention/selection/neural_field_3d.h"
 #include "attention/selection/neural_field_selection.h"
 #include <algorithm>
 #include <cmath>
@@ -255,7 +256,29 @@ std::unique_ptr<SelectionStrategy> create_selection_strategy(const std::string& 
     read_param(strategy_params, "ior_decay", nf.ior_decay);
     return std::make_unique<NeuralFieldSelection>(params, nf);
   }
-  throw std::runtime_error("Unknown selection strategy '" + name + "'. Available: nms, ior, neural-field");
+  if (name == "neural-field-3d")
+  {
+    NeuralField3DSelection::Params nf;
+    read_param(strategy_params, "alpha", nf.field.alpha);
+    read_param(strategy_params, "beta", nf.field.beta);
+    read_param(strategy_params, "resting", nf.field.resting);
+    read_param(strategy_params, "global_mult", nf.field.global_mult);
+    read_param(strategy_params, "input_mult", nf.field.input_mult);
+    read_param(strategy_params, "kernel_s", nf.field.kernel_s);
+    read_param(strategy_params, "kernel_k", nf.field.kernel_k);
+    read_param(strategy_params, "kernel_size", nf.field.kernel_size);
+    read_param(strategy_params, "plane_inhibition", nf.field.plane_inhibition);
+    read_param(strategy_params, "max_cycles", nf.field.max_cycles);
+    read_param(strategy_params, "change_thresh", nf.field.change_thresh);
+    read_param(strategy_params, "depth_layers", nf.depth_layers);
+    read_param(strategy_params, "field_max_size", nf.field_max_size);
+    read_param(strategy_params, "border_margin", nf.border_margin);
+    read_param(strategy_params, "min_cluster_size", nf.min_cluster_size);
+    read_param(strategy_params, "ior_decay", nf.ior_decay);
+    return std::make_unique<NeuralField3DSelection>(params, nf);
+  }
+  throw std::runtime_error("Unknown selection strategy '" + name +
+                           "'. Available: nms, ior, neural-field, neural-field-3d");
 }
 
 } // namespace selection
