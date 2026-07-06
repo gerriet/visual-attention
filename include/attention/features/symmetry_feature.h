@@ -39,18 +39,22 @@ class SymmetryFeature : public FeatureExtractor
    */
   struct ScaleConfig
   {
-    int pyramid_level;            // Which pyramid level to use (negative levels
-                                  // are skipped; for size-adaptive scales use
-                                  // Config::auto_scale_schedule instead)
-    int min_radius;               // Minimum radius to test (e.g., 3)
-    int max_radius;               // Maximum radius to test (e.g., 20)
-    int radius_step;              // Step between radii (1 = all radii, 2 = every other, etc.)
-    int width;                    // Width of orthogonal summation box (e.g., 3)
-    float symmetry_threshold;     // Minimum symmetry value to consider (suppress weak symmetry)
+    int pyramid_level;        // Which pyramid level to use (negative levels
+                              // are skipped; for size-adaptive scales use
+                              // Config::auto_scale_schedule instead)
+    int min_radius;           // Minimum radius to test (e.g., 3)
+    int max_radius;           // Maximum radius to test (e.g., 20)
+    int radius_step;          // Step between radii (1 = all radii, 2 = every other, etc.)
+    int width;                // Width of orthogonal summation box (e.g., 3)
+    float symmetry_threshold; // Minimum symmetry value to consider (suppress weak symmetry)
 
     ScaleConfig(int level = -1, int min_r = 3, int max_r = 20, int r_step = 1, int w = 3, float thresh = 0.3f)
-      : pyramid_level(level), min_radius(min_r), max_radius(max_r),
-        radius_step(r_step), width(w), symmetry_threshold(thresh)
+      : pyramid_level(level),
+        min_radius(min_r),
+        max_radius(max_r),
+        radius_step(r_step),
+        width(w),
+        symmetry_threshold(thresh)
     {
     }
   };
@@ -60,16 +64,15 @@ class SymmetryFeature : public FeatureExtractor
    */
   struct Config
   {
-    int num_orientations;              // Number of Gabor orientations to use (e.g., 12)
-    double wavelength;                 // Wavelength for Gabor filters
-    double bandwidth;                  // Bandwidth parameter
-    std::vector<ScaleConfig> scales;   // Configuration for each pyramid level
-    bool use_multi_scale;              // Whether to combine multiple scales
-    bool auto_scale_schedule = false;  // Ignore 'scales', derive a size-adaptive
-                                       // 3-scale schedule from the frame instead
+    int num_orientations;             // Number of Gabor orientations to use (e.g., 12)
+    double wavelength;                // Wavelength for Gabor filters
+    double bandwidth;                 // Bandwidth parameter
+    std::vector<ScaleConfig> scales;  // Configuration for each pyramid level
+    bool use_multi_scale;             // Whether to combine multiple scales
+    bool auto_scale_schedule = false; // Ignore 'scales', derive a size-adaptive
+                                      // 3-scale schedule from the frame instead
 
-    Config()
-      : num_orientations(12), wavelength(4.0), bandwidth(1.0), use_multi_scale(true)
+    Config() : num_orientations(12), wavelength(4.0), bandwidth(1.0), use_multi_scale(true)
     {
       // Default: use pyramid levels with appropriate radius ranges
       // Level 0 (full res): small radii for local symmetry
@@ -120,7 +123,7 @@ class SymmetryFeature : public FeatureExtractor
    * @return Symmetry map for this scale
    */
   cv::Mat compute_radial_symmetry_at_scale(const std::vector<cv::Mat>& gabor_responses,
-                                            const ScaleConfig& scale_config) const;
+                                           const ScaleConfig& scale_config) const;
 
   /**
    * Compute symmetry for a single orientation and radius.
@@ -133,24 +136,15 @@ class SymmetryFeature : public FeatureExtractor
    * @param num_orientations Total number of orientations
    * @return Contribution to symmetry map from this orientation and radius
    */
-  cv::Mat compute_orientation_radius_contribution(const cv::Mat& gabor_orientation,
-                                                   float orientation_angle,
-                                                   int radius,
-                                                   int width,
-                                                   int num_orientations) const;
+  cv::Mat compute_orientation_radius_contribution(const cv::Mat& gabor_orientation, float orientation_angle, int radius,
+                                                  int width, int num_orientations) const;
 
   // Debug helper: capture intermediate results (keeps algorithm code clean)
-  void capture_debug_data(DebugContext& debug,
-                          const core::Frame& frame,
-                          const std::vector<ScaleConfig>& scales,
+  void capture_debug_data(DebugContext& debug, const core::Frame& frame, const std::vector<ScaleConfig>& scales,
                           const std::vector<std::vector<cv::Mat>>& scale_gabor_responses,
-                          const std::vector<cv::Mat>& scale_results,
-                          const cv::Mat& result,
-                          double total_ms,
-                          double gabor_computation_ms,
-                          const std::vector<double>& scale_computation_times,
-                          double combine_ms,
-                          double resize_ms) const;
+                          const std::vector<cv::Mat>& scale_results, const cv::Mat& result, double total_ms,
+                          double gabor_computation_ms, const std::vector<double>& scale_computation_times,
+                          double combine_ms, double resize_ms) const;
 };
 
 } // namespace features

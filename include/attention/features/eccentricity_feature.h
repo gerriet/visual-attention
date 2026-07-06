@@ -22,19 +22,19 @@ namespace features
  */
 class EccentricityFeature : public FeatureExtractor
 {
-public:
+ public:
   /**
    * Configuration for eccentricity feature extraction.
    */
   struct Config
   {
-    float edge_threshold = 0.75f;   // Threshold for edge detection (0-1)
-    float min_area = 0.05f;         // Minimum segment area as fraction of image (0.0005 = 0.05%)
-    float max_area = 30.0f;         // Maximum segment area as percentage of image
+    float edge_threshold = 0.75f;    // Threshold for edge detection (0-1)
+    float min_area = 0.05f;          // Minimum segment area as fraction of image (0.0005 = 0.05%)
+    float max_area = 30.0f;          // Maximum segment area as percentage of image
     float variance_threshold = 1.5f; // Variance ratio threshold for merging
-    int compute_at_scale = 0;       // Pyramid level for computation (0 = full
-                                    // resolution, -1 = auto: quarter resolution
-                                    // for images larger than 640px)
+    int compute_at_scale = 0;        // Pyramid level for computation (0 = full
+                                     // resolution, -1 = auto: quarter resolution
+                                     // for images larger than 640px)
   };
 
   EccentricityFeature();
@@ -44,7 +44,7 @@ public:
   core::FeatureMap extract(const core::Frame& frame, DebugContext& debug) const override;
   std::string name() const override { return "eccentricity"; }
 
-private:
+ private:
   Config config_;
 
   /**
@@ -72,19 +72,10 @@ private:
   std::map<int, cv::Moments> filter_segments(const cv::Mat& labels, int image_area) const;
 
   // Debug helper: capture intermediate results (keeps algorithm code clean)
-  void capture_debug_data(DebugContext& debug,
-                          const core::Frame& frame,
-                          const cv::Mat& gray,
-                          const cv::Mat& edges,
-                          const cv::Mat& labels,
-                          const cv::Mat& eccentricity_map,
-                          const cv::Mat& result,
-                          double total_ms,
-                          double edge_computation_ms,
-                          double segmentation_ms,
-                          double eccentricity_computation_ms,
-                          double resize_ms,
-                          int num_segments) const;
+  void capture_debug_data(DebugContext& debug, const core::Frame& frame, const cv::Mat& gray, const cv::Mat& edges,
+                          const cv::Mat& labels, const cv::Mat& eccentricity_map, const cv::Mat& result,
+                          double total_ms, double edge_computation_ms, double segmentation_ms,
+                          double eccentricity_computation_ms, double resize_ms, int num_segments) const;
 };
 
 } // namespace features

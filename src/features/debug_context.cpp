@@ -1,15 +1,14 @@
 #include "attention/features/debug_context.h"
-#include <iostream>
-#include <iomanip>
 #include <filesystem>
+#include <iomanip>
+#include <iostream>
 
 namespace attention
 {
 namespace features
 {
 
-void DebugVisualizer::save_debug_images(const DebugContext& context,
-                                        const std::string& output_dir,
+void DebugVisualizer::save_debug_images(const DebugContext& context, const std::string& output_dir,
                                         const std::string& prefix)
 {
   if (context.empty())
@@ -24,8 +23,7 @@ void DebugVisualizer::save_debug_images(const DebugContext& context,
   int idx = 0;
   for (const auto& [name, image] : context.images)
   {
-    std::string filename = output_dir + "/" + prefix + "_" +
-                          std::to_string(idx) + "_" + name + ".png";
+    std::string filename = output_dir + "/" + prefix + "_" + std::to_string(idx) + "_" + name + ".png";
 
     // Convert to 8-bit for saving if needed
     cv::Mat save_img;
@@ -114,7 +112,7 @@ cv::Mat DebugVisualizer::create_debug_visualization(const DebugContext& context)
     if (display_img.cols > max_width || display_img.rows > max_height)
     {
       double scale = std::min(static_cast<double>(max_width) / display_img.cols,
-                             static_cast<double>(max_height) / display_img.rows);
+                              static_cast<double>(max_height) / display_img.rows);
       cv::resize(display_img, display_img, cv::Size(), scale, scale);
     }
 
@@ -123,8 +121,7 @@ cv::Mat DebugVisualizer::create_debug_visualization(const DebugContext& context)
     display_img.copyTo(canvas(roi));
 
     // Add label
-    cv::putText(canvas, name, cv::Point(x, y - 5),
-                cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255, 255, 255), 1);
+    cv::putText(canvas, name, cv::Point(x, y - 5), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255, 255, 255), 1);
 
     idx++;
   }
@@ -180,8 +177,8 @@ cv::Mat DebugVisualizer::visualize_pyramid(const std::vector<cv::Mat>& pyramid, 
 
     // Add level label
     std::string label = "L" + std::to_string(i);
-    cv::putText(canvas, label, cv::Point(x_offset + 5, level_img.rows + 20),
-                cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255, 255, 255), 1);
+    cv::putText(canvas, label, cv::Point(x_offset + 5, level_img.rows + 20), cv::FONT_HERSHEY_SIMPLEX, 0.5,
+                cv::Scalar(255, 255, 255), 1);
 
     x_offset += level_img.cols + 5;
   }
@@ -214,8 +211,8 @@ void DebugVisualizer::print_debug_info(const DebugContext& context, const std::s
     std::cout << "\nTimings:" << std::endl;
     for (const auto& [name, ms] : context.timings)
     {
-      std::cout << "  " << std::setw(30) << std::left << name << ": "
-                << std::fixed << std::setprecision(2) << ms << " ms" << std::endl;
+      std::cout << "  " << std::setw(30) << std::left << name << ": " << std::fixed << std::setprecision(2) << ms
+                << " ms" << std::endl;
     }
   }
 
@@ -229,8 +226,8 @@ void DebugVisualizer::print_debug_info(const DebugContext& context, const std::s
     std::cout << "\n  Image details:" << std::endl;
     for (const auto& [name, image] : context.images)
     {
-      std::cout << "    " << std::setw(30) << std::left << name << ": "
-                << image.cols << "x" << image.rows << " channels=" << image.channels() << std::endl;
+      std::cout << "    " << std::setw(30) << std::left << name << ": " << image.cols << "x" << image.rows
+                << " channels=" << image.channels() << std::endl;
     }
   }
 
@@ -239,8 +236,7 @@ void DebugVisualizer::print_debug_info(const DebugContext& context, const std::s
     std::cout << "\n  Pyramid details:" << std::endl;
     for (const auto& [name, pyramid] : context.pyramids)
     {
-      std::cout << "    " << std::setw(30) << std::left << name << ": "
-                << pyramid.size() << " levels" << std::endl;
+      std::cout << "    " << std::setw(30) << std::left << name << ": " << pyramid.size() << " levels" << std::endl;
     }
   }
 

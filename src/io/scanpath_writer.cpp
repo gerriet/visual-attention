@@ -21,11 +21,20 @@ std::string escape_json(const std::string& s)
   {
     switch (c)
     {
-      case '"': out += "\\\""; break;
-      case '\\': out += "\\\\"; break;
-      case '\n': out += "\\n"; break;
-      case '\t': out += "\\t"; break;
-      default: out += c;
+    case '"':
+      out += "\\\"";
+      break;
+    case '\\':
+      out += "\\\\";
+      break;
+    case '\n':
+      out += "\\n";
+      break;
+    case '\t':
+      out += "\\t";
+      break;
+    default:
+      out += c;
     }
   }
   return out;
@@ -71,8 +80,8 @@ void ScanpathWriter::write(const system::AttentionSystem& sys, const std::string
   {
     const auto& f = scanpath[i];
     out << "    {\"frame\": " << f.frame << ", \"label\": " << f.label << ", \"x\": " << f.location.x
-        << ", \"y\": " << f.location.y << ", \"saliency\": " << format_float(f.saliency) << ", \"bbox\": ["
-        << f.bbox.x << ", " << f.bbox.y << ", " << f.bbox.width << ", " << f.bbox.height << "]}";
+        << ", \"y\": " << f.location.y << ", \"saliency\": " << format_float(f.saliency) << ", \"bbox\": [" << f.bbox.x
+        << ", " << f.bbox.y << ", " << f.bbox.width << ", " << f.bbox.height << "]}";
     if (i + 1 < scanpath.size())
     {
       out << ",";

@@ -1,6 +1,6 @@
 #include "attention/features/orientation_feature.h"
-#include <iostream>
 #include <chrono>
+#include <iostream>
 
 namespace attention
 {
@@ -104,15 +104,15 @@ core::FeatureMap OrientationFeature::extract(const core::Frame& frame, DebugCont
     double cs_ms = std::chrono::duration<double, std::milli>(t_cs_end - t_cs_start).count();
     double norm_ms = std::chrono::duration<double, std::milli>(t_norm_end - t_norm_start).count();
 
-    capture_debug_data(debug, frame, orientation_pyramids, combined, result,
-                      total_ms, gabor_ms, cs_ms, norm_ms, num_maps);
+    capture_debug_data(debug, frame, orientation_pyramids, combined, result, total_ms, gabor_ms, cs_ms, norm_ms,
+                       num_maps);
   }
 
   return core::FeatureMap("orientation", result, 1.0f);
 }
 
 cv::Mat OrientationFeature::compute_center_surround(const std::vector<cv::Mat>& gabor_pyramid, int center_scale,
-                                                     int surround_scale) const
+                                                    int surround_scale) const
 {
   if (center_scale >= static_cast<int>(gabor_pyramid.size()) ||
       surround_scale >= static_cast<int>(gabor_pyramid.size()))
@@ -139,16 +139,11 @@ cv::Mat OrientationFeature::compute_center_surround(const std::vector<cv::Mat>& 
   return diff;
 }
 
-void OrientationFeature::capture_debug_data(DebugContext& debug,
-                                           const core::Frame& frame,
-                                           const std::vector<std::vector<cv::Mat>>& orientation_pyramids,
-                                           const cv::Mat& combined,
-                                           const cv::Mat& result,
-                                           double total_ms,
-                                           double gabor_computation_ms,
-                                           double center_surround_ms,
-                                           double normalize_ms,
-                                           int num_maps) const
+void OrientationFeature::capture_debug_data(DebugContext& debug, const core::Frame& frame,
+                                            const std::vector<std::vector<cv::Mat>>& orientation_pyramids,
+                                            const cv::Mat& combined, const cv::Mat& result, double total_ms,
+                                            double gabor_computation_ms, double center_surround_ms, double normalize_ms,
+                                            int num_maps) const
 {
   // Annotations
   debug.add_annotation("num_orientations", std::to_string(config_.num_orientations));
@@ -170,7 +165,8 @@ void OrientationFeature::capture_debug_data(DebugContext& debug,
     {
       if (orient < static_cast<int>(orientation_pyramids.size()))
       {
-        std::string pyramid_name = "gabor_orientation_" + std::to_string(orient * 180 / config_.num_orientations) + "deg";
+        std::string pyramid_name =
+            "gabor_orientation_" + std::to_string(orient * 180 / config_.num_orientations) + "deg";
         debug.add_pyramid(pyramid_name, orientation_pyramids[orient]);
       }
     }

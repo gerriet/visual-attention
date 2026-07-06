@@ -50,10 +50,10 @@ class StereoFeature : public FeatureExtractor
  public:
   struct Config
   {
-    int num_orientations = 3;   // 1, 3, or 5 near-vertical orientations
-    int min_disparity = -16;    // disparity search range (px, right vs left);
-    int max_disparity = 0;      //   mindisp<0, maxdisp=0 searches leftward
-    int window_size = 15;       // correlation window length dl (odd)
+    int num_orientations = 3;        // 1, 3, or 5 near-vertical orientations
+    int min_disparity = -16;         // disparity search range (px, right vs left);
+    int max_disparity = 0;           //   mindisp<0, maxdisp=0 searches leftward
+    int window_size = 15;            // correlation window length dl (odd)
     double variance_threshold = 3.0; // min windowed std-dev of the Gabor-magnitude
                                      //   response to correlate — gates out flat,
                                      //   textureless windows (empirical, §5.4.2)

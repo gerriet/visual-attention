@@ -29,19 +29,19 @@ void StereoFeature::orientation_scheme(std::vector<double>& thetas, std::vector<
   const double d15 = 15.0 * M_PI / 180.0;
   switch (config_.num_orientations)
   {
-    case 1:
-      thetas = {0.0};
-      weights = {1.0};
-      break;
-    case 5:
-      thetas = {0.0, d15, -d15, d30, -d30};
-      weights = {0.4, 0.2, 0.2, 0.1, 0.1};
-      break;
-    case 3:
-    default:
-      thetas = {0.0, d30, -d30};
-      weights = {0.5, 0.25, 0.25};
-      break;
+  case 1:
+    thetas = {0.0};
+    weights = {1.0};
+    break;
+  case 5:
+    thetas = {0.0, d15, -d15, d30, -d30};
+    weights = {0.4, 0.2, 0.2, 0.1, 0.1};
+    break;
+  case 3:
+  default:
+    thetas = {0.0, d30, -d30};
+    weights = {0.5, 0.25, 0.25};
+    break;
   }
 }
 
@@ -57,8 +57,8 @@ cv::Mat StereoFeature::gabor_magnitude(const cv::Mat& gray, double theta) const
   const double gamma = 1.0;
   cv::Mat kernel_even =
       cv::getGaborKernel(cv::Size(ksize, ksize), sigma, theta, config_.gabor_wavelength, gamma, 0.0, CV_32F);
-  cv::Mat kernel_odd = cv::getGaborKernel(cv::Size(ksize, ksize), sigma, theta, config_.gabor_wavelength, gamma,
-                                          M_PI * 0.5, CV_32F);
+  cv::Mat kernel_odd =
+      cv::getGaborKernel(cv::Size(ksize, ksize), sigma, theta, config_.gabor_wavelength, gamma, M_PI * 0.5, CV_32F);
   cv::Mat resp_even, resp_odd;
   cv::filter2D(gray, resp_even, CV_32F, kernel_even);
   cv::filter2D(gray, resp_odd, CV_32F, kernel_odd);

@@ -2,6 +2,12 @@
 
 This document describes performance measurement, analysis, and optimization techniques applied to the attention framework.
 
+> **Note:** the sections up to "Conclusion" document the Phase-1 (2025)
+> optimization pass over the original five-feature pipeline. For measured
+> numbers on the current v2 pipeline (profiles, neural-field selection, live
+> streaming), see [Current performance (v2)](#current-performance-v2-2026-07)
+> at the end.
+
 ## Performance Measurement
 
 ### Per-Feature Timing
@@ -393,3 +399,36 @@ The key insights:
 2. Applied reduced-resolution computation for large images only
 3. Maintained full quality for typical image sizes
 4. Achieved 15× speedup on large images with minimal quality loss
+
+## Current performance (v2, 2026-07)
+
+Measured on Apple Silicon (Release build), 512×512 input (`lena.png`).
+Single-image runs include one-time setup (Gabor-bank construction, pyramid
+allocation); streaming numbers are steady-state wall clock per frame over a
+30-frame run, including the annotated-PNG write in headless mode.
+
+| Configuration | Time |
+|---------------|------|
+| Default profile (5 features, NMS selection), single image | ~480 ms |
+| Thesis profile (color/eccentricity/symmetry, 2D neural field), single image | ~125 ms |
+| Live profile, `--live` streaming, processing size 480 | ~165 ms/frame (~6 fps) |
+| Live profile, `--live` streaming, processing size 240 | ~113 ms/frame (~9 fps) |
+| Live profile, `--live` streaming, processing size 120 | ~30 ms/frame (~30 fps) |
+
+### Known gap: untimed per-frame work (M8 tuning)
+
+The per-stage timers (`pipeline.get_timing()`) account for only ~23 ms of the
+~155 ms live frame at processing size 480. The remainder lives in stages the
+timing struct does not cover:
+
+- `Frame` construction and the per-frame rebuild of the parameter-keyed
+  Gabor banks (cached per `Frame`, so a fresh frame rebuilds them)
+- system-level work: saliency segmentation into clusters, object-file
+  correspondence, behavior selection
+- overlay drawing and (headless) PNG writes
+
+Consequence: the M8 target of 25+ fps at VGA processing size does not hold
+yet — it currently requires processing size ≈120. The first candidates are
+caching Gabor banks across frames (they depend only on parameters, not frame
+content) and extending the timing struct to cover the untimed stages so the
+gap is visible per run.

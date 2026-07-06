@@ -128,12 +128,11 @@ cv::Mat Frame::create_gabor_kernel(double wavelength, double theta, double bandw
   double sigma = wavelength * bandwidth / M_PI;
 
   // Standard OpenCV Gabor parameters
-  double psi = constants::GABOR_PHASE_OFFSET;  // Phase offset (M_PI * 0.5)
+  double psi = constants::GABOR_PHASE_OFFSET;   // Phase offset (M_PI * 0.5)
   double gamma = constants::GABOR_ASPECT_RATIO; // Spatial aspect ratio
 
   // Create Gabor kernel using OpenCV
-  cv::Mat kernel =
-      cv::getGaborKernel(cv::Size(kernel_size, kernel_size), sigma, theta, wavelength, gamma, psi, CV_32F);
+  cv::Mat kernel = cv::getGaborKernel(cv::Size(kernel_size, kernel_size), sigma, theta, wavelength, gamma, psi, CV_32F);
 
   return kernel;
 }

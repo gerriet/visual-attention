@@ -94,8 +94,9 @@ void ConfigLoader::load_features(const YAML::Node& features, pipeline::PipelineC
 
   if (!features.IsMap())
   {
-    throw std::runtime_error("'features' must be a map of feature-name -> settings "
-                             "(e.g. \"features:\\n  color:\\n    weight: 1.0\"), not a list");
+    throw std::runtime_error(
+        "'features' must be a map of feature-name -> settings "
+        "(e.g. \"features:\\n  color:\\n    weight: 1.0\"), not a list");
   }
 
   // Entries override the matching default spec; listed features that are not
@@ -150,7 +151,6 @@ void ConfigLoader::load_features(const YAML::Node& features, pipeline::PipelineC
 
 void ConfigLoader::load_peaks(const YAML::Node& peaks, pipeline::PipelineConfig& config)
 {
-
   if (peaks["min_distance"])
   {
     config.peak_min_distance = peaks["min_distance"].as<int>();
@@ -185,7 +185,6 @@ void ConfigLoader::load_peaks(const YAML::Node& peaks, pipeline::PipelineConfig&
 
 void ConfigLoader::load_output(const YAML::Node& output, Config& config)
 {
-
   if (output["save_features"])
   {
     config.save_features = output["save_features"].as<bool>();

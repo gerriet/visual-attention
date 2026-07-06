@@ -36,11 +36,14 @@ the modern-model comparison, and a live demonstrator).
 - ✅ Golden regression tests (characterization + behavioral scanpath)
 - ✅ Result interchange format (`docs/INTERCHANGE_FORMAT.md`)
 
-**Performance:**
+**Performance** (Apple Silicon, 512×512 input, July 2026; single-image runs
+include one-time setup):
 
-- 512×512 image: ~210ms
-- 1436×2011 image: ~3000ms
-- Optimized with shared pyramids and parallel extraction
+- Default profile (5 features, NMS selection): ~480 ms
+- Thesis profile (3 features, neural-field selection): ~125 ms
+- Live profile, streaming: ~30 ms/frame at processing size 120,
+  ~165 ms/frame at 480 — see `docs/PERFORMANCE.md` for the breakdown and
+  the open M8 tuning gap
 
 ## Quick Start
 
@@ -91,6 +94,8 @@ make
 ./attention ../data/test_images/input.png --no-display --emit-json out/result.json
 ```
 
+Every binary answers `--help` (as do the Python tools in `tools/` and `eval/`).
+
 ### Tests
 
 ```bash
@@ -112,14 +117,18 @@ ATTENTION_UPDATE_GOLDEN=1 ./build/tests/characterization_tests
 
 ## Documentation
 
+- `docs/V2_ROADMAP.md` - **Direction: goals, locked decisions, milestones M0–M8**
+- `docs/INTERCHANGE_FORMAT.md` - Result/scanpath JSON + saliency-map format all models emit
+- `docs/PERFORMANCE.md` - Timing instrumentation, optimization history, current numbers
+- `docs/thesis_vs_modern.md` - The M7 deliverable: thesis model vs. modern saliency models
 - `docs/MODERN_ARCHITECTURE.md` - System design and architecture
-- `docs/PHASE1_ACTION_PLAN.md` - Week-by-week implementation plan
-- `docs/REALISTIC_TIMELINE.md` - Timeline and effort estimates
 - `docs/MODERN_ATTENTION_RESEARCH.md` - Survey of modern attention systems
+- `docs/SYMMETRY_FEATURE_NOTES.md` - Thesis-spec symmetry feature notes
 - `docs/MIGRATION_GUIDE.md` - How to use old code as reference
 - `docs/DEVELOPMENT_GUIDELINES.md` - **Development best practices and coding guidelines**
 - `docs/CODE_STYLE.md` - Code style guide (Google-Allman hybrid)
 - `docs/FORMATTING.md` - Code formatting with clang-format
+- `docs/PHASE1_ACTION_PLAN.md`, `docs/REALISTIC_TIMELINE.md` - Phase-1 history (superseded by the roadmap)
 - `docs/thesis/` - Original dissertation and extracted equations
 - `reference/old_code/` - Original implementation (reference only, not compiled)
 
@@ -134,25 +143,30 @@ attention-framework/
 ├── include/           # C++ headers
 ├── src/               # C++ implementation
 ├── tests/             # Golden regression tests (Catch2 + CTest)
-├── eval/              # Python evaluation layer (comparators, metrics)
+├── eval/              # Python evaluation layer (comparators, metrics, models)
+├── tools/             # Synthetic test-data generators (stereo pair, motion sequence)
 └── examples/          # Usage examples (built with the project)
 ```
 
 ## Architecture
 
-**Core Pipeline:**
+**Core Pipeline** (each stage is a config-selected strategy):
 
 ```
-Input Image → Multi-scale Pyramids → Parallel Feature Extraction →
-Feature Integration → Winner-Take-All → Attention Peaks
+Frame stream → Pyramids/Gabor banks → Feature Extraction (parallel) →
+Fusion → Selection (WTA or 2D/3D neural field) → Peaks/Clusters →
+AttentionSystem second stage (object files → behavior → focus/scanpath)
 ```
 
 **Key Design Decisions:**
 
-- Shared pyramid computation (eliminates redundancy)
-- Parallel feature extraction (3 threads for color images)
-- Cached data structures for efficiency
-- YAML-based configuration for flexibility
+- Stream-oriented and stateful: a single image is a stream of length one;
+  field activity, IOR, and object files persist across frames (`RunState`)
+- Features, fusion, selection, and object-file processors are registries —
+  composition is fully YAML-driven (`configs/*.yaml`), no code changes to swap
+- Shared pyramid and parameter-keyed Gabor-bank caches per frame
+- Every model (C++ or Python) emits the same interchange format, so the
+  evaluation harness never special-cases a model
 
 ## Development
 

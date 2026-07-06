@@ -16,16 +16,16 @@ namespace features
  */
 class OrientationFeature : public FeatureExtractor
 {
-public:
+ public:
   /**
    * Configuration for orientation feature extraction.
    */
   struct Config
   {
-    int num_orientations = 4;     // Number of orientations (default 4: 0°, 45°, 90°, 135°)
-    double wavelength = 4.0;      // Wavelength for Gabor filters
-    double bandwidth = 1.0;       // Bandwidth parameter
-    int compute_at_scale = 0;     // Pyramid level for computation (0 = full resolution)
+    int num_orientations = 4; // Number of orientations (default 4: 0°, 45°, 90°, 135°)
+    double wavelength = 4.0;  // Wavelength for Gabor filters
+    double bandwidth = 1.0;   // Bandwidth parameter
+    int compute_at_scale = 0; // Pyramid level for computation (0 = full resolution)
   };
 
   OrientationFeature();
@@ -40,7 +40,7 @@ public:
     return {config_.num_orientations, config_.wavelength, config_.bandwidth};
   }
 
-private:
+ private:
   Config config_;
 
   /**
@@ -50,19 +50,14 @@ private:
    * @param surround_scale Surround scale index
    * @return Center-surround difference map
    */
-  cv::Mat compute_center_surround(const std::vector<cv::Mat>& gabor_pyramid, int center_scale, int surround_scale) const;
+  cv::Mat compute_center_surround(const std::vector<cv::Mat>& gabor_pyramid, int center_scale,
+                                  int surround_scale) const;
 
   // Debug helper: capture intermediate results (keeps algorithm code clean)
-  void capture_debug_data(DebugContext& debug,
-                          const core::Frame& frame,
-                          const std::vector<std::vector<cv::Mat>>& orientation_pyramids,
-                          const cv::Mat& combined,
-                          const cv::Mat& result,
-                          double total_ms,
-                          double gabor_computation_ms,
-                          double center_surround_ms,
-                          double normalize_ms,
-                          int num_maps) const;
+  void capture_debug_data(DebugContext& debug, const core::Frame& frame,
+                          const std::vector<std::vector<cv::Mat>>& orientation_pyramids, const cv::Mat& combined,
+                          const cv::Mat& result, double total_ms, double gabor_computation_ms,
+                          double center_surround_ms, double normalize_ms, int num_maps) const;
 };
 
 } // namespace features

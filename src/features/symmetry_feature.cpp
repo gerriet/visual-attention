@@ -1,9 +1,9 @@
 #include "attention/features/symmetry_feature.h"
 #include "attention/core/constants.h"
+#include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <stdexcept>
-#include <chrono>
-#include <algorithm>
 
 namespace attention
 {
@@ -67,7 +67,8 @@ core::FeatureMap SymmetryFeature::extract(const core::Frame& frame, DebugContext
     const auto& gabor_level = gabor_bank[pyramid_level];
     if (gabor_level.empty())
     {
-      std::cerr << "Warning: Skipping scale " << scale_idx << " - gabor level " << pyramid_level << " is empty" << std::endl;
+      std::cerr << "Warning: Skipping scale " << scale_idx << " - gabor level " << pyramid_level << " is empty"
+                << std::endl;
       continue;
     }
 
@@ -155,8 +156,8 @@ core::FeatureMap SymmetryFeature::extract(const core::Frame& frame, DebugContext
     double combine_ms = std::chrono::duration<double, std::milli>(t_combine_end - t_combine_start).count();
     double resize_ms = std::chrono::duration<double, std::milli>(t_resize_end - t_resize_start).count();
 
-    capture_debug_data(debug, frame, scales, scale_gabor_responses, scale_results, result,
-                      total_ms, gabor_ms, scale_computation_times, combine_ms, resize_ms);
+    capture_debug_data(debug, frame, scales, scale_gabor_responses, scale_results, result, total_ms, gabor_ms,
+                       scale_computation_times, combine_ms, resize_ms);
   }
 
   return core::FeatureMap("symmetry", result, 1.0f);
@@ -189,7 +190,7 @@ std::vector<SymmetryFeature::ScaleConfig> SymmetryFeature::resolve_scales(const 
 }
 
 cv::Mat SymmetryFeature::compute_radial_symmetry_at_scale(const std::vector<cv::Mat>& gabor_responses,
-                                                           const ScaleConfig& scale_config) const
+                                                          const ScaleConfig& scale_config) const
 {
   if (gabor_responses.empty())
   {
@@ -226,7 +227,7 @@ cv::Mat SymmetryFeature::compute_radial_symmetry_at_scale(const std::vector<cv::
   // float summation order is identical on every run (bit-reproducible results)
   float delta_alpha = 180.0f / num_orientations;
 
-  #pragma omp parallel for schedule(dynamic) if(num_radii >= 2)
+#pragma omp parallel for schedule(dynamic) if (num_radii >= 2)
   for (int radius_idx = 0; radius_idx < num_radii; ++radius_idx)
   {
     int radius = radii[radius_idx];
@@ -236,8 +237,8 @@ cv::Mat SymmetryFeature::compute_radial_symmetry_at_scale(const std::vector<cv::
       float angle = orientation * delta_alpha;
 
       // Compute contribution from this orientation and radius
-      cv::Mat contribution = compute_orientation_radius_contribution(
-          gabor_responses[orientation], angle, radius, scale_config.width, num_orientations);
+      cv::Mat contribution = compute_orientation_radius_contribution(gabor_responses[orientation], angle, radius,
+                                                                     scale_config.width, num_orientations);
 
       radius_bands[radius_idx] += contribution;
     }
@@ -299,12 +300,9 @@ cv::Mat SymmetryFeature::compute_radial_symmetry_at_scale(const std::vector<cv::
   return result;
 }
 
-cv::Mat SymmetryFeature::compute_orientation_radius_contribution(
-    const cv::Mat& gabor_orientation,
-    float orientation_angle,
-    int radius,
-    int width,
-    int num_orientations) const
+cv::Mat SymmetryFeature::compute_orientation_radius_contribution(const cv::Mat& gabor_orientation,
+                                                                 float orientation_angle, int radius, int width,
+                                                                 int num_orientations) const
 {
   // This implements the core symmetry_intern logic from the old code (lines 109-171)
 
@@ -326,8 +324,7 @@ cv::Mat SymmetryFeature::compute_orientation_radius_contribution(
   int ay = static_cast<int>(sin_a * (radius + width / 2.0f));
 
   // Calculate search area size
-  int area = static_cast<int>(std::sqrt((box_length + 1) * (box_length + 1) +
-                                        (box_width + 1) * (box_width + 1)));
+  int area = static_cast<int>(std::sqrt((box_length + 1) * (box_length + 1) + (box_width + 1) * (box_width + 1)));
 
   // Build index array of points in summation box (old code lines 131-148)
   // OPTIMIZATION #1: This is computed once per orientation/radius, not per pixel
@@ -352,7 +349,8 @@ cv::Mat SymmetryFeature::compute_orientation_radius_contribution(
 
   // Normalization factor
   float normalization = static_cast<float>(box_points.size() * num_orientations) / 2.0f;
-  if (normalization < 1.0f) normalization = 1.0f;
+  if (normalization < 1.0f)
+    normalization = 1.0f;
 
   // Core loop: for each pixel, sum responses in symmetry box (old code lines 154-169)
   int margin_y = std::abs(ay) + max_y;
@@ -382,8 +380,8 @@ cv::Mat SymmetryFeature::compute_orientation_radius_contribution(
         int y2 = y2_base - offset.y;
 
         // Bounds checking
-        if (x1 >= 0 && x1 < width_px && y1 >= 0 && y1 < height_px &&
-            x2 >= 0 && x2 < width_px && y2 >= 0 && y2 < height_px)
+        if (x1 >= 0 && x1 < width_px && y1 >= 0 && y1 < height_px && x2 >= 0 && x2 < width_px && y2 >= 0 &&
+            y2 < height_px)
         {
           sum += gabor_orientation.at<float>(y1, x1) + gabor_orientation.at<float>(y2, x2);
         }
@@ -396,16 +394,12 @@ cv::Mat SymmetryFeature::compute_orientation_radius_contribution(
   return contribution;
 }
 
-void SymmetryFeature::capture_debug_data(DebugContext& debug,
-                                         const core::Frame& frame,
+void SymmetryFeature::capture_debug_data(DebugContext& debug, const core::Frame& frame,
                                          const std::vector<ScaleConfig>& scales,
                                          const std::vector<std::vector<cv::Mat>>& scale_gabor_responses,
-                                         const std::vector<cv::Mat>& scale_results,
-                                         const cv::Mat& result,
-                                         double total_ms,
-                                         double gabor_computation_ms,
-                                         const std::vector<double>& scale_computation_times,
-                                         double combine_ms,
+                                         const std::vector<cv::Mat>& scale_results, const cv::Mat& result,
+                                         double total_ms, double gabor_computation_ms,
+                                         const std::vector<double>& scale_computation_times, double combine_ms,
                                          double resize_ms) const
 {
   // Annotations
@@ -420,8 +414,8 @@ void SymmetryFeature::capture_debug_data(DebugContext& debug,
     const auto& sc = scales[i];
     debug.add_annotation("scale_" + std::to_string(i) + "_pyramid_level", std::to_string(sc.pyramid_level));
     debug.add_annotation("scale_" + std::to_string(i) + "_radius_range",
-                        std::to_string(sc.min_radius) + "-" + std::to_string(sc.max_radius) +
-                        " (step=" + std::to_string(sc.radius_step) + ")");
+                         std::to_string(sc.min_radius) + "-" + std::to_string(sc.max_radius) +
+                             " (step=" + std::to_string(sc.radius_step) + ")");
     debug.add_annotation("scale_" + std::to_string(i) + "_width", std::to_string(sc.width));
     debug.add_annotation("scale_" + std::to_string(i) + "_threshold", std::to_string(sc.symmetry_threshold));
   }
@@ -443,8 +437,8 @@ void SymmetryFeature::capture_debug_data(DebugContext& debug,
     {
       int level = i < scales.size() ? scales[i].pyramid_level : -1;
       int size = scale_results[i].cols;
-      std::string name = "scale_" + std::to_string(i) + "_level" + std::to_string(level) +
-                         "_symmetry_" + std::to_string(size) + "x" + std::to_string(size);
+      std::string name = "scale_" + std::to_string(i) + "_level" + std::to_string(level) + "_symmetry_" +
+                         std::to_string(size) + "x" + std::to_string(size);
       debug.add_image(name, scale_results[i]);
     }
   }

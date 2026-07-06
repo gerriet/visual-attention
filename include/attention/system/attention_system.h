@@ -22,8 +22,8 @@ namespace system
 struct Focus
 {
   int frame = 0;
-  int label = 0;        // object-file label
-  cv::Point location;   // centroid in image coordinates
+  int label = 0;      // object-file label
+  cv::Point location; // centroid in image coordinates
   cv::Rect bbox;
   float saliency = 0.0f;
 };
@@ -53,8 +53,8 @@ class AttentionSystem
  public:
   enum class ActionMode
   {
-    Feature,  // compute saliency only (no object files / behavior)
-    Scanpath  // full second stage + behavior over the stream
+    Feature, // compute saliency only (no object files / behavior)
+    Scanpath // full second stage + behavior over the stream
   };
 
   struct Config

@@ -74,13 +74,8 @@ class IntensityFeature : public FeatureExtractor
   cv::Mat normalize_and_resize(const cv::Mat& feature, const cv::Size& target_size) const;
 
   // Debug helper: capture intermediate results (keeps algorithm code clean)
-  void capture_debug_data(DebugContext& debug,
-                          const core::Frame& frame,
-                          const cv::Mat& saliency,
-                          const cv::Mat& result,
-                          double total_ms,
-                          double center_surround_ms,
-                          double normalize_ms) const;
+  void capture_debug_data(DebugContext& debug, const core::Frame& frame, const cv::Mat& saliency, const cv::Mat& result,
+                          double total_ms, double center_surround_ms, double normalize_ms) const;
 };
 
 } // namespace features

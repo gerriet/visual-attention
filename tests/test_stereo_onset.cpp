@@ -44,8 +44,8 @@ TEST_CASE("stereo feature lights up the near foreground, not the zero-disparity 
   const double fg = cv::mean(map.data(cv::Rect(80, 64, 96, 112)))[0];
   const double bg = cv::mean(map.data(cv::Rect(0, 0, 60, 256)))[0];
 
-  CHECK(fg > 0.4);            // near surface pops out (10/16 ~ 0.63)
-  CHECK(bg < 0.05);           // zero-disparity background stays dark
+  CHECK(fg > 0.4);  // near surface pops out (10/16 ~ 0.63)
+  CHECK(bg < 0.05); // zero-disparity background stays dark
   CHECK(fg > bg + 0.3);
 }
 
@@ -128,8 +128,8 @@ TEST_CASE("3D neural field converges and localizes a single blob in its plane", 
   double mn, mx;
   cv::Point max_loc;
   cv::minMaxLoc(collapsed, &mn, &mx, nullptr, &max_loc);
-  CHECK(mx > 0.0);                                     // sustained activation
-  CHECK(cv::norm(max_loc - cv::Point(24, 24)) < 8);    // localized at the blob
+  CHECK(mx > 0.0);                                  // sustained activation
+  CHECK(cv::norm(max_loc - cv::Point(24, 24)) < 8); // localized at the blob
 
   // The winning depth at the blob centre is its input plane.
   CHECK(field.winning_depth().at<int>(24, 24) == 2);

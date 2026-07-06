@@ -18,7 +18,7 @@ struct Cluster
 {
   cv::Point centroid;
   cv::Rect bbox;
-  int size = 0;           // pixel count
+  int size = 0; // pixel count
   float mean_saliency = 0.0f;
 };
 
@@ -39,15 +39,15 @@ struct ObjectFile
   cv::Point centroid;
   cv::Rect bbox;
   int size = 0;
-  float saliency = 0.0f;        // current-frame mean saliency
-  float avg_saliency = 0.0f;    // leaky-integrated (older frames weigh less)
+  float saliency = 0.0f;     // current-frame mean saliency
+  float avg_saliency = 0.0f; // leaky-integrated (older frames weigh less)
 
   int created_frame = 0;
   int last_seen_frame = 0;
   int last_selected_frame = -1; // -1 == never focally selected
 
   bool active = true;
-  int selection_count = 0;      // how many frames it has been the focus (dwell)
+  int selection_count = 0; // how many frames it has been the focus (dwell)
 
   std::deque<cv::Point> trajectory; // recent centroids (most recent last)
 

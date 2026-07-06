@@ -29,8 +29,8 @@ class LiveDemonstrator
   {
     AttentionSystem::Config system;
     std::vector<std::string> processors{"region-descriptor"};
-    int process_max_side = 480; // process at most this on the longer side (≤ VGA)
-    int scanpath_trail = 12;    // draw this many recent foci as a trail
+    int process_max_side = 480;     // process at most this on the longer side (≤ VGA)
+    int scanpath_trail = 12;        // draw this many recent foci as a trail
     bool run_on_focus_only = false; // run processors on the focus only vs all active files
   };
 

@@ -83,15 +83,15 @@ struct PipelineConfig
   int peak_max_count = 10;     // Maximum number of peaks to detect
 
   // Inhibition of Return (IOR) parameters
-  bool enable_ior = false;     // Legacy alias for selection = "ior"
-  int ior_radius = 50;         // Radius of inhibition disk (pixels)
-  float ior_strength = 0.8f;   // Inhibition strength (0-1, 1 = complete suppression)
+  bool enable_ior = false;   // Legacy alias for selection = "ior"
+  int ior_radius = 50;       // Radius of inhibition disk (pixels)
+  float ior_strength = 0.8f; // Inhibition strength (0-1, 1 = complete suppression)
 
   // Debug parameters
   features::DebugContext::Level debug_level = features::DebugContext::Level::None;
-  std::string debug_output_dir = "debug_output";  // Directory for debug output
-  bool debug_save_images = true;                   // Save debug images to disk
-  bool debug_print_info = false;                   // Print debug info to console
+  std::string debug_output_dir = "debug_output"; // Directory for debug output
+  bool debug_save_images = true;                 // Save debug images to disk
+  bool debug_print_info = false;                 // Print debug info to console
 
   PipelineConfig()
   {

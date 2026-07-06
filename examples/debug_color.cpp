@@ -8,8 +8,8 @@
 #include "attention/core/frame.h"
 #include "attention/features/color_feature.h"
 #include "attention/features/debug_context.h"
-#include <opencv2/opencv.hpp>
 #include <iostream>
+#include <opencv2/opencv.hpp>
 #include <string>
 
 int main(int argc, char** argv)
@@ -48,7 +48,7 @@ int main(int argc, char** argv)
   // Create frame and compute pyramids
   std::cout << "\nComputing pyramids..." << std::endl;
   attention::core::Frame frame(image);
-  frame.compute_pyramids(9);  // Compute 9-level pyramid
+  frame.compute_pyramids(9); // Compute 9-level pyramid
 
   // Create debug context with Detailed level
   attention::features::DebugContext debug(attention::features::DebugContext::Level::Detailed);

@@ -150,9 +150,8 @@ features:
 TEST_CASE("unknown feature and strategy names are rejected with clear errors", "[config]")
 {
   auto path = write_temp_config("features:\n  warp_drive: { weight: 1.0 }\n");
-  CHECK_THROWS_WITH(ConfigLoader::load(path.string()),
-                    Catch::Matchers::ContainsSubstring("warp_drive") &&
-                        Catch::Matchers::ContainsSubstring("Available"));
+  CHECK_THROWS_WITH(ConfigLoader::load(path.string()), Catch::Matchers::ContainsSubstring("warp_drive") &&
+                                                           Catch::Matchers::ContainsSubstring("Available"));
   std::remove(path.string().c_str());
 
   attention::pipeline::PipelineConfig bad_selection;

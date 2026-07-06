@@ -5,11 +5,11 @@
 // negligible and re-selected the same peak repeatedly; behavior here is
 // covered by test_selection.cpp instead.
 
-#include "attention/selection/selection_strategy.h"
 #include "attention/config/yaml_reader.h"
 #include "attention/core/constants.h"
 #include "attention/selection/neural_field_3d.h"
 #include "attention/selection/neural_field_selection.h"
+#include "attention/selection/selection_strategy.h"
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>

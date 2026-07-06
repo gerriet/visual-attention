@@ -22,7 +22,8 @@ namespace visualization
  * @param wait_key If true, wait for key press after displaying
  * @return Visualization as 8-bit grayscale image
  */
-cv::Mat visualize_feature_map(const core::FeatureMap& feature, const std::string& window_name = "", bool wait_key = false);
+cv::Mat visualize_feature_map(const core::FeatureMap& feature, const std::string& window_name = "",
+                              bool wait_key = false);
 
 /**
  * Visualize a saliency map with optional peak markers.

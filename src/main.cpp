@@ -164,23 +164,23 @@ void process_attend(const std::string& path, attention::pipeline::PipelineConfig
   }
 
   const std::string out_base = output_base.empty() ? "results/attend" : output_base;
-  sys.process_stream(
-      *source,
-      [&](attention::system::AttentionSystem& s)
-      {
-        std::ostringstream name;
-        name << "frame_" << std::setw(4) << std::setfill('0') << s.frame_index();
-        fs::path dir = fs::path(out_base) / name.str();
-        fs::create_directories(dir);
-        cv::imwrite((dir / "objects.png").string(), annotate_objects(s));
-        const auto* focus = s.current_focus();
-        std::cout << "  " << name.str() << ": " << s.active_files().size() << " objects";
-        if (focus)
-        {
-          std::cout << ", focus #" << focus->label << " at (" << focus->location.x << "," << focus->location.y << ")";
-        }
-        std::cout << std::endl;
-      });
+  sys.process_stream(*source,
+                     [&](attention::system::AttentionSystem& s)
+                     {
+                       std::ostringstream name;
+                       name << "frame_" << std::setw(4) << std::setfill('0') << s.frame_index();
+                       fs::path dir = fs::path(out_base) / name.str();
+                       fs::create_directories(dir);
+                       cv::imwrite((dir / "objects.png").string(), annotate_objects(s));
+                       const auto* focus = s.current_focus();
+                       std::cout << "  " << name.str() << ": " << s.active_files().size() << " objects";
+                       if (focus)
+                       {
+                         std::cout << ", focus #" << focus->label << " at (" << focus->location.x << ","
+                                   << focus->location.y << ")";
+                       }
+                       std::cout << std::endl;
+                     });
 
   std::cout << "Attend complete: " << sys.scanpath().size() << " foci over " << sys.frame_index() << " frames."
             << std::endl;
@@ -295,7 +295,7 @@ void process_batch(const std::string& directory, const attention::pipeline::Pipe
   {
     long min = LONG_MAX;
     long max = 0;
-    double sum = 0.0;  // Use double to prevent overflow
+    double sum = 0.0; // Use double to prevent overflow
     int count = 0;
 
     void add(long value)
@@ -434,8 +434,9 @@ void process_batch(const std::string& directory, const attention::pipeline::Pipe
 
     auto print_stats = [max_label_length](const std::string& label, const Stats& stats)
     {
-      std::cout << std::left << std::setw(max_label_length) << label << "  min: " << std::setw(6) << std::right << stats.min
-                << "  max: " << std::setw(6) << stats.max << "  mean: " << std::setw(7) << stats.mean() << std::endl;
+      std::cout << std::left << std::setw(max_label_length) << label << "  min: " << std::setw(6) << std::right
+                << stats.min << "  max: " << std::setw(6) << stats.max << "  mean: " << std::setw(7) << stats.mean()
+                << std::endl;
     };
 
     print_stats("Pyramid:", pyramid_stats);
@@ -498,11 +499,13 @@ void print_usage(const char* program_name, std::ostream& out = std::cerr)
   out << "  --sequence <path>    Process a directory or video as a temporal stream (onset/motion)" << std::endl;
   out << "  --attend <path>      Run the full attention system (object files + behavior) over a stream" << std::endl;
   out << "  --emit-scanpath <p>  Write the scanpath JSON (with --attend)" << std::endl;
-  out << "  --live <src>         Live demo: attention + object-file plugins on camera/video/dir (ESC quits)" << std::endl;
+  out << "  --live <src>         Live demo: attention + object-file plugins on camera/video/dir (ESC quits)"
+      << std::endl;
   out << "  --processors <a,b>   Object-file plugins for --live (default: region-descriptor)" << std::endl;
   out << "  --process-size <N>   Max side of the downscaled processing frame for --live (default: 480)" << std::endl;
   out << "  --frames <N>         Stop after N frames (--live headless with --no-display)" << std::endl;
-  out << "  --output <dir>       Specify output directory for batch/sequence mode (default: input_dir/results_batch)" << std::endl;
+  out << "  --output <dir>       Specify output directory for batch/sequence mode (default: input_dir/results_batch)"
+      << std::endl;
   out << "  --emit-json <path>   Write result JSON + saliency map in the interchange format" << std::endl;
   out << "                       (see docs/INTERCHANGE_FORMAT.md; single-image and config modes)" << std::endl;
   out << "  --help, -h           Show this help and exit" << std::endl;

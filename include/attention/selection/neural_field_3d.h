@@ -48,7 +48,7 @@ class NeuralField3D
     int kernel_size = 41;
     float plane_inhibition = 5.0f; // per-plane inhibition factor (nf3d.h: *5)
     int max_cycles = 50;
-    float change_thresh = 0.01f;   // mean |du| per neuron convergence
+    float change_thresh = 0.01f; // mean |du| per neuron convergence
   };
 
   NeuralField3D(const cv::Size& plane_size, int depth, const Params& params);

@@ -58,6 +58,19 @@ reimplement in modern C++.
 - Platform-specific (XIL, old V4L)
 - No longer maintained dependencies
 
+## Reading Notes (Historical Context)
+
+- Written in early-2000s C++ (pre-C++11) for Linux/Solaris on a Pentium 3;
+  the original build used a Makefile linking jtools, vigra, libjpeg/png.
+- Implementation files use the `.C` extension (capital C).
+- Comments are largely German ("Merkmale" = features, "Verhalten" = behavior).
+- Images are `pic2d<T>`/`pic3d<T>` from jtools (grayscale or 3-plane color).
+- `esab2.C` is the original system level (ESAB = DFG project "Entwicklung von
+  Systembausteinen der Aktiven Bildanalyse"); v2 reimplements it as
+  `AttentionSystem`. Its input modes (Xilcam/V4L camera, files, simulator)
+  and action modes (`feature_mode`, `move_sensor_mode`, `scanpath_mode`) map
+  to the v2 CLI's `--sequence`/`--attend`/`--live` and the ActionMode enum.
+
 ## Example Workflow
 
 ```bash

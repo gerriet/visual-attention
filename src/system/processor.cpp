@@ -81,8 +81,8 @@ class RoiProbe : public Processor
     const long us = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
 
     a.label = "#" + std::to_string(object.label) + " " + std::to_string(roi.cols) + "x" + std::to_string(roi.rows);
-    a.detail = "roi " + std::to_string(roi.cols) + "x" + std::to_string(roi.rows) + " (" +
-               std::to_string(roi.total()) + " px), mean=" + fmt(mean[0]) + ", " + std::to_string(us) + "us";
+    a.detail = "roi " + std::to_string(roi.cols) + "x" + std::to_string(roi.rows) + " (" + std::to_string(roi.total()) +
+               " px), mean=" + fmt(mean[0]) + ", " + std::to_string(us) + "us";
     return a;
   }
 };

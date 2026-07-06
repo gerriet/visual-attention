@@ -83,14 +83,14 @@ TEST_CASE("object files: inactive files age out", "[system][objectfile]")
   system::ObjectFileStore store(cfg);
 
   store.update({cluster_at(50, 50, 0.8f)}, 0); // create
-  store.update({}, 1);                          // no clusters -> inactive
+  store.update({}, 1);                         // no clusters -> inactive
   REQUIRE(store.inactive_files().size() == 1);
 
   store.update({}, 2);
   store.update({}, 3);
   CHECK(store.inactive_files().size() == 1); // frame 3 - last_seen 0 = 3, not > 3
   store.update({}, 4);
-  CHECK(store.inactive_files().empty());     // now aged out
+  CHECK(store.inactive_files().empty()); // now aged out
 }
 
 TEST_CASE("Exploration dwells, then switches by inhibition of return", "[system][behavior]")

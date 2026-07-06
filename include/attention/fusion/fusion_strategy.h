@@ -32,8 +32,8 @@ class FusionStrategy
    * @param weights Per-feature weights keyed by feature name (missing = 1.0)
    * @param frame_size Expected map size; mismatching features are an error
    */
-  virtual cv::Mat fuse(const std::vector<core::FeatureMap>& features,
-                       const std::map<std::string, float>& weights, const cv::Size& frame_size) const = 0;
+  virtual cv::Mat fuse(const std::vector<core::FeatureMap>& features, const std::map<std::string, float>& weights,
+                       const cv::Size& frame_size) const = 0;
 };
 
 /**

@@ -120,8 +120,7 @@ VideoSource::VideoSource(const std::string& source) : source_(source)
   }
   if (!opened)
   {
-    throw std::runtime_error("Failed to open video source: " + source +
-                             (all_digits ? " (camera device)" : " (file)"));
+    throw std::runtime_error("Failed to open video source: " + source + (all_digits ? " (camera device)" : " (file)"));
   }
 }
 

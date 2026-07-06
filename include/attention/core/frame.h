@@ -53,10 +53,10 @@ struct Frame
   cv::Mat previous_gray;
 
   // Cached pyramids (computed once, shared across features)
-  std::vector<cv::Mat> rgb_pyramid;                       // RGB color pyramid
-  std::vector<cv::Mat> gray_pyramid;                      // Grayscale intensity pyramid
-  std::map<GaborBankKey, GaborBank> gabor_banks;          // Gabor banks by parameter set
-  bool pyramids_computed = false;                         // Flag to track if pyramids are cached
+  std::vector<cv::Mat> rgb_pyramid;              // RGB color pyramid
+  std::vector<cv::Mat> gray_pyramid;             // Grayscale intensity pyramid
+  std::map<GaborBankKey, GaborBank> gabor_banks; // Gabor banks by parameter set
+  bool pyramids_computed = false;                // Flag to track if pyramids are cached
 
   // Optional metadata
   std::string source_path;
@@ -120,7 +120,7 @@ struct Frame
    */
   const GaborBank& gabor_bank(int num_orientations, double wavelength, double bandwidth) const;
 
-private:
+ private:
   /**
    * Create a Gabor filter kernel.
    * @param wavelength Wavelength of the sinusoidal factor
@@ -130,7 +130,7 @@ private:
    */
   cv::Mat create_gabor_kernel(double wavelength, double theta, double bandwidth) const;
 
-public:
+ public:
 };
 
 } // namespace core

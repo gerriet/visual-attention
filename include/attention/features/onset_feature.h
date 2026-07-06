@@ -32,9 +32,9 @@ class OnsetFeature : public FeatureExtractor
  public:
   struct Config
   {
-    bool use_edges = true;    // onset of edge energy (true) vs. raw intensity (false)
-    double threshold = 4.0;   // ignore changes below this (noise floor, 0-255 scale)
-    int blur_size = 5;        // spatial Gaussian on the change map (odd; 0 = none)
+    bool use_edges = true;  // onset of edge energy (true) vs. raw intensity (false)
+    double threshold = 4.0; // ignore changes below this (noise floor, 0-255 scale)
+    int blur_size = 5;      // spatial Gaussian on the change map (odd; 0 = none)
   };
 
   OnsetFeature() : OnsetFeature(Config{}) {}

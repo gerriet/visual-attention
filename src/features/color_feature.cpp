@@ -1,6 +1,6 @@
 #include "attention/features/color_feature.h"
-#include <stdexcept>
 #include <chrono>
+#include <stdexcept>
 
 namespace attention
 {
@@ -68,8 +68,8 @@ core::FeatureMap ColorFeature::extract(const core::Frame& frame, DebugContext& d
     double cs_ms = std::chrono::duration<double, std::milli>(t_cs_end - t_cs_start).count();
     double norm_ms = std::chrono::duration<double, std::milli>(t_norm_end - t_norm_start).count();
 
-    capture_debug_data(debug, frame, rg_pyramid, by_pyramid, rg_saliency, by_saliency,
-                      combined, result, total_ms, opponent_ms, cs_ms, norm_ms);
+    capture_debug_data(debug, frame, rg_pyramid, by_pyramid, rg_saliency, by_saliency, combined, result, total_ms,
+                       opponent_ms, cs_ms, norm_ms);
   }
 
   return core::FeatureMap("color", result, 1.0f);
@@ -218,18 +218,11 @@ cv::Mat ColorFeature::normalize_and_resize(const cv::Mat& feature, const cv::Siz
   return result;
 }
 
-void ColorFeature::capture_debug_data(DebugContext& debug,
-                                      const core::Frame& frame,
-                                      const std::vector<cv::Mat>& rg_pyramid,
-                                      const std::vector<cv::Mat>& by_pyramid,
-                                      const cv::Mat& rg_saliency,
-                                      const cv::Mat& by_saliency,
-                                      const cv::Mat& combined,
-                                      const cv::Mat& result,
-                                      double total_ms,
-                                      double opponent_ms,
-                                      double center_surround_ms,
-                                      double normalize_ms) const
+void ColorFeature::capture_debug_data(DebugContext& debug, const core::Frame& frame,
+                                      const std::vector<cv::Mat>& rg_pyramid, const std::vector<cv::Mat>& by_pyramid,
+                                      const cv::Mat& rg_saliency, const cv::Mat& by_saliency, const cv::Mat& combined,
+                                      const cv::Mat& result, double total_ms, double opponent_ms,
+                                      double center_surround_ms, double normalize_ms) const
 {
   // Annotations
   debug.add_annotation("pyramid_levels", std::to_string(frame.rgb_pyramid.size()));

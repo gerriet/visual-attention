@@ -7,7 +7,9 @@ namespace system
 {
 
 AttentionSystem::AttentionSystem(const Config& config)
-  : config_(config), pipeline_(config.pipeline), object_store_(config.object_store),
+  : config_(config),
+    pipeline_(config.pipeline),
+    object_store_(config.object_store),
     behavior_(create_behavior(config.behavior))
 {
 }

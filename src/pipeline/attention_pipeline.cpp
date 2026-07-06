@@ -171,8 +171,7 @@ void AttentionPipeline::process()
     // Calculate padding needed after feature name
     size_t padding = max_name_length - pair.first.length();
     std::string spaces(padding, ' ');
-    std::cout << "    Feature '" << pair.first << "'" << spaces << ": "
-              << pair.second << " ms" << std::endl;
+    std::cout << "    Feature '" << pair.first << "'" << spaces << ": " << pair.second << " ms" << std::endl;
   }
   std::cout << "    Integration:             " << timing_.integration_ms << " ms" << std::endl;
   std::cout << "    Peak detection:          " << timing_.peak_detection_ms << " ms" << std::endl;

@@ -145,8 +145,7 @@ void ObjectFileStore::update(const std::vector<Cluster>& clusters, int frame)
   active_ = std::move(next_active);
 
   // Age out inactive files unseen for too long.
-  inactive_.erase(std::remove_if(inactive_.begin(), inactive_.end(),
-                                 [&](const ObjectFile& f)
+  inactive_.erase(std::remove_if(inactive_.begin(), inactive_.end(), [&](const ObjectFile& f)
                                  { return frame - f.last_seen_frame > config_.max_inactive_age; }),
                   inactive_.end());
 }

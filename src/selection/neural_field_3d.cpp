@@ -131,9 +131,9 @@ int NeuralField3D::update(const std::vector<cv::Mat>& input)
       cv::filter2D(sig[z], lateral, CV_32F, kernel_, cv::Point(-1, -1), 0.0, cv::BORDER_CONSTANT);
       const float plane_effect = -params_.global_mult * plane_mean[z] * params_.plane_inhibition;
 
-      cv::Mat updated = params_.alpha * (global_effect + lateral - depth_inhib + plane_effect +
-                                         params_.input_mult * input[z]) +
-                        (1.0f - params_.alpha) * activity_[z];
+      cv::Mat updated =
+          params_.alpha * (global_effect + lateral - depth_inhib + plane_effect + params_.input_mult * input[z]) +
+          (1.0f - params_.alpha) * activity_[z];
       change += static_cast<float>(cv::sum(cv::abs(updated - activity_[z]))[0]);
       activity_[z] = updated;
     }

@@ -1,8 +1,8 @@
 #include "attention/features/eccentricity_feature.h"
+#include <chrono>
 #include <iostream>
 #include <map>
 #include <set>
-#include <chrono>
 
 namespace attention
 {
@@ -119,9 +119,8 @@ core::FeatureMap EccentricityFeature::extract(const core::Frame& frame, DebugCon
     double ecc_ms = std::chrono::duration<double, std::milli>(t_ecc_end - t_ecc_start).count();
     double resize_ms = std::chrono::duration<double, std::milli>(t_resize_end - t_resize_start).count();
 
-    capture_debug_data(debug, frame, gray, edges, labels, eccentricity_map, result,
-                      total_ms, edge_ms, segment_ms, ecc_ms, resize_ms,
-                      static_cast<int>(valid_segments.size()));
+    capture_debug_data(debug, frame, gray, edges, labels, eccentricity_map, result, total_ms, edge_ms, segment_ms,
+                       ecc_ms, resize_ms, static_cast<int>(valid_segments.size()));
   }
 
   return core::FeatureMap("eccentricity", result, 1.0f);
@@ -312,18 +311,11 @@ std::map<int, cv::Moments> EccentricityFeature::filter_segments(const cv::Mat& l
   return valid_segments;
 }
 
-void EccentricityFeature::capture_debug_data(DebugContext& debug,
-                                             const core::Frame& frame,
-                                             const cv::Mat& gray,
-                                             const cv::Mat& edges,
-                                             const cv::Mat& labels,
-                                             const cv::Mat& eccentricity_map,
-                                             const cv::Mat& result,
-                                             double total_ms,
-                                             double edge_computation_ms,
-                                             double segmentation_ms,
-                                             double eccentricity_computation_ms,
-                                             double resize_ms,
+void EccentricityFeature::capture_debug_data(DebugContext& debug, const core::Frame& frame, const cv::Mat& gray,
+                                             const cv::Mat& edges, const cv::Mat& labels,
+                                             const cv::Mat& eccentricity_map, const cv::Mat& result, double total_ms,
+                                             double edge_computation_ms, double segmentation_ms,
+                                             double eccentricity_computation_ms, double resize_ms,
                                              int num_segments) const
 {
   // Annotations

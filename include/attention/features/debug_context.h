@@ -1,10 +1,10 @@
 #pragma once
 
-#include <opencv2/opencv.hpp>
 #include <map>
+#include <memory>
+#include <opencv2/opencv.hpp>
 #include <string>
 #include <vector>
-#include <memory>
 
 namespace attention
 {
@@ -27,10 +27,10 @@ struct DebugContext
    */
   enum class Level
   {
-    None = 0,        // No debug output
-    Basic = 1,       // Only final intermediate results (pyramids, opponent colors)
-    Detailed = 2,    // All intermediate steps (center-surround differences, etc.)
-    Verbose = 3      // Maximum detail (every computation step)
+    None = 0,     // No debug output
+    Basic = 1,    // Only final intermediate results (pyramids, opponent colors)
+    Detailed = 2, // All intermediate steps (center-surround differences, etc.)
+    Verbose = 3   // Maximum detail (every computation step)
   };
 
   Level level = Level::None;
@@ -97,21 +97,12 @@ struct DebugContext
   }
 
   // Check if debug level meets threshold
-  bool is_level(Level threshold) const
-  {
-    return enabled && (level >= threshold);
-  }
+  bool is_level(Level threshold) const { return enabled && (level >= threshold); }
 
   // Get total number of captured items
-  size_t size() const
-  {
-    return images.size() + pyramids.size() + annotations.size() + timings.size();
-  }
+  size_t size() const { return images.size() + pyramids.size() + annotations.size() + timings.size(); }
 
-  bool empty() const
-  {
-    return size() == 0;
-  }
+  bool empty() const { return size() == 0; }
 };
 
 /**
@@ -119,16 +110,14 @@ struct DebugContext
  */
 class DebugVisualizer
 {
-public:
+ public:
   /**
    * Save all debug images to a directory.
    * @param context Debug context with captured data
    * @param output_dir Directory to save images
    * @param prefix Filename prefix
    */
-  static void save_debug_images(const DebugContext& context,
-                                const std::string& output_dir,
-                                const std::string& prefix);
+  static void save_debug_images(const DebugContext& context, const std::string& output_dir, const std::string& prefix);
 
   /**
    * Create a combined visualization showing all intermediate steps.

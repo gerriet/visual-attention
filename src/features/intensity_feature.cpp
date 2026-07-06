@@ -1,6 +1,6 @@
 #include "attention/features/intensity_feature.h"
-#include <stdexcept>
 #include <chrono>
+#include <stdexcept>
 
 namespace attention
 {
@@ -152,13 +152,9 @@ cv::Mat IntensityFeature::normalize_and_resize(const cv::Mat& feature, const cv:
   return result;
 }
 
-void IntensityFeature::capture_debug_data(DebugContext& debug,
-                                         const core::Frame& frame,
-                                         const cv::Mat& saliency,
-                                         const cv::Mat& result,
-                                         double total_ms,
-                                         double center_surround_ms,
-                                         double normalize_ms) const
+void IntensityFeature::capture_debug_data(DebugContext& debug, const core::Frame& frame, const cv::Mat& saliency,
+                                          const cv::Mat& result, double total_ms, double center_surround_ms,
+                                          double normalize_ms) const
 {
   // Annotations
   debug.add_annotation("pyramid_levels", std::to_string(frame.gray_pyramid.size()));
