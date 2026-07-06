@@ -5,22 +5,24 @@ Frame 0 is a static textured background; in frame 1 a bright textured square
 appears on the left; in frame 2 it jumps to the right. The onset feature should
 light up where new structure appears (and not where it vanished).
 
-Usage: python tools/make_synthetic_sequence.py [out_dir]
 Writes f00.png, f01.png, f02.png (200x200 grayscale) into out_dir
 (default: data/test_images/motion_seq/).
 """
-import sys
+import argparse
 from pathlib import Path
-
-import numpy as np
-from PIL import Image
 
 SIZE = 200
 SEED = 7
 
 
 def main():
-    out = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("data/test_images/motion_seq")
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("out_dir", nargs="?", type=Path, default=Path("data/test_images/motion_seq"),
+                        help="output directory (default: %(default)s)")
+    out = parser.parse_args().out_dir
+    # Imported after parsing so --help works without numpy/PIL installed.
+    import numpy as np
+    from PIL import Image
     out.mkdir(parents=True, exist_ok=True)
     rng = np.random.default_rng(SEED)
 

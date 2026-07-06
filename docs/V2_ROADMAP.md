@@ -180,28 +180,29 @@ the name carried no meaning outside the project.)*
   were kept Python-side instead (peers via the interchange format) — cleaner
   and sufficient for the comparison; a C++ port stays optional.
 
-### M8 — Live demonstrator: annotated video + object-file plugins
+### M8 — Live demonstrator: annotated video + object-file plugins ✓ 2026-07-06
 *(depends on M5 video input and M6 object files; independent of M7)*
 
-- `VideoSource : FrameSource` (`cv::VideoCapture`, webcam or file) plus a live
-  display loop. **Processing and display resolution are decoupled**: capture at
-  native resolution, process at ≤VGA, draw annotations on the native frame with
-  coordinates scaled back up. Feasibility per PERFORMANCE.md: with symmetry at
-  quarter resolution the frame budget is ~15–30 ms at 640×480 → 25+ fps.
-- `configs/live.yaml` profile: symmetry forced to `compute_at_scale: 2`, and a
-  fixed number of field iterations per frame instead of per-frame
+- ✓ `VideoSource : FrameSource` (`cv::VideoCapture`) opens a webcam device
+  index or a video file; a frame directory streams via `ImageListSource`.
+  `LiveDemonstrator` **decouples processing from display resolution**: capture
+  native, process at ≤ `process_max_side` (default 480), scale object-file
+  coordinates back up for ROIs and the overlay. CLI `--live <cam|video|dir>`
+  (interactive `imshow`, ESC quits) or headless (`--no-display --frames N
+  --output dir`, saves annotated frames — the CI smoke test).
+- ✓ `configs/live.yaml`: a single coarse symmetry scale and a **fixed number of
+  field cycles per frame** (`cycles_per_frame`) instead of per-frame
   re-convergence — the field state in `RunState` carries over, so attention
-  shifts emerge from the continuous dynamics (closer to the thesis intent for
-  streams, and deterministic per-frame cost).
-- Annotation overlay: one marker per object file (stable ID from M6 tracking,
-  centroid, extent, optional scanpath trail), rendered by the visualizer.
-- **Object-file plugin processes**: a processor interface that receives an
-  object file plus its image region (ROI at native resolution) and returns
-  annotation content (label, measurement, crop, …). Registry + config-driven,
-  like features/fusion/selection. This is the attention premise made visible:
-  expensive analysis runs only on attended areas. First plugins: a timing/ROI
-  probe (proves the mechanism) and one real example (e.g. a small classifier
-  or OCR on attended regions).
+  shifts emerge from the continuous dynamics at a deterministic per-frame cost.
+- ✓ Annotation overlay: one marker per object file (stable M6 ID, box, colour by
+  focus / previously / never selected) plus a scanpath trail.
+- ✓ **Object-file plugin processes**: a `Processor` interface (object file + its
+  native ROI → annotation), registry + config-driven like features/fusion/
+  selection, run only on attended regions. Built-ins: `roi-probe` (ROI dims +
+  timing — proves the mechanism) and `region-descriptor` (a real, dependency-
+  free analysis: colour / brightness / edge density / aspect ratio).
+- Deferred: a learned classifier/OCR plugin (external deps), and the on-device
+  fps tuning (the headless path and the fixed per-frame budget are in place).
 
 ## Working agreement for this phase
 

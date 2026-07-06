@@ -72,6 +72,10 @@ class NeuralFieldSelection : public SelectionStrategy
     float kernel_k = 0.06f;
     int kernel_size = 41;
     int max_cycles = 50;
+    int cycles_per_frame = 0; // >0: run exactly this many cycles per frame (no
+                              // convergence check), carrying field state across
+                              // frames — for live streams, so attention shifts
+                              // emerge from continuous dynamics (roadmap M8)
     float change_thresh = 0.01f;
     int field_max_size = 128;
     int border_margin = 9;

@@ -6,6 +6,7 @@
 #include "attention/io/scanpath_writer.h"
 #include "attention/pipeline/attention_pipeline.h"
 #include "attention/system/attention_system.h"
+#include "attention/system/live_demonstrator.h"
 #include "attention/visualization/visualizer.h"
 #include <algorithm>
 #include <chrono>
@@ -189,6 +190,93 @@ void process_attend(const std::string& path, attention::pipeline::PipelineConfig
     attention::io::ScanpathWriter::write(sys, emit_scanpath);
     std::cout << "✓ Saved scanpath: " << emit_scanpath << std::endl;
   }
+}
+
+std::vector<std::string> split_csv(const std::string& s)
+{
+  std::vector<std::string> out;
+  std::stringstream ss(s);
+  std::string item;
+  while (std::getline(ss, item, ','))
+  {
+    if (!item.empty())
+    {
+      out.push_back(item);
+    }
+  }
+  return out;
+}
+
+// Live demonstrator (M8): attention on a webcam / video / frame directory with
+// object-file plugins running on attended ROIs, drawn as an overlay. Interactive
+// (imshow, ESC to quit) or headless (save annotated frames).
+void process_live(const std::string& source, attention::system::LiveDemonstrator::Config cfg, bool display,
+                  int max_frames, const std::string& output_dir)
+{
+  std::unique_ptr<attention::pipeline::FrameSource> src;
+  if (fs::is_directory(source))
+  {
+    src = std::make_unique<attention::pipeline::ImageListSource>(attention::pipeline::collect_image_paths(source));
+    std::cout << "Live: frame directory " << source << std::endl;
+  }
+  else
+  {
+    src = std::make_unique<attention::pipeline::VideoSource>(source);
+    std::cout << "Live: " << source << std::endl;
+  }
+
+  attention::system::LiveDemonstrator demo(cfg);
+  demo.reset();
+
+  const std::string window = "Attention (live) - ESC to quit";
+  if (display)
+  {
+    cv::namedWindow(window, cv::WINDOW_AUTOSIZE);
+  }
+  const std::string out_base = output_dir.empty() ? "results/live" : output_dir;
+
+  attention::core::Frame frame;
+  int count = 0;
+  while (src->next(frame))
+  {
+    cv::Mat annotated = demo.process(frame.image);
+    const auto* focus = demo.system().current_focus();
+
+    if (display)
+    {
+      cv::imshow(window, annotated);
+      if (cv::waitKey(1) == 27) // ESC
+      {
+        break;
+      }
+    }
+    else
+    {
+      fs::create_directories(out_base);
+      std::ostringstream name;
+      name << "frame_" << std::setw(4) << std::setfill('0') << count << ".png";
+      cv::imwrite((fs::path(out_base) / name.str()).string(), annotated);
+    }
+
+    std::cout << "  frame " << count << ": " << demo.system().active_files().size() << " objects, "
+              << demo.annotations().size() << " annotations";
+    if (focus)
+    {
+      std::cout << ", focus #" << focus->label;
+    }
+    std::cout << std::endl;
+
+    ++count;
+    if (max_frames > 0 && count >= max_frames)
+    {
+      break;
+    }
+  }
+  if (display)
+  {
+    cv::destroyAllWindows();
+  }
+  std::cout << "Live complete: " << count << " frames." << std::endl;
 }
 
 void process_batch(const std::string& directory, const attention::pipeline::PipelineConfig& config,
@@ -377,44 +465,54 @@ attention::features::DebugContext::Level parse_debug_level(const std::string& le
     return attention::features::DebugContext::Level::Basic; // Default
 }
 
-void print_usage(const char* program_name)
+void print_usage(const char* program_name, std::ostream& out = std::cerr)
 {
-  std::cerr << "Usage:" << std::endl;
-  std::cerr << "  " << program_name << " <image_path> [options]" << std::endl;
-  std::cerr << "  " << program_name << " --config <config.yaml> [image] [options]" << std::endl;
-  std::cerr << "  " << program_name << " --batch <directory> [options]" << std::endl;
-  std::cerr << "  " << program_name << " --stereo <left> <right> [options]" << std::endl;
-  std::cerr << "  " << program_name << " --sequence <dir|video> [--output dir] [--config yaml]" << std::endl;
-  std::cerr << "  " << program_name << " --attend <dir|video> [--output dir] [--emit-scanpath path] [--config yaml]"
-            << std::endl;
-  std::cerr << std::endl;
-  std::cerr << "Examples:" << std::endl;
-  std::cerr << "  " << program_name << " data/test_images/input.png" << std::endl;
-  std::cerr << "  " << program_name << " data/test_images/input.png --no-display" << std::endl;
-  std::cerr << "  " << program_name << " data/test_images/input.png --debug" << std::endl;
-  std::cerr << "  " << program_name << " data/test_images/input.png --debug=detailed --debug-print" << std::endl;
-  std::cerr << "  " << program_name << " --config config.yaml" << std::endl;
-  std::cerr << "  " << program_name << " --batch data/test_images/" << std::endl;
-  std::cerr << "  " << program_name << " --batch data/test_images/ --output results/" << std::endl;
-  std::cerr << std::endl;
-  std::cerr << "Options:" << std::endl;
-  std::cerr << "  --no-display         Process without displaying windows (saves to results/)" << std::endl;
-  std::cerr << "  --config             Load configuration from YAML file" << std::endl;
-  std::cerr << "  --batch              Process all images in directory, save features separately" << std::endl;
-  std::cerr << "  --stereo <l> <r>     Process a stereo pair (adds a disparity/depth channel)" << std::endl;
-  std::cerr << "  --sequence <path>    Process a directory or video as a temporal stream (onset/motion)" << std::endl;
-  std::cerr << "  --attend <path>      Run the full attention system (object files + behavior) over a stream" << std::endl;
-  std::cerr << "  --emit-scanpath <p>  Write the scanpath JSON (with --attend)" << std::endl;
-  std::cerr << "  --output <dir>       Specify output directory for batch/sequence mode (default: input_dir/results_batch)" << std::endl;
-  std::cerr << "  --emit-json <path>   Write result JSON + saliency map in the interchange format" << std::endl;
-  std::cerr << "                       (see docs/INTERCHANGE_FORMAT.md; single-image and config modes)" << std::endl;
-  std::cerr << std::endl;
-  std::cerr << "Debug Options:" << std::endl;
-  std::cerr << "  --debug[=LEVEL]      Enable debugging (levels: basic, detailed, verbose)" << std::endl;
-  std::cerr << "                       Default: basic if no level specified" << std::endl;
-  std::cerr << "  --debug-output <dir> Debug output directory (default: debug_output/)" << std::endl;
-  std::cerr << "  --debug-print        Print debug info to console" << std::endl;
-  std::cerr << "  --no-debug-save      Don't save debug images to disk" << std::endl;
+  out << "attention - neural-field visual attention pipeline (v2)" << std::endl;
+  out << std::endl;
+  out << "Usage:" << std::endl;
+  out << "  " << program_name << " <image_path> [options]" << std::endl;
+  out << "  " << program_name << " --config <config.yaml> [image] [options]" << std::endl;
+  out << "  " << program_name << " --batch <directory> [options]" << std::endl;
+  out << "  " << program_name << " --stereo <left> <right> [options]" << std::endl;
+  out << "  " << program_name << " --sequence <dir|video> [--output dir] [--config yaml]" << std::endl;
+  out << "  " << program_name << " --attend <dir|video> [--output dir] [--emit-scanpath path] [--config yaml]"
+      << std::endl;
+  out << "  " << program_name << " --live <camera|video|dir> [--config configs/live.yaml] [--processors a,b]"
+      << std::endl;
+  out << "  " << program_name << " --help" << std::endl;
+  out << std::endl;
+  out << "Examples:" << std::endl;
+  out << "  " << program_name << " data/test_images/input.png" << std::endl;
+  out << "  " << program_name << " data/test_images/input.png --no-display" << std::endl;
+  out << "  " << program_name << " data/test_images/input.png --debug=detailed --debug-print" << std::endl;
+  out << "  " << program_name << " --config configs/thesis.yaml data/test_images/inputc.png --no-display" << std::endl;
+  out << "  " << program_name << " --batch data/test_images/ --output results/" << std::endl;
+  out << "  " << program_name << " --live 0 --config configs/live.yaml" << std::endl;
+  out << "  " << program_name << " --live video.mp4 --processors roi-probe,region-descriptor" << std::endl;
+  out << std::endl;
+  out << "Options:" << std::endl;
+  out << "  --no-display         Process without displaying windows (saves to results/)" << std::endl;
+  out << "  --config             Load configuration from YAML file" << std::endl;
+  out << "  --batch              Process all images in directory, save features separately" << std::endl;
+  out << "  --stereo <l> <r>     Process a stereo pair (adds a disparity/depth channel)" << std::endl;
+  out << "  --sequence <path>    Process a directory or video as a temporal stream (onset/motion)" << std::endl;
+  out << "  --attend <path>      Run the full attention system (object files + behavior) over a stream" << std::endl;
+  out << "  --emit-scanpath <p>  Write the scanpath JSON (with --attend)" << std::endl;
+  out << "  --live <src>         Live demo: attention + object-file plugins on camera/video/dir (ESC quits)" << std::endl;
+  out << "  --processors <a,b>   Object-file plugins for --live (default: region-descriptor)" << std::endl;
+  out << "  --process-size <N>   Max side of the downscaled processing frame for --live (default: 480)" << std::endl;
+  out << "  --frames <N>         Stop after N frames (--live headless with --no-display)" << std::endl;
+  out << "  --output <dir>       Specify output directory for batch/sequence mode (default: input_dir/results_batch)" << std::endl;
+  out << "  --emit-json <path>   Write result JSON + saliency map in the interchange format" << std::endl;
+  out << "                       (see docs/INTERCHANGE_FORMAT.md; single-image and config modes)" << std::endl;
+  out << "  --help, -h           Show this help and exit" << std::endl;
+  out << std::endl;
+  out << "Debug Options:" << std::endl;
+  out << "  --debug[=LEVEL]      Enable debugging (levels: basic, detailed, verbose)" << std::endl;
+  out << "                       Default: basic if no level specified" << std::endl;
+  out << "  --debug-output <dir> Debug output directory (default: debug_output/)" << std::endl;
+  out << "  --debug-print        Print debug info to console" << std::endl;
+  out << "  --no-debug-save      Don't save debug images to disk" << std::endl;
 }
 
 int main(int argc, char** argv)
@@ -424,6 +522,11 @@ int main(int argc, char** argv)
   {
     print_usage(argv[0]);
     return 1;
+  }
+  if (std::string(argv[1]) == "--help" || std::string(argv[1]) == "-h")
+  {
+    print_usage(argv[0], std::cout);
+    return 0;
   }
 
   try
@@ -480,6 +583,55 @@ int main(int argc, char** argv)
         }
       }
       process_sequence(seq_path, config.pipeline, output_dir);
+      return 0;
+    }
+    else if (std::string(argv[1]) == "--live")
+    {
+      // Live demonstrator: <camera-index | video-file | frame-directory>.
+      if (argc < 3)
+      {
+        std::cerr << "Error: --live requires a camera index, video file, or frame directory" << std::endl;
+        print_usage(argv[0]);
+        return 1;
+      }
+      std::string source = argv[2];
+      std::string output_dir;
+      bool display = true;
+      int max_frames = 0;
+      attention::system::LiveDemonstrator::Config live_cfg;
+      // Built-in defaults unless --config is given (configs/live.yaml is the
+      // tuned live profile: quarter-res symmetry, fixed field iterations).
+      config = attention::config::ConfigLoader::create_default();
+      for (int i = 3; i < argc; ++i)
+      {
+        std::string arg = argv[i];
+        if (arg == "--config" && i + 1 < argc)
+        {
+          config = attention::config::ConfigLoader::load(argv[++i]);
+        }
+        else if (arg == "--processors" && i + 1 < argc)
+        {
+          live_cfg.processors = split_csv(argv[++i]);
+        }
+        else if (arg == "--output" && i + 1 < argc)
+        {
+          output_dir = argv[++i];
+        }
+        else if (arg == "--frames" && i + 1 < argc)
+        {
+          max_frames = std::stoi(argv[++i]);
+        }
+        else if (arg == "--process-size" && i + 1 < argc)
+        {
+          live_cfg.process_max_side = std::stoi(argv[++i]);
+        }
+        else if (arg == "--no-display")
+        {
+          display = false;
+        }
+      }
+      live_cfg.system.pipeline = config.pipeline;
+      process_live(source, live_cfg, display, max_frames, output_dir);
       return 0;
     }
     else if (std::string(argv[1]) == "--attend")
@@ -609,7 +761,14 @@ int main(int argc, char** argv)
     }
     else
     {
-      // Command-line mode (backward compatible)
+      // Command-line mode (backward compatible): argv[1] is an image path.
+      // Reject unknown flags so a typo doesn't get loaded as an image.
+      if (std::string(argv[1]).rfind("--", 0) == 0)
+      {
+        std::cerr << "Error: unknown option '" << argv[1] << "'" << std::endl << std::endl;
+        print_usage(argv[0]);
+        return 1;
+      }
       config = attention::config::ConfigLoader::create_default();
       config.input_image = argv[1];
       config.display = true;

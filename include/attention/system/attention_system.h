@@ -82,6 +82,21 @@ class AttentionSystem
    */
   void process_stream(pipeline::FrameSource& source, const FocusCallback& on_frame = {});
 
+  /**
+   * Reset all per-run state (pipeline RunState, object files, behavior,
+   * scanpath). Call once before driving a stream frame by frame via
+   * process_frame() (the live demonstrator does this).
+   */
+  void reset();
+
+  /**
+   * Process a single frame: run the pipeline (stage 1) and the second stage,
+   * carrying state from the previous frame. Use with reset() for manual
+   * per-frame control (e.g. a live loop that also displays each frame);
+   * process_stream() is the convenience form.
+   */
+  void process_frame(const cv::Mat& image, const std::string& source_name = "");
+
   const std::vector<Focus>& scanpath() const { return scanpath_; }
   const std::vector<ObjectFile>& active_files() const { return object_store_.active_files(); }
   const ObjectFileStore& object_store() const { return object_store_; }
@@ -99,6 +114,9 @@ class AttentionSystem
 
   // Run the second stage for the current pipeline frame.
   void process_second_stage();
+
+  // Reset the second-stage state only (object files, behavior, scanpath).
+  void reset_stage2();
 
   Config config_;
   pipeline::AttentionPipeline pipeline_;

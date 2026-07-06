@@ -4,12 +4,23 @@
 
 #include "attention/pipeline/attention_pipeline.h"
 #include <iostream>
+#include <string>
 
 int main(int argc, char** argv)
 {
+  if (argc >= 2 && (std::string(argv[1]) == "--help" || std::string(argv[1]) == "-h"))
+  {
+    std::cout << "pipeline_test - minimal AttentionPipeline example" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Runs the default attention pipeline (all features, default fusion and" << std::endl;
+    std::cout << "selection) on one image and saves the visualization to ../results/." << std::endl;
+    std::cout << std::endl;
+    std::cout << "Usage: " << argv[0] << " <image_path>" << std::endl;
+    return 0;
+  }
   if (argc < 2)
   {
-    std::cerr << "Usage: " << argv[0] << " <image_path>" << std::endl;
+    std::cerr << "Usage: " << argv[0] << " <image_path>  (--help for details)" << std::endl;
     return 1;
   }
 

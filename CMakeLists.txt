@@ -40,6 +40,8 @@ add_library(attention_core STATIC
     src/system/object_file.cpp
     src/system/behavior.cpp
     src/system/attention_system.cpp
+    src/system/processor.cpp
+    src/system/live_demonstrator.cpp
     src/config/config_loader.cpp
     src/visualization/visualizer.cpp
     src/io/result_writer.cpp

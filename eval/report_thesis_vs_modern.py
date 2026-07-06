@@ -10,9 +10,8 @@ ground-truth benchmark once a dataset is downloaded.
 Usage (from the eval/ directory): python report_thesis_vs_modern.py
 """
 
+import argparse
 from pathlib import Path
-
-from attention_eval import benchmark, plots
 
 REPO = Path(__file__).resolve().parents[1]
 BINARY = REPO / "build" / "attention"
@@ -24,6 +23,10 @@ MONTAGE_IMAGE = REPO / "data" / "test_images" / "inputc.png"
 
 
 def main():
+    # No options; argparse supplies --help from the module docstring.
+    # Imported after parsing so --help works without the eval venv.
+    argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter).parse_args()
+    from attention_eval import benchmark, plots
     specs = [
         benchmark.parse_spec(f"cpp:{BINARY}:{CONFIG}=thesis"),
         benchmark.parse_spec("spectral-residual"),

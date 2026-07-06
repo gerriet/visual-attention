@@ -77,9 +77,14 @@ void NeuralFieldSelection::run_to_convergence(cv::Mat& activity, const cv::Mat& 
   const float pixel_count = static_cast<float>(activity.total());
   const float threshold = params_.change_thresh * pixel_count; // original: sum |du| vs 0.01 * N
 
+  // Live mode: run a fixed number of cycles per frame (no convergence break),
+  // so with field state carried in RunState attention evolves across frames.
+  const bool fixed = params_.cycles_per_frame > 0;
+  const int cycles = fixed ? params_.cycles_per_frame : params_.max_cycles;
+
   cv::Mat sig = sigmoid(activity);
 
-  for (int cycle = 0; cycle < params_.max_cycles; ++cycle)
+  for (int cycle = 0; cycle < cycles; ++cycle)
   {
     // Lateral interaction: convolution of the sigmoid activity with the
     // kernel; zero border like the original (whose missing border inhibition
@@ -97,7 +102,7 @@ void NeuralFieldSelection::run_to_convergence(cv::Mat& activity, const cv::Mat& 
     activity = updated;
     sig = sigmoid(activity);
 
-    if (change <= threshold && cycle >= 2) // original: minimum 3 cycles
+    if (!fixed && change <= threshold && cycle >= 2) // original: minimum 3 cycles
     {
       break;
     }

@@ -76,13 +76,34 @@ void AttentionSystem::process_second_stage()
   }
 }
 
-void AttentionSystem::process_stream(pipeline::FrameSource& source, const FocusCallback& on_frame)
+void AttentionSystem::reset_stage2()
 {
   object_store_.reset();
   behavior_->reset();
   scanpath_.clear();
   has_focus_ = false;
   frame_index_ = 0;
+}
+
+void AttentionSystem::reset()
+{
+  pipeline_.reset_state();
+  reset_stage2();
+}
+
+void AttentionSystem::process_frame(const cv::Mat& image, const std::string& source_name)
+{
+  pipeline_.load_image(image, source_name);
+  pipeline_.process();
+  process_second_stage();
+  ++frame_index_;
+}
+
+void AttentionSystem::process_stream(pipeline::FrameSource& source, const FocusCallback& on_frame)
+{
+  // pipeline_.process_stream resets the pipeline RunState itself; reset only
+  // the second-stage state here.
+  reset_stage2();
 
   pipeline_.process_stream(source,
                            [&](pipeline::AttentionPipeline& /*p*/)

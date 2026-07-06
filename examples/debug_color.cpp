@@ -10,14 +10,24 @@
 #include "attention/features/debug_context.h"
 #include <opencv2/opencv.hpp>
 #include <iostream>
+#include <string>
 
 int main(int argc, char** argv)
 {
+  if (argc >= 2 && (std::string(argv[1]) == "--help" || std::string(argv[1]) == "-h"))
+  {
+    std::cout << "debug_color - feature-debugging example" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Demonstrates DebugContext: extracts the color feature from one image," << std::endl;
+    std::cout << "prints the intermediate steps, saves debug images to debug_output/," << std::endl;
+    std::cout << "and displays the result (press any key to exit)." << std::endl;
+    std::cout << std::endl;
+    std::cout << "Usage: " << argv[0] << " <image_path>" << std::endl;
+    return 0;
+  }
   if (argc < 2)
   {
-    std::cout << "Usage: " << argv[0] << " <image_path>" << std::endl;
-    std::cout << "\nThis program demonstrates feature extraction debugging." << std::endl;
-    std::cout << "It will extract color features and save intermediate results." << std::endl;
+    std::cerr << "Usage: " << argv[0] << " <image_path>  (--help for details)" << std::endl;
     return 1;
   }
 

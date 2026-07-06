@@ -1,0 +1,49 @@
+# Live demonstrator profile (roadmap M8): tuned for a deterministic, low
+# per-frame cost so attention runs in real time on a video/webcam stream via
+#   ./attention --live <camera-index|video|dir> [--config configs/live.yaml]
+#
+# Two live-specific choices (see docs/V2_ROADMAP.md M8):
+#  - the neural field runs a FIXED small number of cycles per frame instead of
+#    re-converging; its state carries across frames (RunState), so attention
+#    shifts emerge from the continuous dynamics rather than restarting each frame;
+#  - symmetry (the costly feature) runs at a single coarse scale, and the field
+#    is small — giving a fixed, predictable frame budget.
+
+pipeline:
+  fusion: weighted-sum
+  selection: neural-field
+  selection_params:
+    alpha: 0.5
+    beta: 30.0
+    resting: -0.25
+    global_mult: 1.0
+    kernel_s: 5.0
+    kernel_k: 0.06
+    cycles_per_frame: 3     # fixed cost; the field integrates over frames
+    field_max_size: 96
+    ior_decay: 0.85         # object-based IOR is symbolic; keep some spatial decay
+
+features:
+  color:
+    weight: 1.0
+  intensity:
+    weight: 1.0
+  onset:                    # motion/onset is highly salient in live video
+    weight: 1.5
+  symmetry:
+    weight: 1.0
+    params:
+      scales:               # a single coarse scale keeps symmetry cheap
+        - {level: 2, min_radius: 6, max_radius: 20, radius_step: 2, width: 3, threshold: 0.3}
+  orientation:
+    enabled: false
+  eccentricity:
+    enabled: false
+
+peaks:
+  max_count: 8
+  ior_strength: 0.8
+
+output:
+  output_dir: "results/"
+  display: false

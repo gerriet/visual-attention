@@ -82,6 +82,28 @@ class VideoFrameSource : public FrameSource
 };
 
 /**
+ * VideoSource yields frames from a webcam or a video file — the live
+ * demonstrator's input (roadmap M8). A source string that is all digits opens
+ * that camera device index (e.g. "0"); otherwise it is a file path. Unlike a
+ * finite file, a webcam stream ends only when the device stops delivering.
+ */
+class VideoSource : public FrameSource
+{
+ public:
+  explicit VideoSource(const std::string& source);
+
+  bool next(core::Frame& frame) override;
+
+  bool is_camera() const { return is_camera_; }
+
+ private:
+  cv::VideoCapture capture_;
+  std::string source_;
+  bool is_camera_ = false;
+  int index_ = 0;
+};
+
+/**
  * Collect all image files (jpg/jpeg/png/bmp) in a directory, sorted by path.
  * Feed the result to ImageListSource.
  */

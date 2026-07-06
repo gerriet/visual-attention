@@ -5,8 +5,9 @@ Modern C++ reimplementation of neural field-based visual attention system from d
 ## Current Status: v2 Phase
 
 Development happens on the `v2` branch following `docs/V2_ROADMAP.md`
-(milestones M0–M7: swappable architecture, neural-field selection, stereo,
-motion, ESAB2 system level, modern learned-model comparison).
+(milestones M0–M8, all complete: swappable architecture, neural-field
+selection, stereo, motion/onset, the AttentionSystem symbolic second stage,
+the modern-model comparison, and a live demonstrator).
 
 **Implemented Features:**
 
@@ -28,6 +29,8 @@ motion, ESAB2 system level, modern learned-model comparison).
 - ✅ Modern-track benchmark: modern saliency models (spectral residual,
   center-bias, DeepGaze slot) compared head-to-head with the thesis model
   (`docs/thesis_vs_modern.md`)
+- ✅ Live demonstrator: real-time attention on webcam/video with object-file
+  plugins running only on attended regions (the attention premise made visible)
 - ✅ YAML configuration system
 - ✅ Batch processing mode
 - ✅ Golden regression tests (characterization + behavioral scanpath)
@@ -71,6 +74,11 @@ make
 # Full attention system: object files + Exploration behavior + scanpath
 ./attention --attend ../data/test_images/motion_seq \
     --output ../results/attend --emit-scanpath ../results/scanpath.json
+
+# Live demonstrator: attention + object-file plugins on a webcam (ESC to quit)
+./attention --live 0 --config ../configs/live.yaml --processors region-descriptor
+# ...or headless on a video / frame directory, saving annotated frames
+./attention --live ../data/test_images/motion_seq --no-display --frames 30 --output ../results/live
 
 # Use configuration file
 ./attention --config ../configs/default.yaml
@@ -161,11 +169,11 @@ generator — see `eval/README.md`), stereo + motion/onset (M5: the disparity
 feature, onset/motion on the stream pipeline, and the 3D neural field), and
 the AttentionSystem (M6: the symbolic second stage — object files tracked
 across frames, the Exploration behavior with dwell and object-based IOR, and
-scanpaths over a stream), and the modern track (M7: modern saliency models as
+scanpaths over a stream), the modern track (M7: modern saliency models as
 interchange peers, a benchmark harness, and the "thesis, 20 years later"
-comparison report — see `docs/thesis_vs_modern.md`) are done. The full
-replication and comparison arc (M0–M7) is complete; remaining: the M8 live
-demonstrator.
+comparison report — see `docs/thesis_vs_modern.md`), and the live demonstrator
+(M8: real-time attention on webcam/video with object-file plugins running only
+on attended regions) are done. The full v2 roadmap (M0–M8) is complete.
 
 ### Code Formatting
 

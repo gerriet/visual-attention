@@ -13,12 +13,32 @@ if(NOT Catch2_FOUND)
     FetchContent_MakeAvailable(Catch2)
 endif()
 
-add_executable(characterization_tests test_characterization.cpp test_config.cpp test_selection.cpp test_stereo_onset.cpp test_system.cpp)
+add_executable(characterization_tests test_characterization.cpp test_config.cpp test_selection.cpp test_stereo_onset.cpp test_system.cpp test_processors.cpp)
 target_link_libraries(characterization_tests PRIVATE attention_core Catch2::Catch2WithMain)
 target_compile_definitions(characterization_tests PRIVATE
     ATTENTION_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 
 add_test(NAME characterization COMMAND characterization_tests)
+
+# CLI contract: every binary answers --help with a usage synopsis, and the
+# main CLI rejects unknown flags instead of treating them as an image path.
+foreach(bin attention pipeline_test debug_color)
+    add_test(NAME help_${bin} COMMAND ${bin} --help)
+    set_tests_properties(help_${bin} PROPERTIES PASS_REGULAR_EXPRESSION "Usage")
+endforeach()
+add_test(NAME unknown_flag_rejected COMMAND attention --no-such-flag)
+set_tests_properties(unknown_flag_rejected PROPERTIES
+    WILL_FAIL TRUE)
+
+# M8 live demonstrator, headless: annotated frames + object-file plugins over
+# the synthetic motion sequence ("Live complete" prints only after the loop).
+add_test(NAME live_headless_smoke
+    COMMAND attention --live ${CMAKE_SOURCE_DIR}/data/test_images/motion_seq
+            --no-display --frames 3 --output ${CMAKE_BINARY_DIR}/live_smoke
+            --processors roi-probe,region-descriptor
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+set_tests_properties(live_headless_smoke PROPERTIES
+    PASS_REGULAR_EXPRESSION "Live complete: 3 frames")
 
 # Behavioral tests: run the CLI with --emit-json, then compare the emitted
 # scanpath against the golden result with loose tolerances (see V2_ROADMAP.md:

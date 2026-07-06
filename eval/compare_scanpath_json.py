@@ -24,10 +24,11 @@ def load_foci(path):
 
 
 def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("golden")
-    ap.add_argument("actual")
-    ap.add_argument("--pos-tol", type=float, default=20.0)
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("golden", help="golden attention-scanpath/v1 JSON")
+    ap.add_argument("actual", help="actual attention-scanpath/v1 JSON")
+    ap.add_argument("--pos-tol", type=float, default=20.0,
+                    help="max focus-position distance in px (default: %(default)s)")
     args = ap.parse_args()
 
     golden = load_foci(args.golden)

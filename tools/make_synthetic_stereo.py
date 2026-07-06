@@ -6,15 +6,11 @@ is shifted left by a known disparity in the right image (a nearer surface).
 The stereo feature should light up the foreground (large |disparity|) and leave
 the background dark.
 
-Usage: python tools/make_synthetic_stereo.py [out_dir]
 Writes left.png and right.png (256x256 grayscale) into out_dir
 (default: data/test_images/stereo/).
 """
-import sys
+import argparse
 from pathlib import Path
-
-import numpy as np
-from PIL import Image
 
 SIZE = 256
 FG = (80, 176, 64, 176)  # foreground rect: (x0, x1, y0, y1)
@@ -24,6 +20,7 @@ SEED = 20040521          # deterministic
 
 def vertical_texture(rng, h, w):
     """Texture rich in vertical edges (what the near-vertical Gabor responds to)."""
+    import numpy as np
     base = rng.integers(0, 256, size=(h, w // 4), dtype=np.uint8)
     tex = np.repeat(base, 4, axis=1)[:, :w]
     # Blend in a low-contrast smooth field so flat runs still vary a little.
@@ -33,7 +30,13 @@ def vertical_texture(rng, h, w):
 
 
 def main():
-    out_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("data/test_images/stereo")
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("out_dir", nargs="?", type=Path, default=Path("data/test_images/stereo"),
+                        help="output directory (default: %(default)s)")
+    out_dir = parser.parse_args().out_dir
+    # Imported after parsing so --help works without numpy/PIL installed.
+    import numpy as np
+    from PIL import Image
     out_dir.mkdir(parents=True, exist_ok=True)
     rng = np.random.default_rng(SEED)
 
