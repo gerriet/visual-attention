@@ -38,3 +38,6 @@ data/middlebury/
 
 # Python eval layer
 eval/.venv/
+
+# Personal / private test images (not for distribution)
+data/test_images/gb_profile_social.jpg
