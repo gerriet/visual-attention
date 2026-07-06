@@ -25,6 +25,9 @@ motion, ESAB2 system level, modern learned-model comparison).
 - ✅ 3D neural-field selection (depth-aware, cross-depth inhibition, thesis §6.4)
 - ✅ AttentionSystem: symbolic second stage — object files tracked across
   frames, Exploration behavior with dwell + object-based IOR, scanpaths
+- ✅ Modern-track benchmark: modern saliency models (spectral residual,
+  center-bias, DeepGaze slot) compared head-to-head with the thesis model
+  (`docs/thesis_vs_modern.md`)
 - ✅ YAML configuration system
 - ✅ Batch processing mode
 - ✅ Golden regression tests (characterization + behavioral scanpath)
@@ -158,7 +161,11 @@ generator — see `eval/README.md`), stereo + motion/onset (M5: the disparity
 feature, onset/motion on the stream pipeline, and the 3D neural field), and
 the AttentionSystem (M6: the symbolic second stage — object files tracked
 across frames, the Exploration behavior with dwell and object-based IOR, and
-scanpaths over a stream) are done. Next up: the modern track (M7).
+scanpaths over a stream), and the modern track (M7: modern saliency models as
+interchange peers, a benchmark harness, and the "thesis, 20 years later"
+comparison report — see `docs/thesis_vs_modern.md`) are done. The full
+replication and comparison arc (M0–M7) is complete; remaining: the M8 live
+demonstrator.
 
 ### Code Formatting
 

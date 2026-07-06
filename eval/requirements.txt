@@ -1,2 +1,11 @@
+# Core evaluation layer (metrics, scanpath, models, benchmark).
 numpy>=1.24
 pillow>=10.0
+
+# Optional: plots (attention_eval.plots). Install to render montages/bar charts.
+matplotlib>=3.7
+
+# Optional: the DeepGaze learned-model adapter (attention_eval.models.deepgaze)
+# needs torch and the deepgaze_pytorch package — install separately:
+#   pip install torch
+#   pip install git+https://github.com/matthias-k/DeepGaze.git

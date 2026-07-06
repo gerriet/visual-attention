@@ -159,13 +159,26 @@ the name carried no meaning outside the project.)*
   overt sensor control / field displacement, and the seeded-region-growing
   object segmentation refinement (thesis §7.3.2).
 
-### M7 — Modern track
-- Python-side learned models (DeepGaze IIE or successor) emitting the
-  interchange format.
-- C++ modern-classical strategies where cheap (spectral residual is in OpenCV;
-  optionally GBVS/BMS).
-- Deliverable: an evaluation report — thesis model vs. modern models on the
-  thesis images *and* a public fixation dataset. "The thesis, 20 years later."
+### M7 — Modern track ✓ 2026-07-06
+- ✓ Modern saliency models as interchange-format peers
+  (`eval/attention_eval/models/`): spectral-residual (Hou & Zhang, numpy) and
+  a Gaussian center-bias baseline, runnable in CI; a torch-gated DeepGaze IIE
+  adapter as the learned-model slot (documented, not run in CI). Each emits the
+  same JSON + 16-bit PNG the C++ pipeline does, so all models are peers.
+- ✓ Benchmark harness (`attention_eval.benchmark`): run model specs (Python
+  names + `cpp:<binary>:<config>`) over an image set; aggregate cross-model
+  (reference model) or against ground-truth fixations (`--dataset mit1003`).
+  Markdown report + saliency montage / metric-bar plots (`attention_eval.plots`,
+  matplotlib optional).
+- ✓ Deliverable report `docs/thesis_vs_modern.md` (+ montage): the 2004 model
+  vs spectral-residual vs center-bias on the thesis images. Finding: the modern
+  baselines diverge markedly (CC 0.11 SR / 0.34 center-bias vs the thesis map,
+  ~10 % scanpath overlap); the center bias tracks the thesis model more closely
+  than spectral residual, so the thesis model carries a moderate central
+  tendency. Ground-truth benchmarking runs against MIT1003 once downloaded.
+- The C++ modern-classical strategies (spectral residual / GBVS in-pipeline)
+  were kept Python-side instead (peers via the interchange format) — cleaner
+  and sufficient for the comparison; a C++ port stays optional.
 
 ### M8 — Live demonstrator: annotated video + object-file plugins
 *(depends on M5 video input and M6 object files; independent of M7)*

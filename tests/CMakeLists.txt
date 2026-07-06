@@ -54,6 +54,19 @@ if(Python3_Interpreter_FOUND)
                     ${CMAKE_SOURCE_DIR}/tests/golden/thesis_inputc/result.json
                     --names modern-default thesis-profile
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/eval)
+
+        # Modern-track benchmark (M7): the C++ thesis model vs the Python modern
+        # models, cross-model, over two thesis images. Exercises the full path
+        # (model runners → interchange → aggregate report).
+        add_test(NAME eval_benchmark_smoke
+            COMMAND ${EVAL_PYTHON} -m attention_eval.benchmark
+                    --images ${CMAKE_SOURCE_DIR}/data/test_images/input.png
+                             ${CMAKE_SOURCE_DIR}/data/test_images/inputc.png
+                    --out ${CMAKE_BINARY_DIR}/benchmark_smoke
+                    --model cpp:$<TARGET_FILE:attention>:${CMAKE_SOURCE_DIR}/configs/thesis.yaml=thesis
+                    --model spectral-residual --model center-bias --reference thesis
+                    --report ${CMAKE_BINARY_DIR}/benchmark_smoke/report.md
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/eval)
     else()
         message(STATUS "eval/.venv not found - Python eval tests disabled")
     endif()
