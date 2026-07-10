@@ -772,16 +772,44 @@ int main(int argc, char** argv)
         print_usage(argv[0]);
         return 1;
       }
+      // --config may appear anywhere in the trailing flags, so both
+      // "attention --config X image" and "attention image --config X" work.
+      // Load it FIRST (pre-pass) so the remaining flags — debug, --no-display —
+      // apply on top regardless of order; the positional image always wins over
+      // the config's input.image, and display defaults on only without a config.
       config = attention::config::ConfigLoader::create_default();
-      config.input_image = argv[1];
-      config.display = true;
+      bool config_loaded = false;
+      for (int i = 2; i < argc; ++i)
+      {
+        if (std::string(argv[i]) == "--config")
+        {
+          if (i + 1 >= argc)
+          {
+            std::cerr << "Error: --config requires a YAML file path" << std::endl;
+            print_usage(argv[0]);
+            return 1;
+          }
+          config = attention::config::ConfigLoader::load(argv[i + 1]);
+          config_loaded = true;
+          break;
+        }
+      }
+      config.input_image = argv[1]; // positional image overrides config input
+      if (!config_loaded)
+      {
+        config.display = true; // interactive default for a bare single-image run
+      }
 
-      // Parse optional flags
+      // Parse the remaining optional flags on top of the (possibly loaded) config.
       for (int i = 2; i < argc; ++i)
       {
         std::string arg = argv[i];
 
-        if (arg == "--no-display")
+        if (arg == "--config")
+        {
+          ++i; // path already consumed by the pre-pass above
+        }
+        else if (arg == "--no-display")
         {
           config.display = false;
         }

@@ -1,0 +1,65 @@
+# Alternative saliency profile: bottom-up saliency operators from the
+# post-thesis literature, plugged in as features. These are NOT part of the
+# dissertation model — the thesis feature set remains the default everywhere
+# else (see configs/thesis.yaml, configs/default.yaml). This profile is opt-in
+# and exists so the alternatives can be run and compared on their own.
+#
+#   spectral-residual  Hou & Zhang, CVPR 2007     (frequency-domain residual)
+#   phase-spectrum     Guo et al., CVPR 2008      (phase-only reconstruction;
+#                                                  motion channel on streams)
+#   frequency-tuned    Achanta et al., CVPR 2009  (CIELab band-pass contrast)
+#   image-signature    Hou et al., TPAMI 2012     (DCT sign signature)
+#   boolean-map        Zhang & Sclaroff, ICCV 2013 (topological figure-ground)
+#   minimum-barrier    Zhang et al., ICCV 2015    (barrier distance from border)
+#
+# To fuse the alternatives WITH the thesis features, add the thesis keys back
+# in with weights, e.g.:
+#   color: {weight: 1.0}
+#   eccentricity: {weight: 1.0}
+#   symmetry: {weight: 1.0}
+#
+# Each feature also accepts a `params:` block, e.g.:
+#   spectral-residual:
+#     weight: 1.0
+#     params:
+#       input_size: 128
+
+pipeline:
+  fusion: weighted-sum
+  selection: nms
+
+features:
+  # The alternatives run on their own here.
+  spectral-residual:
+    weight: 1.0
+  phase-spectrum:
+    weight: 1.0
+  frequency-tuned:
+    weight: 1.0
+  image-signature:
+    weight: 1.0
+  boolean-map:
+    weight: 1.0
+  minimum-barrier:
+    weight: 1.0
+  # The default pipeline pre-populates the thesis features; disable them so this
+  # profile is a clean alternatives-only run (drop these lines to fuse both).
+  color:
+    enabled: false
+  intensity:
+    enabled: false
+  orientation:
+    enabled: false
+  eccentricity:
+    enabled: false
+  symmetry:
+    enabled: false
+
+peaks:
+  min_distance: 30
+  threshold: 0.3
+  max_count: 10
+
+output:
+  output_dir: "results/"
+  display: false

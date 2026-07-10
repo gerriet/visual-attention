@@ -31,6 +31,12 @@ add_library(attention_core STATIC
     src/features/symmetry_feature.cpp
     src/features/stereo_feature.cpp
     src/features/onset_feature.cpp
+    src/features/spectral_residual_feature.cpp
+    src/features/frequency_tuned_feature.cpp
+    src/features/boolean_map_feature.cpp
+    src/features/image_signature_feature.cpp
+    src/features/phase_spectrum_feature.cpp
+    src/features/minimum_barrier_feature.cpp
     src/features/debug_context.cpp
     src/features/feature_registry.cpp
     src/fusion/fusion.cpp

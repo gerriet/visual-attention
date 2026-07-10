@@ -1,6 +1,6 @@
 # V2 Roadmap — Bolder Modernization Phase
 
-*Agreed 2026-07-04. Supersedes PHASE1_ACTION_PLAN.md / REALISTIC_TIMELINE.md for direction; those remain as history of the first phase.*
+*Agreed 2026-07-04. Supersedes PHASE1_ACTION_PLAN.md / REALISTIC_TIMELINE.md for direction; those remain as history of the first phase. The follow-on science phase (replication dossier, dynamic-IOR study, model lab, recognition processors, scenarios) is planned in `docs/V3_ROADMAP.md`.*
 
 ## Goals
 
@@ -203,6 +203,41 @@ the name carried no meaning outside the project.)*
   free analysis: colour / brightness / edge density / aspect ratio).
 - Deferred: a learned classifier/OCR plugin (external deps), and the on-device
   fps tuning (the headless path and the fixed per-frame budget are in place).
+
+### M9 — Pluggable alternatives: non-thesis saliency features ✓ 2026-07-07
+*(opens the "configure/plug aspects the thesis never had" arc; thesis stays the default)*
+
+- ✓ Three bottom-up saliency operators from the post-2004 literature, added as
+  `FeatureExtractor`s behind new registry keys — opt-in only, so no
+  default/thesis/modern config changes and the dissertation feature set remains
+  the default everywhere:
+  - `spectral-residual` — Hou & Zhang, CVPR 2007 (frequency-domain log-spectrum
+    residual). Independently mirrored by the Python eval model of the same name.
+  - `frequency-tuned` — Achanta et al., CVPR 2009 (full-resolution CIELab
+    band-pass; an alternative colour/contrast channel).
+  - `boolean-map` — Zhang & Sclaroff, ICCV 2013 (topological figure-ground via
+    border-connectivity of thresholded boolean maps).
+- ✓ Self-contained (OpenCV core+imgproc only, no Gabor/pyramid coupling, no
+  contrib module); each falls back sensibly on grayscale input.
+- ✓ `configs/alternative.yaml` runs the three standalone (disables the
+  pre-populated thesis features) for comparison; drop the disables to fuse both.
+  Documented in `docs/ALTERNATIVE_FEATURES.md`.
+- ✓ CLI: `--config` is now honored regardless of argument order (previously
+  `attention <image> --config X` silently ignored the config).
+- ✓ Locked: `tests/test_alt_features.cpp` (behavioral + registry) and an
+  `alt_features_profile` CLI smoke test.
+- ✓ 2026-07-10, three more operators on the same plug-in path (six total):
+  - `phase-spectrum` — Guo et al., CVPR 2008 (phase-only Fourier
+    reconstruction; the PFT formulation of PQFT, with a motion channel against
+    `Frame::previous_gray` on temporal streams — the first stream-aware
+    alternative).
+  - `image-signature` — Hou, Harel & Koch, TPAMI 2012 (DCT sign signature;
+    sparse-foreground theory, the DCT sibling of spectral-residual).
+  - `minimum-barrier` — Zhang et al., ICCV 2015 (FastMBD raster-scan barrier
+    distance from the border; boundary prior from the salient-object-detection
+    literature; core MBD without the MB+ extras).
+- Next in this arc: alternative fusion strategies and selection behaviors, then
+  alternative *implementations* of thesis features (e.g. a Lab-based colour).
 
 ## Working agreement for this phase
 

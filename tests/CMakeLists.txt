@@ -13,7 +13,7 @@ if(NOT Catch2_FOUND)
     FetchContent_MakeAvailable(Catch2)
 endif()
 
-add_executable(characterization_tests test_characterization.cpp test_config.cpp test_selection.cpp test_stereo_onset.cpp test_system.cpp test_processors.cpp)
+add_executable(characterization_tests test_characterization.cpp test_config.cpp test_selection.cpp test_stereo_onset.cpp test_system.cpp test_processors.cpp test_alt_features.cpp)
 target_link_libraries(characterization_tests PRIVATE attention_core Catch2::Catch2WithMain)
 target_compile_definitions(characterization_tests PRIVATE
     ATTENTION_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
@@ -39,6 +39,17 @@ add_test(NAME live_headless_smoke
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 set_tests_properties(live_headless_smoke PROPERTIES
     PASS_REGULAR_EXPRESSION "Live complete: 3 frames")
+
+# M9 alternative saliency features: the config-driven plug-in path runs the
+# non-thesis operators (spectral-residual, phase-spectrum, frequency-tuned,
+# image-signature, boolean-map, minimum-barrier) end to end, standalone.
+# Guards the registry keys and configs/alternative.yaml.
+add_test(NAME alt_features_profile
+    COMMAND attention ${CMAKE_SOURCE_DIR}/data/test_images/inputc.png
+            --config ${CMAKE_SOURCE_DIR}/configs/alternative.yaml --no-display
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+set_tests_properties(alt_features_profile PROPERTIES
+    PASS_REGULAR_EXPRESSION "Features extracted: 6")
 
 # Behavioral tests: run the CLI with --emit-json, then compare the emitted
 # scanpath against the golden result with loose tolerances (see V2_ROADMAP.md:

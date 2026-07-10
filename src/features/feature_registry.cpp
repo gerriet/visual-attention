@@ -1,10 +1,16 @@
 #include "attention/features/feature_registry.h"
 #include "attention/config/yaml_reader.h"
+#include "attention/features/boolean_map_feature.h"
 #include "attention/features/color_feature.h"
 #include "attention/features/eccentricity_feature.h"
+#include "attention/features/frequency_tuned_feature.h"
+#include "attention/features/image_signature_feature.h"
 #include "attention/features/intensity_feature.h"
+#include "attention/features/minimum_barrier_feature.h"
 #include "attention/features/onset_feature.h"
 #include "attention/features/orientation_feature.h"
+#include "attention/features/phase_spectrum_feature.h"
+#include "attention/features/spectral_residual_feature.h"
 #include "attention/features/stereo_feature.h"
 #include "attention/features/symmetry_feature.h"
 #include <sstream>
@@ -172,6 +178,67 @@ void register_builtin_features()
                  read_param(params, "threshold", config.threshold);
                  read_param(params, "blur_size", config.blur_size);
                  return std::make_unique<OnsetFeature>(config);
+               });
+
+  // Alternative (non-thesis) saliency operators from the post-2004 literature.
+  // Opt-in only: no default/thesis config names them, so the thesis feature set
+  // stays the default. See docs/ALTERNATIVE_FEATURES.md and configs/alternative.yaml.
+
+  registry.add("spectral-residual",
+               [](const YAML::Node& params)
+               {
+                 SpectralResidualFeature::Config config;
+                 read_param(params, "input_size", config.input_size);
+                 read_param(params, "avg_filter_size", config.avg_filter_size);
+                 read_param(params, "gaussian_sigma", config.gaussian_sigma);
+                 return std::make_unique<SpectralResidualFeature>(config);
+               });
+
+  registry.add("frequency-tuned",
+               [](const YAML::Node& params)
+               {
+                 FrequencyTunedFeature::Config config;
+                 read_param(params, "blur_size", config.blur_size);
+                 return std::make_unique<FrequencyTunedFeature>(config);
+               });
+
+  registry.add("boolean-map",
+               [](const YAML::Node& params)
+               {
+                 BooleanMapFeature::Config config;
+                 read_param(params, "working_size", config.working_size);
+                 read_param(params, "threshold_step", config.threshold_step);
+                 read_param(params, "blur_sigma", config.blur_sigma);
+                 return std::make_unique<BooleanMapFeature>(config);
+               });
+
+  registry.add("image-signature",
+               [](const YAML::Node& params)
+               {
+                 ImageSignatureFeature::Config config;
+                 read_param(params, "input_size", config.input_size);
+                 read_param(params, "gaussian_sigma", config.gaussian_sigma);
+                 return std::make_unique<ImageSignatureFeature>(config);
+               });
+
+  registry.add("phase-spectrum",
+               [](const YAML::Node& params)
+               {
+                 PhaseSpectrumFeature::Config config;
+                 read_param(params, "input_size", config.input_size);
+                 read_param(params, "gaussian_sigma", config.gaussian_sigma);
+                 read_param(params, "use_motion", config.use_motion);
+                 return std::make_unique<PhaseSpectrumFeature>(config);
+               });
+
+  registry.add("minimum-barrier",
+               [](const YAML::Node& params)
+               {
+                 MinimumBarrierFeature::Config config;
+                 read_param(params, "working_size", config.working_size);
+                 read_param(params, "num_passes", config.num_passes);
+                 read_param(params, "blur_sigma", config.blur_sigma);
+                 return std::make_unique<MinimumBarrierFeature>(config);
                });
 }
 

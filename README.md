@@ -31,6 +31,11 @@ the modern-model comparison, and a live demonstrator).
   (`docs/thesis_vs_modern.md`)
 - ✅ Live demonstrator: real-time attention on webcam/video with object-file
   plugins running only on attended regions (the attention premise made visible)
+- ✅ Pluggable alternative (non-thesis) saliency features from the 2007–2015
+  literature — spectral residual, phase spectrum (PQFT-style, motion-aware on
+  streams), frequency-tuned, image signature, boolean-map, minimum barrier —
+  opt-in via config; the thesis set stays the default
+  (`docs/ALTERNATIVE_FEATURES.md`)
 - ✅ YAML configuration system
 - ✅ Batch processing mode
 - ✅ Golden regression tests (characterization + behavioral scanpath)
@@ -90,6 +95,9 @@ make
 ./attention --config ../configs/thesis.yaml ../data/test_images/inputc.png --no-display
 ./attention --config ../configs/modern.yaml ../data/test_images/inputc.png --no-display
 
+# Alternative (non-thesis) saliency operators, opt-in via config
+./attention --config ../configs/alternative.yaml ../data/samples/images/soccer.jpg --no-display
+
 # Emit results in the interchange format (JSON + 16-bit saliency PNG)
 ./attention ../data/test_images/input.png --no-display --emit-json out/result.json
 ```
@@ -117,7 +125,9 @@ ATTENTION_UPDATE_GOLDEN=1 ./build/tests/characterization_tests
 
 ## Documentation
 
-- `docs/V2_ROADMAP.md` - **Direction: goals, locked decisions, milestones M0–M8**
+- `docs/V3_ROADMAP.md` - **Direction (current): the science phase — replication, dynamic-IOR study, model lab, recognition, scenarios (M10–M16)**
+- `docs/V2_ROADMAP.md` - v2 history: goals, locked decisions, milestones M0–M9
+- `docs/ALTERNATIVE_FEATURES.md` - Non-thesis saliency features and how to plug them in
 - `docs/INTERCHANGE_FORMAT.md` - Result/scanpath JSON + saliency-map format all models emit
 - `docs/PERFORMANCE.md` - Timing instrumentation, optimization history, current numbers
 - `docs/thesis_vs_modern.md` - The M7 deliverable: thesis model vs. modern saliency models
