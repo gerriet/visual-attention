@@ -7,6 +7,7 @@
 
 #include "attention/config/yaml_reader.h"
 #include "attention/core/constants.h"
+#include "attention/selection/kalman_mot_selection.h"
 #include "attention/selection/neural_field_3d.h"
 #include "attention/selection/neural_field_selection.h"
 #include "attention/selection/selection_strategy.h"
@@ -278,8 +279,22 @@ std::unique_ptr<SelectionStrategy> create_selection_strategy(const std::string& 
     read_param(strategy_params, "ior_decay", nf.ior_decay);
     return std::make_unique<NeuralField3DSelection>(params, nf);
   }
+  if (name == "kalman-mot")
+  {
+    KalmanMotSelection::Params km;
+    read_param(strategy_params, "min_blob_size", km.min_blob_size);
+    read_param(strategy_params, "max_assoc_dist", km.max_assoc_dist);
+    read_param(strategy_params, "depth_assoc_weight", km.depth_assoc_weight);
+    read_param(strategy_params, "use_depth", km.use_depth);
+    read_param(strategy_params, "max_age", km.max_age);
+    read_param(strategy_params, "process_noise", km.process_noise);
+    read_param(strategy_params, "measurement_noise", km.measurement_noise);
+    read_param(strategy_params, "object_ior", km.object_ior);
+    read_param(strategy_params, "ior_frames", km.ior_frames);
+    return std::make_unique<KalmanMotSelection>(params, km);
+  }
   throw std::runtime_error("Unknown selection strategy '" + name +
-                           "'. Available: nms, ior, neural-field, neural-field-3d");
+                           "'. Available: nms, ior, neural-field, neural-field-3d, kalman-mot");
 }
 
 } // namespace selection

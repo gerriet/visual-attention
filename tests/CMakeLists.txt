@@ -13,7 +13,7 @@ if(NOT Catch2_FOUND)
     FetchContent_MakeAvailable(Catch2)
 endif()
 
-add_executable(characterization_tests test_characterization.cpp test_config.cpp test_selection.cpp test_stereo_onset.cpp test_system.cpp test_processors.cpp test_alt_features.cpp)
+add_executable(characterization_tests test_characterization.cpp test_config.cpp test_selection.cpp test_stereo_onset.cpp test_system.cpp test_processors.cpp test_alt_features.cpp test_kalman_mot.cpp)
 target_link_libraries(characterization_tests PRIVATE attention_core Catch2::Catch2WithMain)
 target_compile_definitions(characterization_tests PRIVATE
     ATTENTION_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
@@ -50,6 +50,27 @@ add_test(NAME alt_features_profile
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 set_tests_properties(alt_features_profile PROPERTIES
     PASS_REGULAR_EXPRESSION "Features extracted: 6")
+
+# kalman-mot selection backend (docs/SELECTION_BACKENDS.md): detection + Kalman
+# multi-object tracking as an alternative to the neural field, exercised across
+# frames of the motion sequence via the live path.
+add_test(NAME kalman_mot_stream
+    COMMAND attention --live ${CMAKE_SOURCE_DIR}/data/test_images/motion_seq
+            --config ${CMAKE_SOURCE_DIR}/configs/kalman.yaml
+            --no-display --frames 3 --output ${CMAKE_BINARY_DIR}/kalman_smoke
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+set_tests_properties(kalman_mot_stream PROPERTIES
+    PASS_REGULAR_EXPRESSION "Live complete: 3 frames")
+
+# ...and that kalman-mot actually emits peaks through the config path (a still,
+# deterministic): guards against a regression to silently-empty selection that
+# the streaming completion banner above cannot detect.
+add_test(NAME kalman_mot_peaks
+    COMMAND attention ${CMAKE_SOURCE_DIR}/data/test_images/inputc.png
+            --config ${CMAKE_SOURCE_DIR}/configs/kalman.yaml --no-display
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+set_tests_properties(kalman_mot_peaks PROPERTIES
+    PASS_REGULAR_EXPRESSION "Peaks detected: [1-9]")
 
 # Behavioral tests: run the CLI with --emit-json, then compare the emitted
 # scanpath against the golden result with loose tolerances (see V2_ROADMAP.md:

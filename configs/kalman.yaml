@@ -1,0 +1,42 @@
+# Kalman-MOT selection profile: the thesis feature set, but selection done by
+# blob-detection + Kalman multi-object tracking instead of the neural field
+# (docs/SELECTION_BACKENDS.md, option B). A drop-in A/B against configs/thesis.yaml
+# on the same features and inputs — especially streams (--attend / --live / a
+# frame directory), where tracking and object-based IOR matter.
+#
+# The thesis neural field stays the default everywhere; this is opt-in.
+
+pipeline:
+  fusion: weighted-sum
+  selection: kalman-mot
+  selection_params:
+    min_blob_size: 9         # ignore specks below this area (px)
+    max_assoc_dist: 40       # detection->track gating radius (px)
+    max_age: 15              # frames a track may coast through occlusion
+    process_noise: 1.0       # Kalman Q scale (constant-velocity)
+    measurement_noise: 4.0   # Kalman R scale (blob centroid)
+    object_ior: true         # inhibition of return rides the tracked object
+    ior_frames: 6            # frames a selected object stays suppressed
+    use_depth: true          # gate association on the depth cue when present
+
+features:
+  color:
+    weight: 1.0
+  eccentricity:
+    weight: 1.0
+  symmetry:
+    weight: 1.0
+  intensity:
+    enabled: false
+  orientation:
+    enabled: false
+
+peaks:
+  max_count: 10
+  threshold: 0.3
+  min_distance: 30
+  ior_strength: 0.8
+
+output:
+  output_dir: "results/"
+  display: false
