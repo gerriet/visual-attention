@@ -1,0 +1,38 @@
+# Divisive-normalization selection profile: the thesis feature set, but the
+# competition done by input-scale-invariant divisive normalization (Reynolds &
+# Heeger) instead of the neural field (docs/SELECTION_BACKENDS.md, option D).
+# A drop-in A/B against configs/thesis.yaml that removes the field's worst
+# tuning problem (ignition depending on absolute input brightness).
+#
+# The thesis neural field stays the default everywhere; this is opt-in.
+
+pipeline:
+  fusion: weighted-sum
+  selection: normalization
+  selection_params:
+    exponent: 2.0     # contrast gain n of the divisive normalization
+    pool_size: 25     # surround normalization-pool width (Gaussian sigma, px)
+    sigma: 0.5        # semi-saturation, relative to mean activity (scale-free)
+    ior_decay: 0.8    # cross-frame space-based IOR decay (thesis: ~20%/frame)
+
+features:
+  color:
+    weight: 1.0
+  eccentricity:
+    weight: 1.0
+  symmetry:
+    weight: 1.0
+  intensity:
+    enabled: false
+  orientation:
+    enabled: false
+
+peaks:
+  max_count: 10
+  threshold: 0.3
+  ior_radius: 50
+  ior_strength: 0.8
+
+output:
+  output_dir: "results/"
+  display: false

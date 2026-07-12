@@ -13,7 +13,7 @@ if(NOT Catch2_FOUND)
     FetchContent_MakeAvailable(Catch2)
 endif()
 
-add_executable(characterization_tests test_characterization.cpp test_config.cpp test_selection.cpp test_stereo_onset.cpp test_system.cpp test_processors.cpp test_alt_features.cpp test_kalman_mot.cpp)
+add_executable(characterization_tests test_characterization.cpp test_config.cpp test_selection.cpp test_stereo_onset.cpp test_system.cpp test_processors.cpp test_alt_features.cpp test_kalman_mot.cpp test_normalization.cpp)
 target_link_libraries(characterization_tests PRIVATE attention_core Catch2::Catch2WithMain)
 target_compile_definitions(characterization_tests PRIVATE
     ATTENTION_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
@@ -70,6 +70,15 @@ add_test(NAME kalman_mot_peaks
             --config ${CMAKE_SOURCE_DIR}/configs/kalman.yaml --no-display
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 set_tests_properties(kalman_mot_peaks PROPERTIES
+    PASS_REGULAR_EXPRESSION "Peaks detected: [1-9]")
+
+# normalization selection backend (docs/SELECTION_BACKENDS.md, option D):
+# divisive-normalization competition, emitting peaks through the config path.
+add_test(NAME normalization_peaks
+    COMMAND attention ${CMAKE_SOURCE_DIR}/data/test_images/inputc.png
+            --config ${CMAKE_SOURCE_DIR}/configs/normalization.yaml --no-display
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+set_tests_properties(normalization_peaks PROPERTIES
     PASS_REGULAR_EXPRESSION "Peaks detected: [1-9]")
 
 # Behavioral tests: run the CLI with --emit-json, then compare the emitted

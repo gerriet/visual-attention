@@ -44,6 +44,7 @@ add_library(attention_core STATIC
     src/selection/neural_field_selection.cpp
     src/selection/neural_field_3d.cpp
     src/selection/kalman_mot_selection.cpp
+    src/selection/normalization_selection.cpp
     src/system/object_file.cpp
     src/system/behavior.cpp
     src/system/attention_system.cpp

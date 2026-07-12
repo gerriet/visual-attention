@@ -10,6 +10,7 @@
 #include "attention/selection/kalman_mot_selection.h"
 #include "attention/selection/neural_field_3d.h"
 #include "attention/selection/neural_field_selection.h"
+#include "attention/selection/normalization_selection.h"
 #include "attention/selection/selection_strategy.h"
 #include <algorithm>
 #include <cmath>
@@ -293,8 +294,18 @@ std::unique_ptr<SelectionStrategy> create_selection_strategy(const std::string& 
     read_param(strategy_params, "ior_frames", km.ior_frames);
     return std::make_unique<KalmanMotSelection>(params, km);
   }
+  if (name == "normalization")
+  {
+    NormalizationSelection::Params ns;
+    read_param(strategy_params, "exponent", ns.exponent);
+    read_param(strategy_params, "pool_size", ns.pool_size);
+    read_param(strategy_params, "sigma", ns.sigma);
+    read_param(strategy_params, "smooth_factor", ns.smooth_factor);
+    read_param(strategy_params, "ior_decay", ns.ior_decay);
+    return std::make_unique<NormalizationSelection>(params, ns);
+  }
   throw std::runtime_error("Unknown selection strategy '" + name +
-                           "'. Available: nms, ior, neural-field, neural-field-3d, kalman-mot");
+                           "'. Available: nms, ior, neural-field, neural-field-3d, kalman-mot, normalization");
 }
 
 } // namespace selection
