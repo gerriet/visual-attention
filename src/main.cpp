@@ -139,7 +139,8 @@ cv::Mat annotate_objects(const attention::system::AttentionSystem& sys)
 // Run the AttentionSystem (second stage + behavior) over a temporal sequence
 // (image directory or video) and emit its scanpath.
 void process_attend(const std::string& path, attention::pipeline::PipelineConfig& pipeline_config,
-                    const std::string& output_base, const std::string& emit_scanpath, bool user_config)
+                    const std::string& output_base, const std::string& emit_scanpath, bool user_config,
+                    const std::string& behavior)
 {
   if (!user_config)
   {
@@ -148,6 +149,10 @@ void process_attend(const std::string& path, attention::pipeline::PipelineConfig
 
   attention::system::AttentionSystem::Config cfg;
   cfg.pipeline = pipeline_config;
+  if (!behavior.empty())
+  {
+    cfg.behavior = behavior; // dynamic-IOR ablation: greedy / spatial-ior / object-ior / exploration
+  }
   attention::system::AttentionSystem sys(cfg);
 
   std::unique_ptr<attention::pipeline::FrameSource> source;
@@ -476,8 +481,8 @@ void print_usage(const char* program_name, std::ostream& out = std::cerr)
   out << "  " << program_name << " --batch <directory> [options]" << std::endl;
   out << "  " << program_name << " --stereo <left> <right> [options]" << std::endl;
   out << "  " << program_name << " --sequence <dir|video> [--output dir] [--config yaml]" << std::endl;
-  out << "  " << program_name << " --attend <dir|video> [--output dir] [--emit-scanpath path] [--config yaml]"
-      << std::endl;
+  out << "  " << program_name
+      << " --attend <dir|video> [--output dir] [--emit-scanpath path] [--config yaml] [--behavior name]" << std::endl;
   out << "  " << program_name << " --live <camera|video|dir> [--config configs/live.yaml] [--processors a,b]"
       << std::endl;
   out << "  " << program_name << " --help" << std::endl;
@@ -650,6 +655,7 @@ int main(int argc, char** argv)
       std::string seq_path = argv[2];
       std::string output_dir;
       std::string scanpath_path;
+      std::string behavior;
       bool user_config = false;
       config = attention::config::ConfigLoader::create_default();
       for (int i = 3; i < argc; ++i)
@@ -668,8 +674,12 @@ int main(int argc, char** argv)
         {
           scanpath_path = argv[++i];
         }
+        else if (arg == "--behavior" && i + 1 < argc)
+        {
+          behavior = argv[++i];
+        }
       }
-      process_attend(seq_path, config.pipeline, output_dir, scanpath_path, user_config);
+      process_attend(seq_path, config.pipeline, output_dir, scanpath_path, user_config, behavior);
       return 0;
     }
     else if (std::string(argv[1]) == "--stereo")

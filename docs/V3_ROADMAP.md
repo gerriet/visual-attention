@@ -202,6 +202,17 @@ regime map (where object-IOR pays, where it doesn't). Honesty requirement:
 publish the failure regimes too (e.g. very slow scenes where space-IOR
 suffices).
 
+**Status (2026-07-12): first cut done** — the three arms are behaviors
+(`greedy` / `spatial-ior` / `object-ior`, `attention --attend --behavior`),
+identical except in what they inhibit; `tools/make_dynamic_scene.py` +
+`eval/dynamic_ior.py` generate scenes and score coverage/latency/waste/
+perseveration. Finding: **IOR ≫ no-IOR (H1's first half strongly supported);
+object- vs space-based is regime-dependent and naive object-IOR does not win by
+default** at the settings tried (large inhibition radius vs slow motion;
+object-IOR sensitive to tracking label-switches). Remaining: fast-motion +
+occlusion/crossing regimes (where object-IOR should win), seeds+CIs, fixed
+dwell, DAVIS real video. See `docs/DYNAMIC_IOR_STUDY.md`.
+
 ### M13 — Recognition processors (attention-gated perception, H2)
 
 - Tier 1 (zero new dependencies): `hog-person` and `haar-face` processors
