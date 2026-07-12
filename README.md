@@ -126,6 +126,7 @@ ATTENTION_UPDATE_GOLDEN=1 ./build/tests/characterization_tests
 ## Documentation
 
 - `docs/V3_ROADMAP.md` - **Direction (current): the science phase — replication, dynamic-IOR study, model lab, recognition, scenarios (M10–M16)**
+- `docs/RESEARCH_POSITIONING.md` - Where the system and v3 plan sit vs. 2025–26 attention research (human + CV) and how it could interface with LLMs/VLMs
 - `docs/V2_ROADMAP.md` - v2 history: goals, locked decisions, milestones M0–M9
 - `docs/ALTERNATIVE_FEATURES.md` - Non-thesis saliency features and how to plug them in
 - `docs/INTERCHANGE_FORMAT.md` - Result/scanpath JSON + saliency-map format all models emit
