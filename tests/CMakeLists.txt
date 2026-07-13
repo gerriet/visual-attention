@@ -86,7 +86,7 @@ set_tests_properties(normalization_peaks PROPERTIES
 # the replication bar is "mainly equivalent", not exact).
 find_package(Python3 COMPONENTS Interpreter)
 if(Python3_Interpreter_FOUND)
-    set(BEHAVIORAL_IMAGES input inputc lena)
+    set(BEHAVIORAL_IMAGES input inputc)
     foreach(img IN LISTS BEHAVIORAL_IMAGES)
         add_test(NAME emit_json_${img}
             COMMAND attention ${CMAKE_SOURCE_DIR}/data/test_images/${img}.png

@@ -3,7 +3,7 @@
 
 # Input configuration
 input:
-  image: "data/test_images/lena.png"
+  image: "data/test_images/input.png"
 
 # Feature extraction and weights
 features:

@@ -46,14 +46,14 @@ Usage:
 
 ```bash
 ./attention --batch ../data/test_images/ --output ../results
-cat ../results/lena/timing.txt
+cat ../results/input/timing.txt
 ```
 
 ## Performance Analysis
 
 ### Timing Breakdown (Before Optimization)
 
-On a 512×512 image (Lena):
+On a 512×512 test image:
 
 ```text
 Pyramid computation:  4 ms   (1.8%)
@@ -402,7 +402,7 @@ The key insights:
 
 ## Current performance (v2, 2026-07)
 
-Measured on Apple Silicon (Release build), 512×512 input (`lena.png`).
+Measured on Apple Silicon (Release build), a 512×512 test image.
 Single-image runs include one-time setup (Gabor-bank construction, pyramid
 allocation); streaming numbers are steady-state wall clock per frame over a
 30-frame run, including the annotated-PNG write in headless mode.

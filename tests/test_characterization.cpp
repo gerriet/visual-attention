@@ -22,7 +22,7 @@ namespace
 {
 
 // Small thesis-era reference images; kept small so the suite stays fast
-const char* const kImages[] = {"input", "inputc", "lena"};
+const char* const kImages[] = {"input", "inputc"};
 
 // Tolerances leave headroom for reordered float arithmetic in refactors
 // while still catching real algorithmic drift
