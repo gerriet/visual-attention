@@ -74,6 +74,11 @@ class ObjectFileStore
     int max_inactive_age = 30;  // drop inactive files unseen for this many frames
     float leaky_alpha = 0.5f;   // leaky-integrator weight for the current frame
     int trajectory_length = 16; // capped position history per file
+    // Match clusters to each file's *predicted* next centroid (last + trajectory
+    // velocity) instead of its last centroid. Holds object identity through fast
+    // motion and short occlusions, which object-based IOR depends on (M12).
+    // Default off: the thesis's simple nearest-centroid correspondence.
+    bool motion_prediction = false;
   };
 
   ObjectFileStore() : ObjectFileStore(Config{}) {}

@@ -206,12 +206,17 @@ suffices).
 (`greedy` / `spatial-ior` / `object-ior`, `attention --attend --behavior`),
 identical except in what they inhibit; `tools/make_dynamic_scene.py` +
 `eval/dynamic_ior.py` generate scenes and score coverage/latency/waste/
-perseveration. Finding: **IOR ≫ no-IOR (H1's first half strongly supported);
-object- vs space-based is regime-dependent and naive object-IOR does not win by
-default** at the settings tried (large inhibition radius vs slow motion;
-object-IOR sensitive to tracking label-switches). Remaining: fast-motion +
-occlusion/crossing regimes (where object-IOR should win), seeds+CIs, fixed
-dwell, DAVIS real video. See `docs/DYNAMIC_IOR_STUDY.md`.
+perseveration. Finding: **IOR ≫ no-IOR (H1's first half strongly supported);** but pushing into
+fast-motion + occlusion (with a configurable `--ior-radius` and opt-in
+**motion-predicted correspondence** in the object-file store, `--motion-prediction`)
+shows, across seeds, that **space-based IOR is at least as good as — usually
+better than — object-based IOR**. The thesis's headline object-IOR advantage does
+*not* robustly materialize: object-IOR is only as good as the tracker, and every
+label-switch under fast/dense motion costs it a wasted re-fixation; motion
+prediction narrows but does not close the gap. Sharper H1: object-IOR beats
+space-IOR only to the extent identities stay stable — needs a real MOT tracker in
+the object-file loop (promote the kalman-mot backend) and identity-centric
+metrics. Remaining: seeds+CIs, DAVIS. See `docs/DYNAMIC_IOR_STUDY.md`.
 
 ### M13 — Recognition processors (attention-gated perception, H2)
 

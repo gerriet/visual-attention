@@ -6,6 +6,25 @@ namespace attention
 namespace system
 {
 
+namespace
+{
+// Where an object file is expected `steps` frames ahead: its last centroid plus
+// its trajectory velocity (last step), when motion prediction is enabled and
+// there is enough history. Falls back to the last centroid otherwise.
+cv::Point2d expected_centroid(const ObjectFile& file, bool use_motion, int steps)
+{
+  const cv::Point2d last(file.centroid.x, file.centroid.y);
+  if (!use_motion || file.trajectory.size() < 2)
+  {
+    return last;
+  }
+  const cv::Point& p1 = file.trajectory[file.trajectory.size() - 1];
+  const cv::Point& p0 = file.trajectory[file.trajectory.size() - 2];
+  const int s = std::max(1, std::min(steps, 8)); // clamp wild extrapolation
+  return cv::Point2d(p1.x + s * (p1.x - p0.x), p1.y + s * (p1.y - p0.y));
+}
+} // namespace
+
 ObjectFileStore::ObjectFileStore(const Config& config) : config_(config) {}
 
 ObjectFile ObjectFileStore::make_file(const Cluster& cluster, int frame)
@@ -67,7 +86,8 @@ void ObjectFileStore::update(const std::vector<Cluster>& clusters, int frame)
   {
     for (int c = 0; c < nc; ++c)
     {
-      const double d = cv::norm(active_[f].centroid - clusters[c].centroid);
+      const cv::Point2d predicted = expected_centroid(active_[f], config_.motion_prediction, 1);
+      const double d = cv::norm(predicted - cv::Point2d(clusters[c].centroid.x, clusters[c].centroid.y));
       if (d < 2.0 * radius)
       {
         pairs.push_back({d, f, c});
@@ -122,7 +142,11 @@ void ObjectFileStore::update(const std::vector<Cluster>& clusters, int frame)
     double best_dist = radius;
     for (int i = 0; i < static_cast<int>(inactive_.size()); ++i)
     {
-      const double d = cv::norm(inactive_[i].centroid - clusters[c].centroid);
+      // Extrapolate the inactive file forward over the frames it was gone, so an
+      // object that kept moving while occluded is revived at where it should be.
+      const int gone = std::max(1, frame - inactive_[i].last_seen_frame);
+      const cv::Point2d predicted = expected_centroid(inactive_[i], config_.motion_prediction, gone);
+      const double d = cv::norm(predicted - cv::Point2d(clusters[c].centroid.x, clusters[c].centroid.y));
       if (d < best_dist)
       {
         best_dist = d;

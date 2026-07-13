@@ -128,10 +128,12 @@ class IorBehavior : public Behavior
 
 /**
  * Create a behavior by name. Available: "exploration" (thesis default), and the
- * dynamic-IOR ablation "greedy" / "spatial-ior" / "object-ior". Throws for
+ * dynamic-IOR ablation "greedy" / "spatial-ior" / "object-ior". The IOR params
+ * apply to the ablation behaviors (Exploration ignores them). Throws for
  * unknown names.
  */
-std::unique_ptr<Behavior> create_behavior(const std::string& name);
+std::unique_ptr<Behavior> create_behavior(const std::string& name,
+                                          const IorBehavior::Params& ior_params = IorBehavior::Params{});
 
 } // namespace system
 } // namespace attention

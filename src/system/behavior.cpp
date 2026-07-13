@@ -158,7 +158,7 @@ void IorBehavior::reset()
   object_inhib_.clear();
 }
 
-std::unique_ptr<Behavior> create_behavior(const std::string& name)
+std::unique_ptr<Behavior> create_behavior(const std::string& name, const IorBehavior::Params& ior_params)
 {
   if (name == "exploration")
   {
@@ -166,15 +166,15 @@ std::unique_ptr<Behavior> create_behavior(const std::string& name)
   }
   if (name == "greedy")
   {
-    return std::make_unique<IorBehavior>(IorBehavior::Mode::None, "greedy");
+    return std::make_unique<IorBehavior>(IorBehavior::Mode::None, "greedy", ior_params);
   }
   if (name == "spatial-ior")
   {
-    return std::make_unique<IorBehavior>(IorBehavior::Mode::Spatial, "spatial-ior");
+    return std::make_unique<IorBehavior>(IorBehavior::Mode::Spatial, "spatial-ior", ior_params);
   }
   if (name == "object-ior")
   {
-    return std::make_unique<IorBehavior>(IorBehavior::Mode::Object, "object-ior");
+    return std::make_unique<IorBehavior>(IorBehavior::Mode::Object, "object-ior", ior_params);
   }
   throw std::runtime_error("Unknown behavior '" + name + "'. Available: exploration, greedy, spatial-ior, object-ior");
 }

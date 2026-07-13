@@ -85,26 +85,70 @@ space-based is regime-dependent, and naive object-IOR does not win by default.**
 That is a sharper, more honest claim than the thesis's, and the framework can
 now measure exactly where each regime lives.
 
-## Where object-IOR *should* win (next)
+## Follow-up: pushing into fast motion + occlusion (and it doesn't rescue H1)
 
-The regimes this first cut does not yet stress, where object-IOR's advantage is
-predicted to appear — the next iteration:
+We chased the regime where object-IOR *should* win — objects moving far enough to
+escape a tight spatial tag, and occlusion where object-IOR should "remember" a
+reappeared object — and added the machinery for it:
 
-- **Fast motion relative to the inhibition scale** (small `ior_radius`, high
-  speed) so objects escape spatial tags; map the crossover speed.
-- **Occlusion / crossing stress**: an object that disappears and returns, or two
-  that swap positions — object-IOR (with tracking memory / the kalman-mot
-  backend) should remember "already seen" where space-IOR re-fixates the
-  reappeared object. This is the clearest theoretical win and needs a reliable
-  tracker in the loop.
-- **Rigorous statistics**: ≥20 seeds/cell with bootstrap CIs (here: 3 seeds, no
-  CIs) and a fixed dwell across arms to remove that confound.
-- **Real video**: DAVIS-2017 masks for exact "which object attended" on natural
-  motion.
+- a configurable spatial-tag radius (`--ior-radius`), so objects can be made to
+  escape spatial inhibition;
+- **motion-predicted correspondence** in the object-file store
+  (`--motion-prediction`, `ObjectFileStore::Config::motion_prediction`, default
+  off): match clusters to each file's *predicted* next centroid (last position +
+  trajectory velocity), extrapolated over the gap for occluded files. This holds
+  object identity through fast motion / short occlusion — the thing object-IOR
+  depends on.
+
+Single seeds *can* show object-IOR winning (e.g. 3 objects, speed 28,
+`ior_radius` 15: object-IOR best on latency 5.33 and waste 0.000). But averaged
+over seeds the advantage does not survive:
+
+High speed (4 objects, speed 40, `ior_radius` 20, 4 seeds averaged):
+
+| tracker | arm | revisit waste | mean latency |
+|---|---|---|---|
+| naive | spatial-ior | **0.086** | **4.81** |
+| naive | object-ior | 0.413 | 8.19 |
+| motion-predicted | spatial-ior | **0.086** | **4.81** |
+| motion-predicted | object-ior | 0.311 | 6.50 |
+
+Occlusion (4 objects, speed 20, `ior_radius` 18, occlude-len 10, 4 seeds averaged):
+space-IOR waste 0.240 vs object-IOR 0.253 — a tie, space-IOR marginally ahead.
+
+**Honest conclusion.** Across seeds and regimes, **space-based IOR is at least as
+good as object-based IOR, and usually better** — the thesis's headline advantage
+for object-based selection does *not* robustly materialize here. Motion-predicted
+tracking helps object-IOR (high-speed waste 0.413 → 0.311, latency 8.19 → 6.50)
+but does not close the gap. The reason is structural: **object-IOR is only as
+good as the tracker.** Every time the object-file correspondence switches a
+label — under fast, dense, or crossing motion — the object-keyed inhibition is
+lost and the object is re-fixated as if new. Space-IOR has no such failure mode;
+it inhibits locations, which are always "tracked." So object-IOR's theoretical
+edge (inhibition that follows the object) is spent paying for tracking errors.
+
+This refines H1 into a sharper, testable claim: **object-based IOR beats
+space-based only to the extent the tracker keeps identities stable** — and the
+thesis's simple nearest-centroid correspondence (even with velocity prediction)
+is not stable enough at the speeds where space-IOR would otherwise fail.
+
+## What a genuine object-IOR win would need (next)
+
+- **A real MOT tracker in the object-file loop** — the kalman-mot backend's
+  Kalman + gated association (currently a *selection* strategy, unused by
+  `--attend`) promoted into the object-file store, or a JPDA/GM-PHD tracker.
+  Object-IOR's win is gated on near-zero label-switch rate.
+- **Identity-centric metrics.** Coverage/waste reward *finding* objects; they
+  under-credit object-IOR's real product — a stable, identity-consistent
+  scanpath through occlusion. Score ID-persistence and occlusion-recovery of the
+  *same* label, where object-IOR should win by construction.
+- **Rigorous statistics**: ≥20 seeds/cell with bootstrap CIs (here: ≤4 seeds).
+- **Real video**: DAVIS-2017 masks for exact "which object attended".
 
 ## Artifacts
 
 - `tools/make_dynamic_scene.py` — scene + `gt.json` generator (`dynamic-scene-gt/v1`).
-- `eval/dynamic_ior.py` — three-arm runner + scorer.
-- Behaviors: `greedy` / `spatial-ior` / `object-ior` (src/system/behavior.cpp),
-  selectable with `attention --attend --behavior <name>`.
+- `eval/dynamic_ior.py` — three-arm runner + scorer (`--ior-radius`, `--motion-prediction`).
+- Behaviors `greedy` / `spatial-ior` / `object-ior` (src/system/behavior.cpp) via
+  `attention --attend --behavior <name> [--ior-radius R] [--motion-prediction]`.
+- Motion-predicted correspondence: `ObjectFileStore::Config::motion_prediction`.
