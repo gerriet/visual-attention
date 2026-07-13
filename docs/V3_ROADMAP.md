@@ -214,9 +214,15 @@ better than — object-based IOR**. The thesis's headline object-IOR advantage d
 *not* robustly materialize: object-IOR is only as good as the tracker, and every
 label-switch under fast/dense motion costs it a wasted re-fixation; motion
 prediction narrows but does not close the gap. Sharper H1: object-IOR beats
-space-IOR only to the extent identities stay stable — needs a real MOT tracker in
-the object-file loop (promote the kalman-mot backend) and identity-centric
-metrics. Remaining: seeds+CIs, DAVIS. See `docs/DYNAMIC_IOR_STUDY.md`.
+space-IOR only to the extent identities stay stable. So we built better tracking
+**from the features we already compute** — opt-in motion-predicted + **appearance
+(mean-colour) correspondence** in the object-file store (DeepSORT-style, using
+the already-selected regions). It cuts object-IOR's high-speed waste **3×**
+(0.413 → 0.126), confirming label-switches were the bottleneck and taking
+object-IOR from clearly-worse to *nearly tied* with space-IOR — but not past it
+on exploration metrics. Remaining (the likely object-IOR win): identity-centric
+metrics + *persistent* object memory vs necessarily-decaying spatial memory;
+seeds+CIs; DAVIS. See `docs/DYNAMIC_IOR_STUDY.md`.
 
 ### M13 — Recognition processors (attention-gated perception, H2)
 

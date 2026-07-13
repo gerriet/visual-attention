@@ -32,6 +32,12 @@ std::vector<Cluster> AttentionSystem::segment(const cv::Mat& saliency) const
   const double thresh = std::max(static_cast<double>(config_.segment_min), config_.segment_fraction * max_val);
   cv::Mat mask = saliency > thresh; // CV_8U
 
+  // The native frame, at saliency resolution, gives each cluster an appearance
+  // descriptor (mean colour) for identity-stable correspondence (M12) — computed
+  // only over the already-selected regions, at no extra segmentation cost.
+  const cv::Mat& image = pipeline_.get_frame().image;
+  const bool have_image = !image.empty() && image.size() == saliency.size();
+
   cv::Mat labels, stats, centroids;
   const int num_labels = cv::connectedComponentsWithStats(mask, labels, stats, centroids, 8, CV_32S);
   for (int label = 1; label < num_labels; ++label) // 0 == background
@@ -47,7 +53,14 @@ std::vector<Cluster> AttentionSystem::segment(const cv::Mat& saliency) const
                             stats.at<int>(label, cv::CC_STAT_WIDTH), stats.at<int>(label, cv::CC_STAT_HEIGHT));
     cluster.centroid = cv::Point(static_cast<int>(centroids.at<double>(label, 0) + 0.5),
                                  static_cast<int>(centroids.at<double>(label, 1) + 0.5));
-    cluster.mean_saliency = static_cast<float>(cv::mean(saliency, labels == label)[0]);
+    const cv::Mat region = (labels == label);
+    cluster.mean_saliency = static_cast<float>(cv::mean(saliency, region)[0]);
+    if (have_image)
+    {
+      const cv::Scalar mean_colour = cv::mean(image, region);
+      cluster.appearance = cv::Vec3f(static_cast<float>(mean_colour[0]), static_cast<float>(mean_colour[1]),
+                                     static_cast<float>(mean_colour[2]));
+    }
     clusters.push_back(cluster);
   }
   return clusters;

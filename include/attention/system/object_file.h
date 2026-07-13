@@ -20,6 +20,7 @@ struct Cluster
   cv::Rect bbox;
   int size = 0; // pixel count
   float mean_saliency = 0.0f;
+  cv::Vec3f appearance = cv::Vec3f(0, 0, 0); // mean colour (BGR, 0-255) over the region
 };
 
 /**
@@ -49,7 +50,8 @@ struct ObjectFile
   bool active = true;
   int selection_count = 0; // how many frames it has been the focus (dwell)
 
-  std::deque<cv::Point> trajectory; // recent centroids (most recent last)
+  std::deque<cv::Point> trajectory;          // recent centroids (most recent last)
+  cv::Vec3f appearance = cv::Vec3f(0, 0, 0); // leaky-integrated mean colour (BGR)
 
   bool ever_selected() const { return last_selected_frame >= 0; }
 };
@@ -79,6 +81,14 @@ class ObjectFileStore
     // motion and short occlusions, which object-based IOR depends on (M12).
     // Default off: the thesis's simple nearest-centroid correspondence.
     bool motion_prediction = false;
+    // Fold an appearance descriptor (mean colour of the region, computed from
+    // features the pipeline already produced) into the correspondence cost, so
+    // crossing objects of different colour keep their labels — the DeepSORT
+    // idea, which is what stops the label-switches that cripple object-based IOR.
+    bool appearance_matching = false;
+    // Weight of appearance in the cost: cost = position_px + weight * colour_L2.
+    // A colour difference of 100 (0-255 scale) at weight 0.3 adds 30 px of cost.
+    double appearance_weight = 0.3;
   };
 
   ObjectFileStore() : ObjectFileStore(Config{}) {}

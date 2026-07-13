@@ -133,6 +133,45 @@ TEST_CASE("Exploration dwells, then switches by inhibition of return", "[system]
   CHECK(step(6) == strong_label);
 }
 
+TEST_CASE("appearance matching keeps object identity through a crossing", "[system][objectfile][appearance]")
+{
+  // Two objects of different colour swap positions. Position-only correspondence
+  // swaps their labels at the crossing; folding appearance into the cost keeps
+  // each label with its own colour — the DeepSORT idea using our own features.
+  auto make_cluster = [](int x, int y, cv::Vec3f colour)
+  {
+    system::Cluster c;
+    c.centroid = cv::Point(x, y);
+    c.bbox = cv::Rect(x - 10, y - 10, 20, 20);
+    c.size = 400;
+    c.mean_saliency = 0.8f;
+    c.appearance = colour;
+    return c;
+  };
+  const cv::Vec3f red(0, 0, 255);
+  const cv::Vec3f blue(255, 0, 0);
+
+  auto red_label_after_crossing = [&](bool appearance_matching)
+  {
+    system::ObjectFileStore::Config cfg;
+    cfg.correspondence_radius = 50.0;
+    cfg.appearance_matching = appearance_matching;
+    system::ObjectFileStore store(cfg);
+
+    store.update({make_cluster(60, 100, red), make_cluster(140, 100, blue)}, 0);
+    const int red_label = label_near(store, {60, 100});
+    store.update({make_cluster(90, 100, red), make_cluster(110, 100, blue)}, 1); // approaching
+    store.update({make_cluster(140, 100, red), make_cluster(60, 100, blue)}, 2); // crossed over
+    return std::make_pair(red_label, label_near(store, {140, 100}));             // label now on the red object
+  };
+
+  const auto with_appearance = red_label_after_crossing(true);
+  CHECK(with_appearance.second == with_appearance.first); // identity preserved
+
+  const auto position_only = red_label_after_crossing(false);
+  CHECK(position_only.second != position_only.first); // identity swapped at the crossing
+}
+
 TEST_CASE("AttentionSystem produces a scanpath over the motion sequence", "[system]")
 {
   const fs::path dir = fs::path(ATTENTION_SOURCE_DIR) / "data" / "test_images" / "motion_seq";

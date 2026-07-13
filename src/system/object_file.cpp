@@ -41,6 +41,7 @@ ObjectFile ObjectFileStore::make_file(const Cluster& cluster, int frame)
   file.last_selected_frame = -1;
   file.active = true;
   file.trajectory.push_back(cluster.centroid);
+  file.appearance = cluster.appearance;
   return file;
 }
 
@@ -52,6 +53,7 @@ void ObjectFileStore::update_file(ObjectFile& file, const Cluster& cluster, int 
   file.saliency = cluster.mean_saliency;
   // Leaky integrator: recent frames weigh more, older information decays.
   file.avg_saliency = config_.leaky_alpha * cluster.mean_saliency + (1.0f - config_.leaky_alpha) * file.avg_saliency;
+  file.appearance = 0.5f * cluster.appearance + 0.5f * file.appearance; // stabilize the descriptor
   file.last_seen_frame = frame;
   file.active = true;
   file.trajectory.push_back(cluster.centroid);
@@ -77,7 +79,7 @@ void ObjectFileStore::update(const std::vector<Cluster>& clusters, int frame)
   // deterministic given the small number of files and clusters.
   struct Pair
   {
-    double dist;
+    double cost;
     int file;
     int cluster;
   };
@@ -88,17 +90,26 @@ void ObjectFileStore::update(const std::vector<Cluster>& clusters, int frame)
     {
       const cv::Point2d predicted = expected_centroid(active_[f], config_.motion_prediction, 1);
       const double d = cv::norm(predicted - cv::Point2d(clusters[c].centroid.x, clusters[c].centroid.y));
-      if (d < 2.0 * radius)
+      if (d >= 2.0 * radius) // position gate: too far to be the same object
       {
-        pairs.push_back({d, f, c});
+        continue;
       }
+      // Appearance folds into the cost (not the gate): a colour mismatch pushes a
+      // spatially plausible but wrong-looking cluster down the assignment order,
+      // so crossing objects of different colour keep their labels.
+      double cost = d;
+      if (config_.appearance_matching)
+      {
+        cost += config_.appearance_weight * cv::norm(active_[f].appearance - clusters[c].appearance);
+      }
+      pairs.push_back({cost, f, c});
     }
   }
   std::sort(pairs.begin(), pairs.end(),
             [](const Pair& a, const Pair& b)
             {
-              if (a.dist != b.dist)
-                return a.dist < b.dist;
+              if (a.cost != b.cost)
+                return a.cost < b.cost;
               if (a.file != b.file)
                 return a.file < b.file;
               return a.cluster < b.cluster;

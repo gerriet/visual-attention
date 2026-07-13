@@ -100,7 +100,7 @@ def score(gt, scanpath, match_radius):
     }
 
 
-def run_arm(binary, scene_dir, config, behavior, out_dir, ior_radius=None, motion_prediction=False):
+def run_arm(binary, scene_dir, config, behavior, out_dir, ior_radius=None, tracking=()):
     os.makedirs(out_dir, exist_ok=True)
     scan_path = os.path.join(out_dir, "scanpath_%s.json" % behavior)
     cmd = [binary, "--attend", scene_dir, "--behavior", behavior,
@@ -109,8 +109,7 @@ def run_arm(binary, scene_dir, config, behavior, out_dir, ior_radius=None, motio
         cmd += ["--config", config]
     if ior_radius is not None:
         cmd += ["--ior-radius", str(ior_radius)]
-    if motion_prediction:
-        cmd += ["--motion-prediction"]
+    cmd += list(tracking)  # e.g. --motion-prediction / --appearance-matching
     subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return load_json(scan_path)["scanpath"]
 
@@ -118,11 +117,11 @@ def run_arm(binary, scene_dir, config, behavior, out_dir, ior_radius=None, motio
 ARMS = ["greedy", "spatial-ior", "object-ior"]
 
 
-def study(binary, scene_dir, config, out_dir, match_radius, ior_radius=None, motion_prediction=False):
+def study(binary, scene_dir, config, out_dir, match_radius, ior_radius=None, tracking=()):
     gt = load_json(os.path.join(scene_dir, "gt.json"))
     rows = {}
     for behavior in ARMS:
-        scanpath = run_arm(binary, scene_dir, config, behavior, out_dir, ior_radius, motion_prediction)
+        scanpath = run_arm(binary, scene_dir, config, behavior, out_dir, ior_radius, tracking)
         rows[behavior] = score(gt, scanpath, match_radius)
     return gt, rows
 
@@ -152,6 +151,8 @@ def main():
                     help="spatial-IOR tag radius (px); tight radius + fast motion is where object-IOR wins")
     ap.add_argument("--motion-prediction", action="store_true",
                     help="object-file correspondence tracks predicted position (holds identity under motion)")
+    ap.add_argument("--appearance-matching", action="store_true",
+                    help="fold appearance (region colour) into correspondence (holds identity through crossings)")
     ap.add_argument("--json", action="store_true", help="also print the raw metrics as JSON")
     args = ap.parse_args()
 
@@ -160,8 +161,13 @@ def main():
     if not os.path.exists(os.path.join(args.scene, "gt.json")):
         sys.exit("no gt.json in %s (generate with tools/make_dynamic_scene.py)" % args.scene)
 
+    tracking = []
+    if args.motion_prediction:
+        tracking.append("--motion-prediction")
+    if args.appearance_matching:
+        tracking.append("--appearance-matching")
     _, rows = study(args.binary, args.scene, args.config, args.out, args.match_radius,
-                    args.ior_radius, args.motion_prediction)
+                    args.ior_radius, tuple(tracking))
     print(format_table(rows))
     if args.json:
         print(json.dumps(rows, indent=2))

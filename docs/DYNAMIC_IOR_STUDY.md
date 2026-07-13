@@ -132,23 +132,66 @@ space-based only to the extent the tracker keeps identities stable** — and the
 thesis's simple nearest-centroid correspondence (even with velocity prediction)
 is not stable enough at the speeds where space-IOR would otherwise fail.
 
+## Better tracking from the features we already have (and it helps — a lot)
+
+If object-IOR is bottlenecked by label-switches, the fix is a better tracker —
+and we can build one almost for free. The first selection stage has already
+chosen the regions and the feature pipeline has already computed colour there,
+so each object file can carry an **appearance descriptor** (mean colour of its
+region) and correspondence can match on **motion + appearance**, not position
+alone — the DeepSORT idea, with our own features as the embedding. Two crossing
+objects of different colour then keep their labels (unit test:
+`appearance matching keeps object identity through a crossing`). Both are opt-in
+(`ObjectFileStore::Config::{motion_prediction, appearance_matching}`,
+`--motion-prediction --appearance-matching`), default off so the thesis
+behaviour is unchanged.
+
+The effect on object-IOR is large. High speed (4 objects, speed 40,
+`ior_radius` 20, 4 seeds):
+
+| tracker | object-IOR waste | object-IOR latency |
+|---|---|---|
+| naive (position only) | 0.413 | 8.19 |
+| motion-predicted | 0.311 | 6.50 |
+| **motion + appearance** | **0.126** | **5.88** |
+
+Appearance matching cuts object-IOR's wasted revisits **3×** (0.413 → 0.126) —
+direct confirmation that label-switches were the bottleneck. Object-IOR goes
+from clearly-worse to **nearly tied** with space-IOR (0.086 / 4.81).
+
+But *nearly tied* is the honest word: even with good tracking, **space-IOR is
+still marginally ahead on these exploration metrics** (high speed and occlusion
+alike). Why: coverage / revisit-waste / latency reward *spreading attention over
+the scene*, which "don't look where you just looked" does inherently well.
+Object-IOR's distinctive product — knowing you are re-visiting the *same*
+identity, and never needing to forget it (spatial memory must decay because
+locations get reused; object memory needn't) — is barely exercised by these
+metrics. So the tracking upgrade closed the gap that tracking errors had opened,
+but did not, on its own, flip the exploration comparison.
+
 ## What a genuine object-IOR win would need (next)
 
-- **A real MOT tracker in the object-file loop** — the kalman-mot backend's
-  Kalman + gated association (currently a *selection* strategy, unused by
-  `--attend`) promoted into the object-file store, or a JPDA/GM-PHD tracker.
-  Object-IOR's win is gated on near-zero label-switch rate.
-- **Identity-centric metrics.** Coverage/waste reward *finding* objects; they
-  under-credit object-IOR's real product — a stable, identity-consistent
-  scanpath through occlusion. Score ID-persistence and occlusion-recovery of the
-  *same* label, where object-IOR should win by construction.
-- **Rigorous statistics**: ≥20 seeds/cell with bootstrap CIs (here: ≤4 seeds).
+- **Identity-centric metrics — the most likely place object-IOR wins.**
+  Coverage / waste reward *finding* objects; they under-credit object-IOR's real
+  product: a stable, identity-consistent scanpath, and *never forgetting* an
+  object was seen (spatial memory has to decay because locations are reused;
+  object memory needn't). Score ID-persistence and same-label occlusion recovery,
+  and let object-IOR use *persistent* object memory against space-IOR's
+  necessarily-decaying spatial memory — the asymmetry is the point.
+- **Even better tracking** if needed — promote the kalman-mot backend's Kalman +
+  gated association fully into the store, or add a stronger appearance embedding
+  (histogram / per-feature signature, not just mean colour).
+- **Rigorous statistics**: ≥20 seeds/cell with bootstrap CIs (here: ≤5 seeds).
 - **Real video**: DAVIS-2017 masks for exact "which object attended".
 
 ## Artifacts
 
 - `tools/make_dynamic_scene.py` — scene + `gt.json` generator (`dynamic-scene-gt/v1`).
-- `eval/dynamic_ior.py` — three-arm runner + scorer (`--ior-radius`, `--motion-prediction`).
+- `eval/dynamic_ior.py` — three-arm runner + scorer (`--ior-radius`,
+  `--motion-prediction`, `--appearance-matching`).
 - Behaviors `greedy` / `spatial-ior` / `object-ior` (src/system/behavior.cpp) via
-  `attention --attend --behavior <name> [--ior-radius R] [--motion-prediction]`.
-- Motion-predicted correspondence: `ObjectFileStore::Config::motion_prediction`.
+  `attention --attend --behavior <name> [--ior-radius R] [--ior-decay D]
+  [--motion-prediction] [--appearance-matching]`.
+- Robust correspondence: `ObjectFileStore::Config::{motion_prediction,
+  appearance_matching, appearance_weight}` — appearance from the mean colour of
+  each selected region, computed in `AttentionSystem::segment`.
