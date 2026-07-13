@@ -41,3 +41,10 @@ eval/.venv/
 
 # Personal / private test images (not for distribution)
 data/test_images/gb_profile_social.jpg
+
+# Dissertation — kept locally, not redistributed with the public repo.
+# The published open-access version is linked from the README instead.
+docs/thesis/
+
+# Internal working notes — local only, never part of the public repo
+CONTEXT_public-release.md
