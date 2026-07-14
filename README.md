@@ -1,10 +1,10 @@
-# Visual Attention Framework
+# Visual Attention
 
 A two-stage, biologically inspired visual-attention system in modern C++ — a
 faithful, tested reimplementation of the model from my 2004 doctoral
 dissertation, rebuilt in 2025–26.
 
-[![CI](https://github.com/OWNER/attention-framework/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/attention-framework/actions/workflows/ci.yml)
+[![CI](https://github.com/gerriet/visual-attention/actions/workflows/ci.yml/badge.svg)](https://github.com/gerriet/visual-attention/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ![Scanpath on a sample image](docs/images/scanpath_butterfly.png)
