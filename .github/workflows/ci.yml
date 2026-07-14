@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # OpenCV 4 and yaml-cpp from apt; Catch2 v3 is fetched by CMake at configure time.
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake g++ libopencv-dev libyaml-cpp-dev
+
+      # The Python evaluation layer (numpy/pillow); lets the eval + behavioural
+      # tests run in CI as well. CMake picks up eval/.venv automatically.
+      - name: Set up Python evaluation venv
+        run: |
+          python3 -m venv eval/.venv
+          eval/.venv/bin/pip install --upgrade pip
+          eval/.venv/bin/pip install -r eval/requirements.txt
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build -j
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
