@@ -202,6 +202,28 @@ regime map (where object-IOR pays, where it doesn't). Honesty requirement:
 publish the failure regimes too (e.g. very slow scenes where space-IOR
 suffices).
 
+**Status (2026-07-12): first cut done** — the three arms are behaviors
+(`greedy` / `spatial-ior` / `object-ior`, `attention --attend --behavior`),
+identical except in what they inhibit; `tools/make_dynamic_scene.py` +
+`eval/dynamic_ior.py` generate scenes and score coverage/latency/waste/
+perseveration. Finding: **IOR ≫ no-IOR (H1's first half strongly supported);** but pushing into
+fast-motion + occlusion (with a configurable `--ior-radius` and opt-in
+**motion-predicted correspondence** in the object-file store, `--motion-prediction`)
+shows, across seeds, that **space-based IOR is at least as good as — usually
+better than — object-based IOR**. The thesis's headline object-IOR advantage does
+*not* robustly materialize: object-IOR is only as good as the tracker, and every
+label-switch under fast/dense motion costs it a wasted re-fixation; motion
+prediction narrows but does not close the gap. Sharper H1: object-IOR beats
+space-IOR only to the extent identities stay stable. So we built better tracking
+**from the features we already compute** — opt-in motion-predicted + **appearance
+(mean-colour) correspondence** in the object-file store (DeepSORT-style, using
+the already-selected regions). It cuts object-IOR's high-speed waste **3×**
+(0.413 → 0.126), confirming label-switches were the bottleneck and taking
+object-IOR from clearly-worse to *nearly tied* with space-IOR — but not past it
+on exploration metrics. Remaining (the likely object-IOR win): identity-centric
+metrics + *persistent* object memory vs necessarily-decaying spatial memory;
+seeds+CIs; DAVIS. See `docs/DYNAMIC_IOR_STUDY.md`.
+
 ### M13 — Recognition processors (attention-gated perception, H2)
 
 - Tier 1 (zero new dependencies): `hog-person` and `haar-face` processors

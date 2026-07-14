@@ -1,8 +1,10 @@
 #pragma once
 
 #include "attention/system/object_file.h"
+#include <map>
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace attention
 {
@@ -70,9 +72,68 @@ class Exploration : public Behavior
 };
 
 /**
- * Create a behavior by name ("exploration"). Throws for unknown names.
+ * IorBehavior: the inhibition-of-return ablation for the dynamic-IOR study
+ * (roadmap M12, docs/DYNAMIC_IOR_STUDY.md). Three modes that are identical
+ * except in *what* they inhibit, so a scanpath comparison isolates the effect of
+ * the inhibition domain — the thesis's core stage-2 claim (H1):
+ *   None    ("greedy")      — no inhibition; always the most salient object, so
+ *                             attention perseverates on the strongest one.
+ *   Spatial ("spatial-ior") — inhibit recently attended LOCATIONS (decaying); a
+ *                             moving object escapes its own inhibited spot, so it
+ *                             is re-fixated and empty inhibited regions waste
+ *                             revisits — the space-based weakness in motion.
+ *   Object  ("object-ior")  — inhibit recently attended OBJECTS (decaying); the
+ *                             tag follows the object as it moves.
+ * Focus score = object saliency − inhibition; the winner is re-inhibited.
  */
-std::unique_ptr<Behavior> create_behavior(const std::string& name);
+class IorBehavior : public Behavior
+{
+ public:
+  enum class Mode
+  {
+    None,
+    Spatial,
+    Object
+  };
+
+  struct Params
+  {
+    float ior_radius = 60.0f;  // Spatial: Gaussian radius of a location tag (px)
+    float ior_strength = 1.0f; // inhibition deposited on the selected focus
+    float ior_decay = 0.8f;    // per-frame decay (thesis §8.3: ~20%/frame)
+  };
+
+  IorBehavior(Mode mode, std::string name) : IorBehavior(mode, std::move(name), Params{}) {}
+  IorBehavior(Mode mode, std::string name, const Params& params) : mode_(mode), name_(std::move(name)), params_(params)
+  {
+  }
+
+  std::string name() const override { return name_; }
+  const ObjectFile* select_focus(ObjectFileStore& store, int frame) override;
+  void reset() override;
+
+ private:
+  struct Spot
+  {
+    cv::Point loc;
+    float strength;
+  };
+
+  Mode mode_;
+  std::string name_;
+  Params params_;
+  std::vector<Spot> spatial_;         // Spatial mode: decaying location tags
+  std::map<int, float> object_inhib_; // Object mode: decaying inhibition by label
+};
+
+/**
+ * Create a behavior by name. Available: "exploration" (thesis default), and the
+ * dynamic-IOR ablation "greedy" / "spatial-ior" / "object-ior". The IOR params
+ * apply to the ablation behaviors (Exploration ignores them). Throws for
+ * unknown names.
+ */
+std::unique_ptr<Behavior> create_behavior(const std::string& name,
+                                          const IorBehavior::Params& ior_params = IorBehavior::Params{});
 
 } // namespace system
 } // namespace attention

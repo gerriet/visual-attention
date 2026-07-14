@@ -133,6 +133,45 @@ TEST_CASE("Exploration dwells, then switches by inhibition of return", "[system]
   CHECK(step(6) == strong_label);
 }
 
+TEST_CASE("appearance matching keeps object identity through a crossing", "[system][objectfile][appearance]")
+{
+  // Two objects of different colour swap positions. Position-only correspondence
+  // swaps their labels at the crossing; folding appearance into the cost keeps
+  // each label with its own colour — the DeepSORT idea using our own features.
+  auto make_cluster = [](int x, int y, cv::Vec3f colour)
+  {
+    system::Cluster c;
+    c.centroid = cv::Point(x, y);
+    c.bbox = cv::Rect(x - 10, y - 10, 20, 20);
+    c.size = 400;
+    c.mean_saliency = 0.8f;
+    c.appearance = colour;
+    return c;
+  };
+  const cv::Vec3f red(0, 0, 255);
+  const cv::Vec3f blue(255, 0, 0);
+
+  auto red_label_after_crossing = [&](bool appearance_matching)
+  {
+    system::ObjectFileStore::Config cfg;
+    cfg.correspondence_radius = 50.0;
+    cfg.appearance_matching = appearance_matching;
+    system::ObjectFileStore store(cfg);
+
+    store.update({make_cluster(60, 100, red), make_cluster(140, 100, blue)}, 0);
+    const int red_label = label_near(store, {60, 100});
+    store.update({make_cluster(90, 100, red), make_cluster(110, 100, blue)}, 1); // approaching
+    store.update({make_cluster(140, 100, red), make_cluster(60, 100, blue)}, 2); // crossed over
+    return std::make_pair(red_label, label_near(store, {140, 100}));             // label now on the red object
+  };
+
+  const auto with_appearance = red_label_after_crossing(true);
+  CHECK(with_appearance.second == with_appearance.first); // identity preserved
+
+  const auto position_only = red_label_after_crossing(false);
+  CHECK(position_only.second != position_only.first); // identity swapped at the crossing
+}
+
 TEST_CASE("AttentionSystem produces a scanpath over the motion sequence", "[system]")
 {
   const fs::path dir = fs::path(ATTENTION_SOURCE_DIR) / "data" / "test_images" / "motion_seq";
@@ -150,6 +189,71 @@ TEST_CASE("AttentionSystem produces a scanpath over the motion sequence", "[syst
   CHECK_FALSE(sys.scanpath().empty());
   // Object files were formed from the salient square.
   CHECK_FALSE(sys.active_files().empty());
+}
+
+TEST_CASE("IOR-ablation behaviors differ by inhibition domain", "[system][behavior][ior]")
+{
+  // The dynamic-IOR study (M12) hinges on these three differing only in what
+  // they inhibit. Two objects; the "strong" one stays the more salient.
+  auto make_store = [] { return system::ObjectFileStore{}; };
+
+  SECTION("greedy (no IOR) perseverates on the most salient object")
+  {
+    auto behavior = system::create_behavior("greedy");
+    system::ObjectFileStore store = make_store();
+    const auto strong = cluster_at(20, 20, 0.9f);
+    const auto weak = cluster_at(150, 150, 0.5f);
+    int strong_label = 0;
+    for (int f = 0; f < 5; ++f)
+    {
+      store.update({strong, weak}, f);
+      if (f == 0)
+      {
+        strong_label = label_near(store, {20, 20});
+      }
+      const system::ObjectFile* focus = behavior->select_focus(store, f);
+      REQUIRE(focus != nullptr);
+      CHECK(focus->label == strong_label); // never leaves the strongest
+    }
+  }
+
+  SECTION("object-ior leaves a static object after selecting it")
+  {
+    auto behavior = system::create_behavior("object-ior");
+    system::ObjectFileStore store = make_store();
+    const auto strong = cluster_at(20, 20, 0.9f);
+    const auto weak = cluster_at(150, 150, 0.5f);
+
+    store.update({strong, weak}, 0);
+    const int strong_label = label_near(store, {20, 20});
+    const system::ObjectFile* f0 = behavior->select_focus(store, 0);
+    REQUIRE(f0 != nullptr);
+    CHECK(f0->label == strong_label); // strongest first
+
+    store.update({strong, weak}, 1);
+    const system::ObjectFile* f1 = behavior->select_focus(store, 1);
+    REQUIRE(f1 != nullptr);
+    CHECK(f1->label != strong_label); // inhibited -> moves to the other object
+  }
+
+  SECTION("spatial-ior inhibits a selected location (unlike greedy)")
+  {
+    // On static objects space-based IOR behaves like object-based: it leaves the
+    // strong object after looking at it. (The two diverge only under motion,
+    // which is an emergent, statistical effect measured by the M12 study, not a
+    // single-step unit assertion.)
+    auto behavior = system::create_behavior("spatial-ior");
+    system::ObjectFileStore store = make_store();
+    const auto strong = cluster_at(20, 20, 0.9f);
+    const auto weak = cluster_at(150, 150, 0.5f);
+
+    store.update({strong, weak}, 0);
+    const int strong_label = label_near(store, {20, 20});
+    REQUIRE(behavior->select_focus(store, 0)->label == strong_label);
+
+    store.update({strong, weak}, 1);
+    CHECK(behavior->select_focus(store, 1)->label != strong_label); // location inhibited
+  }
 }
 
 TEST_CASE("AttentionSystem in Feature mode keeps no object files", "[system]")

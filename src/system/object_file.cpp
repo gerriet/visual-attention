@@ -6,6 +6,25 @@ namespace attention
 namespace system
 {
 
+namespace
+{
+// Where an object file is expected `steps` frames ahead: its last centroid plus
+// its trajectory velocity (last step), when motion prediction is enabled and
+// there is enough history. Falls back to the last centroid otherwise.
+cv::Point2d expected_centroid(const ObjectFile& file, bool use_motion, int steps)
+{
+  const cv::Point2d last(file.centroid.x, file.centroid.y);
+  if (!use_motion || file.trajectory.size() < 2)
+  {
+    return last;
+  }
+  const cv::Point& p1 = file.trajectory[file.trajectory.size() - 1];
+  const cv::Point& p0 = file.trajectory[file.trajectory.size() - 2];
+  const int s = std::max(1, std::min(steps, 8)); // clamp wild extrapolation
+  return cv::Point2d(p1.x + s * (p1.x - p0.x), p1.y + s * (p1.y - p0.y));
+}
+} // namespace
+
 ObjectFileStore::ObjectFileStore(const Config& config) : config_(config) {}
 
 ObjectFile ObjectFileStore::make_file(const Cluster& cluster, int frame)
@@ -22,6 +41,7 @@ ObjectFile ObjectFileStore::make_file(const Cluster& cluster, int frame)
   file.last_selected_frame = -1;
   file.active = true;
   file.trajectory.push_back(cluster.centroid);
+  file.appearance = cluster.appearance;
   return file;
 }
 
@@ -33,6 +53,7 @@ void ObjectFileStore::update_file(ObjectFile& file, const Cluster& cluster, int 
   file.saliency = cluster.mean_saliency;
   // Leaky integrator: recent frames weigh more, older information decays.
   file.avg_saliency = config_.leaky_alpha * cluster.mean_saliency + (1.0f - config_.leaky_alpha) * file.avg_saliency;
+  file.appearance = 0.5f * cluster.appearance + 0.5f * file.appearance; // stabilize the descriptor
   file.last_seen_frame = frame;
   file.active = true;
   file.trajectory.push_back(cluster.centroid);
@@ -58,7 +79,7 @@ void ObjectFileStore::update(const std::vector<Cluster>& clusters, int frame)
   // deterministic given the small number of files and clusters.
   struct Pair
   {
-    double dist;
+    double cost;
     int file;
     int cluster;
   };
@@ -67,18 +88,28 @@ void ObjectFileStore::update(const std::vector<Cluster>& clusters, int frame)
   {
     for (int c = 0; c < nc; ++c)
     {
-      const double d = cv::norm(active_[f].centroid - clusters[c].centroid);
-      if (d < 2.0 * radius)
+      const cv::Point2d predicted = expected_centroid(active_[f], config_.motion_prediction, 1);
+      const double d = cv::norm(predicted - cv::Point2d(clusters[c].centroid.x, clusters[c].centroid.y));
+      if (d >= 2.0 * radius) // position gate: too far to be the same object
       {
-        pairs.push_back({d, f, c});
+        continue;
       }
+      // Appearance folds into the cost (not the gate): a colour mismatch pushes a
+      // spatially plausible but wrong-looking cluster down the assignment order,
+      // so crossing objects of different colour keep their labels.
+      double cost = d;
+      if (config_.appearance_matching)
+      {
+        cost += config_.appearance_weight * cv::norm(active_[f].appearance - clusters[c].appearance);
+      }
+      pairs.push_back({cost, f, c});
     }
   }
   std::sort(pairs.begin(), pairs.end(),
             [](const Pair& a, const Pair& b)
             {
-              if (a.dist != b.dist)
-                return a.dist < b.dist;
+              if (a.cost != b.cost)
+                return a.cost < b.cost;
               if (a.file != b.file)
                 return a.file < b.file;
               return a.cluster < b.cluster;
@@ -122,7 +153,11 @@ void ObjectFileStore::update(const std::vector<Cluster>& clusters, int frame)
     double best_dist = radius;
     for (int i = 0; i < static_cast<int>(inactive_.size()); ++i)
     {
-      const double d = cv::norm(inactive_[i].centroid - clusters[c].centroid);
+      // Extrapolate the inactive file forward over the frames it was gone, so an
+      // object that kept moving while occluded is revived at where it should be.
+      const int gone = std::max(1, frame - inactive_[i].last_seen_frame);
+      const cv::Point2d predicted = expected_centroid(inactive_[i], config_.motion_prediction, gone);
+      const double d = cv::norm(predicted - cv::Point2d(clusters[c].centroid.x, clusters[c].centroid.y));
       if (d < best_dist)
       {
         best_dist = d;

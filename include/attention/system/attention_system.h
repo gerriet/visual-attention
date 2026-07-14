@@ -62,6 +62,7 @@ class AttentionSystem
     pipeline::PipelineConfig pipeline;
     ObjectFileStore::Config object_store;
     std::string behavior = "exploration";
+    IorBehavior::Params ior_params; // params for the IOR-ablation behaviors (M12)
     ActionMode action_mode = ActionMode::Scanpath;
 
     // Saliency segmentation into candidate clusters:

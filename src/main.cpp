@@ -139,7 +139,9 @@ cv::Mat annotate_objects(const attention::system::AttentionSystem& sys)
 // Run the AttentionSystem (second stage + behavior) over a temporal sequence
 // (image directory or video) and emit its scanpath.
 void process_attend(const std::string& path, attention::pipeline::PipelineConfig& pipeline_config,
-                    const std::string& output_base, const std::string& emit_scanpath, bool user_config)
+                    const std::string& output_base, const std::string& emit_scanpath, bool user_config,
+                    const std::string& behavior, float ior_radius, float ior_decay, bool motion_prediction,
+                    bool appearance_matching)
 {
   if (!user_config)
   {
@@ -148,6 +150,20 @@ void process_attend(const std::string& path, attention::pipeline::PipelineConfig
 
   attention::system::AttentionSystem::Config cfg;
   cfg.pipeline = pipeline_config;
+  cfg.object_store.motion_prediction = motion_prediction;
+  cfg.object_store.appearance_matching = appearance_matching;
+  if (!behavior.empty())
+  {
+    cfg.behavior = behavior; // dynamic-IOR ablation: greedy / spatial-ior / object-ior / exploration
+  }
+  if (ior_radius > 0.0f)
+  {
+    cfg.ior_params.ior_radius = ior_radius;
+  }
+  if (ior_decay > 0.0f)
+  {
+    cfg.ior_params.ior_decay = ior_decay;
+  }
   attention::system::AttentionSystem sys(cfg);
 
   std::unique_ptr<attention::pipeline::FrameSource> source;
@@ -476,7 +492,9 @@ void print_usage(const char* program_name, std::ostream& out = std::cerr)
   out << "  " << program_name << " --batch <directory> [options]" << std::endl;
   out << "  " << program_name << " --stereo <left> <right> [options]" << std::endl;
   out << "  " << program_name << " --sequence <dir|video> [--output dir] [--config yaml]" << std::endl;
-  out << "  " << program_name << " --attend <dir|video> [--output dir] [--emit-scanpath path] [--config yaml]"
+  out << "  " << program_name
+      << " --attend <dir|video> [--output dir] [--emit-scanpath path] [--config yaml] [--behavior name] "
+         "[--ior-radius px] [--motion-prediction] [--appearance-matching]"
       << std::endl;
   out << "  " << program_name << " --live <camera|video|dir> [--config configs/live.yaml] [--processors a,b]"
       << std::endl;
@@ -650,6 +668,11 @@ int main(int argc, char** argv)
       std::string seq_path = argv[2];
       std::string output_dir;
       std::string scanpath_path;
+      std::string behavior;
+      float ior_radius = -1.0f;
+      float ior_decay = -1.0f;
+      bool motion_prediction = false;
+      bool appearance_matching = false;
       bool user_config = false;
       config = attention::config::ConfigLoader::create_default();
       for (int i = 3; i < argc; ++i)
@@ -668,8 +691,29 @@ int main(int argc, char** argv)
         {
           scanpath_path = argv[++i];
         }
+        else if (arg == "--behavior" && i + 1 < argc)
+        {
+          behavior = argv[++i];
+        }
+        else if (arg == "--ior-radius" && i + 1 < argc)
+        {
+          ior_radius = std::stof(argv[++i]);
+        }
+        else if (arg == "--ior-decay" && i + 1 < argc)
+        {
+          ior_decay = std::stof(argv[++i]);
+        }
+        else if (arg == "--motion-prediction")
+        {
+          motion_prediction = true;
+        }
+        else if (arg == "--appearance-matching")
+        {
+          appearance_matching = true;
+        }
       }
-      process_attend(seq_path, config.pipeline, output_dir, scanpath_path, user_config);
+      process_attend(seq_path, config.pipeline, output_dir, scanpath_path, user_config, behavior, ior_radius, ior_decay,
+                     motion_prediction, appearance_matching);
       return 0;
     }
     else if (std::string(argv[1]) == "--stereo")
