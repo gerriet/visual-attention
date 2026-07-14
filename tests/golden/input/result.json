@@ -1,7 +1,7 @@
 {
   "schema": "attention-result/v1",
   "source": {
-    "image": "data/test_images/input.png",
+    "image": "input.png",
     "width": 256,
     "height": 256
   },

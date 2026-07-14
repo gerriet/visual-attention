@@ -88,7 +88,10 @@ void ResultWriter::write(const pipeline::AttentionPipeline& pipeline, const std:
   out << "{\n";
   out << "  \"schema\": \"attention-result/v1\",\n";
   out << "  \"source\": {\n";
-  out << "    \"image\": \"" << escape_json(frame.source_path) << "\",\n";
+  // Emit only the filename, never the caller's absolute path (avoids leaking
+  // local filesystem layout into committed/shared results; the field is
+  // informational, see docs/INTERCHANGE_FORMAT.md).
+  out << "    \"image\": \"" << escape_json(fs::path(frame.source_path).filename().string()) << "\",\n";
   out << "    \"width\": " << frame.width() << ",\n";
   out << "    \"height\": " << frame.height() << "\n";
   out << "  },\n";

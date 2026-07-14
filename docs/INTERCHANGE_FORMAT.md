@@ -32,7 +32,7 @@ A result is two files side by side:
 {
   "schema": "attention-result/v1",
   "source": {
-    "image": "path as given to the generator (informational only)",
+    "image": "input filename, e.g. inputc.png (informational only)",
     "width": 256,
     "height": 256
   },
