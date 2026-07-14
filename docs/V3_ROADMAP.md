@@ -112,7 +112,7 @@ The thesis contains concrete, reproducible experiments — mostly ch. 5/6:
 - Qualitative ch. 9 claims worth a demo each: flanker-compatibility effect
   (§9.3.2), early vs late selection (§9.3.3).
 
-Work: mine `docs/thesis/thesis.txt` into a definitive findings list (ref →
+Work: mine the dissertation text (published open access) into a definitive findings list (ref →
 claim → stimulus → expected curve/behavior); build each as a scripted
 experiment under `experiments/replication/`; synthetic stimulus generators
 where the thesis used lab imagery. Deliverable:

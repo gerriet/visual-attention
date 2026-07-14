@@ -60,7 +60,8 @@ flowchart TD
     P --> OS[ObjectFileStore<br/>correspondence + tracking]
     OS --> BH[Behaviour<br/>Exploration: dwell + object-based IoR]
     BH --> SP[Focus + scanpath]
-    RS[(RunState<br/>field activity · IoR map · object files · prev. frame)] -.carried across frames.- SEL
+    RS[(RunState<br/>field activity · IoR map · object files · prev. frame)]
+    RS -.->|carried across frames| SEL
     RS -.-> OS
 ```
 

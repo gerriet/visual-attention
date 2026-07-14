@@ -1,6 +1,6 @@
 # V2 Roadmap — Bolder Modernization Phase
 
-*Agreed 2026-07-04. Supersedes PHASE1_ACTION_PLAN.md / REALISTIC_TIMELINE.md for direction; those remain as history of the first phase. The follow-on science phase (replication dossier, dynamic-IOR study, model lab, recognition processors, scenarios) is planned in `docs/V3_ROADMAP.md`.*
+*Agreed 2026-07-04. Supersedes the initial phase-1 planning notes for direction. The follow-on science phase (replication dossier, dynamic-IOR study, model lab, recognition processors, scenarios) is planned in `docs/V3_ROADMAP.md`.*
 
 ## Goals
 
