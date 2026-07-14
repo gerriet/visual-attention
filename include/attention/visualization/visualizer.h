@@ -35,7 +35,7 @@ cv::Mat visualize_feature_map(const core::FeatureMap& feature, const std::string
  * @return Visualization as BGR image (heatmap or overlay)
  */
 cv::Mat visualize_saliency_map(const core::SaliencyMap& saliency, const cv::Mat& original = cv::Mat(),
-                               const std::string& window_name = "Saliency Map", bool mark_peaks = false,
+                               const std::string& window_name = "", bool mark_peaks = false,
                                bool wait_key = false);
 
 /**
@@ -47,7 +47,7 @@ cv::Mat visualize_saliency_map(const core::SaliencyMap& saliency, const cv::Mat&
  * @return Combined visualization
  */
 cv::Mat visualize_side_by_side(const std::vector<cv::Mat>& images, const std::vector<std::string>& labels = {},
-                               const std::string& window_name = "Comparison", bool wait_key = false);
+                               const std::string& window_name = "", bool wait_key = false);
 
 /**
  * Save visualization to file.
@@ -67,7 +67,7 @@ bool save_visualization(const cv::Mat& image, const std::string& filepath);
  * @return Visualization with scan path overlay
  */
 cv::Mat visualize_scan_path(const core::SaliencyMap& saliency, const cv::Mat& original,
-                            const std::string& window_name = "Scan Path", bool wait_key = false);
+                            const std::string& window_name = "", bool wait_key = false);
 
 } // namespace visualization
 } // namespace attention
