@@ -9,6 +9,10 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    # OpenCV's highgui is built against Qt on Ubuntu; force the offscreen Qt
+    # platform so any stray window call cannot abort on the display-less runner.
+    env:
+      QT_QPA_PLATFORM: offscreen
     steps:
       - uses: actions/checkout@v4
 
