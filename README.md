@@ -106,7 +106,7 @@ including where it could still be relevant — is in
 The dissertation is open access: Backer, G. (2004). *Modellierung visueller
 Aufmerksamkeit im Computer-Sehen: Ein zweistufiges Selektionsmodell für ein
 Aktives Sehsystem.* PhD thesis, Universität Hamburg —
-[ediss.sub.uni-hamburg.de](https://ediss.sub.uni-hamburg.de/volltexte/2004/2226/).
+[ediss.sub.uni-hamburg.de](https://ediss.sub.uni-hamburg.de/handle/ediss/719).
 
 ## Tests
 
@@ -143,7 +143,7 @@ MIT — see [LICENSE](LICENSE).
 
 ## Citation
 
-If you reference this work, please cite the dissertation:
+If you reference this work, please cite the [dissertation](https://ediss.sub.uni-hamburg.de/handle/ediss/719):
 
 > Backer, G. (2004). *Modellierung visueller Aufmerksamkeit im Computer-Sehen:
 > Ein zweistufiges Selektionsmodell für ein Aktives Sehsystem.* PhD thesis,
