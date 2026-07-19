@@ -85,6 +85,7 @@ The load-bearing choices are recorded as short ADRs:
 - [C++ core, Python evaluation layer](docs/adr/0001-cpp-core-python-eval.md)
 - [Registry- and config-driven strategies](docs/adr/0002-registry-config-driven-strategies.md)
 - [File-based interchange instead of FFI](docs/adr/0003-file-interchange-not-ffi.md)
+- [IOR as a controlled ablation, and an honest negative result](docs/adr/0004-ior-ablation-honest-negative-result.md)
 
 ## Context — where this sits
 
