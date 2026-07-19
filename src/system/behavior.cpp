@@ -85,6 +85,88 @@ void Exploration::reset()
   dwell_count_ = 0;
 }
 
+bool Identification::is_settled(const ObjectFile& file) const
+{
+  const bool labeled =
+      file.labels.best_count() >= params_.min_votes && file.labels.best_confidence() >= params_.confidence;
+  const bool given_up = file.labels.inspections >= params_.max_inspections;
+  return labeled || given_up;
+}
+
+const ObjectFile* Identification::select_focus(ObjectFileStore& store, int frame)
+{
+  const auto& active = store.active_files();
+  if (active.empty())
+  {
+    current_focus_label_ = -1;
+    dwell_count_ = 0;
+    return nullptr;
+  }
+
+  // Keep dwelling on the current focus while it is present, unsettled, and the
+  // dwell is not complete — but drop it the moment it settles (once an object
+  // is identified, curiosity has nothing left to gain there).
+  if (current_focus_label_ >= 0 && dwell_count_ < params_.dwell_frames)
+  {
+    if (ObjectFile* current = store.find_active(current_focus_label_))
+    {
+      if (!is_settled(*current))
+      {
+        ++dwell_count_;
+        store.mark_selected(current->label, frame);
+        return store.find_active(current_focus_label_);
+      }
+    }
+  }
+
+  // Two priority classes. Unsettled leads; within it, least-inspected first
+  // (spread the looks), then saliency. Settled objects cycle like Exploration
+  // (longest-unselected first), so the scene keeps being revisited — objects
+  // change, and a revisit casts a fresh vote.
+  auto outranks = [&](const ObjectFile& a, const ObjectFile& b)
+  {
+    const bool a_settled = is_settled(a);
+    const bool b_settled = is_settled(b);
+    if (a_settled != b_settled)
+    {
+      return !a_settled;
+    }
+    if (!a_settled)
+    {
+      if (a.labels.inspections != b.labels.inspections)
+      {
+        return a.labels.inspections < b.labels.inspections;
+      }
+      if (a.saliency != b.saliency)
+      {
+        return a.saliency > b.saliency;
+      }
+      return a.label < b.label;
+    }
+    return higher_priority(a, b, frame);
+  };
+
+  const ObjectFile* best = &active[0];
+  for (const auto& file : active)
+  {
+    if (outranks(file, *best))
+    {
+      best = &file;
+    }
+  }
+
+  current_focus_label_ = best->label;
+  dwell_count_ = 1;
+  store.mark_selected(best->label, frame);
+  return store.find_active(current_focus_label_);
+}
+
+void Identification::reset()
+{
+  current_focus_label_ = -1;
+  dwell_count_ = 0;
+}
+
 const ObjectFile* IorBehavior::select_focus(ObjectFileStore& store, int frame)
 {
   const auto& active = store.active_files();
@@ -158,11 +240,16 @@ void IorBehavior::reset()
   object_inhib_.clear();
 }
 
-std::unique_ptr<Behavior> create_behavior(const std::string& name, const IorBehavior::Params& ior_params)
+std::unique_ptr<Behavior> create_behavior(const std::string& name, const IorBehavior::Params& ior_params,
+                                          const Identification::Params& identification_params)
 {
   if (name == "exploration")
   {
     return std::make_unique<Exploration>();
+  }
+  if (name == "identification")
+  {
+    return std::make_unique<Identification>(identification_params);
   }
   if (name == "greedy")
   {
@@ -176,7 +263,8 @@ std::unique_ptr<Behavior> create_behavior(const std::string& name, const IorBeha
   {
     return std::make_unique<IorBehavior>(IorBehavior::Mode::Object, "object-ior", ior_params);
   }
-  throw std::runtime_error("Unknown behavior '" + name + "'. Available: exploration, greedy, spatial-ior, object-ior");
+  throw std::runtime_error("Unknown behavior '" + name +
+                           "'. Available: exploration, identification, greedy, spatial-ior, object-ior");
 }
 
 } // namespace system

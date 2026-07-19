@@ -127,13 +127,56 @@ class IorBehavior : public Behavior
 };
 
 /**
- * Create a behavior by name. Available: "exploration" (thesis default), and the
- * dynamic-IOR ablation "greedy" / "spatial-ior" / "object-ior". The IOR params
- * apply to the ablation behaviors (Exploration ignores them). Throws for
- * unknown names.
+ * Identification (M13): curiosity — attention as a drive to *know* the scene,
+ * not just to have seen it. Object files without a confident semantic label
+ * outrank recognized ones (least-inspected first, so looks spread across the
+ * unknowns); once an object is confidently labeled — or has been inspected
+ * max_inspections times without yielding a label ("give up") — it drops into
+ * the background rotation, which cycles like Exploration. This is
+ * recognition-triggered semantic inhibition of return: being identified is
+ * what inhibits. Pair with recognition processors (they cast the label votes);
+ * without them every object stays unknown and the behavior degenerates to
+ * least-inspected-first coverage.
  */
-std::unique_ptr<Behavior> create_behavior(const std::string& name,
-                                          const IorBehavior::Params& ior_params = IorBehavior::Params{});
+class Identification : public Behavior
+{
+ public:
+  struct Params
+  {
+    float confidence = 0.5f; // a label at/above this mean confidence counts
+    int min_votes = 2;       // votes needed before a label is trusted
+    int max_inspections = 6; // stop chasing an unlabelable object after this
+    int dwell_frames = 3;    // focus dwell, as in Exploration
+  };
+
+  Identification() : Identification(Params{}) {}
+  explicit Identification(const Params& params) : params_(params) {}
+
+  std::string name() const override { return "identification"; }
+
+  const ObjectFile* select_focus(ObjectFileStore& store, int frame) override;
+
+  void reset() override;
+
+  // Whether this behavior considers the object identified (or given up on).
+  bool is_settled(const ObjectFile& file) const;
+
+ private:
+  Params params_;
+  int current_focus_label_ = -1;
+  int dwell_count_ = 0;
+};
+
+/**
+ * Create a behavior by name. Available: "exploration" (thesis default), the
+ * dynamic-IOR ablation "greedy" / "spatial-ior" / "object-ior", and
+ * "identification" (M13 curiosity). The IOR params apply to the ablation
+ * behaviors, the identification params to Identification; others ignore them.
+ * Throws for unknown names.
+ */
+std::unique_ptr<Behavior> create_behavior(
+    const std::string& name, const IorBehavior::Params& ior_params = IorBehavior::Params{},
+    const Identification::Params& identification_params = Identification::Params{});
 
 } // namespace system
 } // namespace attention

@@ -1,7 +1,9 @@
 #pragma once
 
 #include <deque>
+#include <map>
 #include <opencv2/opencv.hpp>
+#include <string>
 #include <vector>
 
 namespace attention
@@ -21,6 +23,36 @@ struct Cluster
   int size = 0; // pixel count
   float mean_saliency = 0.0f;
   cv::Vec3f appearance = cv::Vec3f(0, 0, 0); // mean colour (BGR, 0-255) over the region
+};
+
+/**
+ * LabelMemory: accumulated semantic labels on one object file (M13). Each
+ * recognition-processor firing on the object casts a confidence-weighted vote;
+ * the majority label with its mean confidence is the object's stable semantic
+ * identity ("person #3"). Processor-agnostic: HOG, Haar, DNN, or a future VLM
+ * labeler all feed the same votes.
+ */
+struct LabelMemory
+{
+  struct Vote
+  {
+    int count = 0;
+    float confidence_sum = 0.0f;
+  };
+
+  std::map<std::string, Vote> votes; // class label -> accumulated votes
+  int inspections = 0;               // processor firings, including empty-handed ones
+
+  void add_inspection() { ++inspections; }
+  void add_vote(const std::string& label, float confidence);
+
+  // The majority label (most votes; confidence sum breaks ties), or "" if no
+  // votes yet.
+  std::string best_label() const;
+  // Mean confidence of the majority label's votes (0 if unlabeled).
+  float best_confidence() const;
+  // Votes cast for the majority label.
+  int best_count() const;
 };
 
 /**
@@ -52,6 +84,7 @@ struct ObjectFile
 
   std::deque<cv::Point> trajectory;          // recent centroids (most recent last)
   cv::Vec3f appearance = cv::Vec3f(0, 0, 0); // leaky-integrated mean colour (BGR)
+  LabelMemory labels;                        // accumulated semantic identity (M13)
 
   bool ever_selected() const { return last_selected_frame >= 0; }
 };
@@ -104,6 +137,12 @@ class ObjectFileStore
   // Mark a file as focally selected on the given frame (drives object-based
   // IOR and the Exploration priority classes).
   void mark_selected(int label, int frame);
+
+  // Label memory (M13): record that a recognition processor inspected the
+  // file, and optionally cast a confidence-weighted vote for a class label.
+  // No-ops if the label is not active.
+  void record_inspection(int label);
+  void add_label_vote(int label, const std::string& class_label, float confidence);
 
   const std::vector<ObjectFile>& active_files() const { return active_; }
   const std::vector<ObjectFile>& inactive_files() const { return inactive_; }

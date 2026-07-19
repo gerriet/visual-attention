@@ -62,11 +62,25 @@ cv::Mat LiveDemonstrator::process(const cv::Mat& native_frame)
     }
     cv::Rect native_box(static_cast<int>(obj.bbox.x * sx), static_cast<int>(obj.bbox.y * sy),
                         static_cast<int>(obj.bbox.width * sx), static_cast<int>(obj.bbox.height * sy));
-    native_box &= cv::Rect(0, 0, native_frame.cols, native_frame.rows); // clamp to frame
+    // Same ROI policy as the --attend recognition path: expand by the margin
+    // (detectors want context around the object), then clamp to the frame.
+    const int mx = static_cast<int>(native_box.width * config_.system.roi_margin);
+    const int my = static_cast<int>(native_box.height * config_.system.roi_margin);
+    native_box += cv::Point(-mx, -my);
+    native_box += cv::Size(2 * mx, 2 * my);
+    native_box &= cv::Rect(0, 0, native_frame.cols, native_frame.rows);
     const cv::Mat roi = native_box.area() > 0 ? native_frame(native_box) : cv::Mat();
+    // process_frame() has already advanced frame_index; the frame just
+    // analyzed is the previous index (keeps annotation stamps aligned with
+    // the scanpath).
+    const int current_frame = system_.frame_index() - 1;
     for (const auto& processor : processors_)
     {
-      annotations_.push_back(processor->process(obj, roi));
+      // Timed run + record: feeds the object file's label memory (M13), so the
+      // overlay can show the accumulated semantic identity ("person #3").
+      Annotation ann = run_processor(*processor, obj, roi, native_box.tl(), current_frame);
+      system_.record_annotation(ann);
+      annotations_.push_back(std::move(ann));
     }
   }
 
@@ -122,8 +136,14 @@ cv::Mat LiveDemonstrator::draw_overlay(const cv::Mat& native, double sx, double 
     {
       cv::rectangle(vis, box, colour, thickness);
       cv::Point label_at(box.x, std::max(12, box.y - 4));
-      cv::putText(vis, "#" + std::to_string(obj.label), label_at, cv::FONT_HERSHEY_SIMPLEX, 0.45, colour, 1,
-                  cv::LINE_AA);
+      // Stable semantic identity from label memory, when the object has one.
+      std::string text = "#" + std::to_string(obj.label);
+      const std::string semantic = obj.labels.best_label();
+      if (!semantic.empty())
+      {
+        text = semantic + " " + text;
+      }
+      cv::putText(vis, text, label_at, cv::FONT_HERSHEY_SIMPLEX, 0.45, colour, 1, cv::LINE_AA);
     }
   }
 

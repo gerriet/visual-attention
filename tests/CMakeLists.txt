@@ -13,7 +13,7 @@ if(NOT Catch2_FOUND)
     FetchContent_MakeAvailable(Catch2)
 endif()
 
-add_executable(characterization_tests test_characterization.cpp test_config.cpp test_selection.cpp test_stereo_onset.cpp test_system.cpp test_processors.cpp test_alt_features.cpp test_kalman_mot.cpp test_normalization.cpp)
+add_executable(characterization_tests test_characterization.cpp test_config.cpp test_selection.cpp test_stereo_onset.cpp test_system.cpp test_processors.cpp test_alt_features.cpp test_kalman_mot.cpp test_normalization.cpp test_recognition.cpp)
 target_link_libraries(characterization_tests PRIVATE attention_core Catch2::Catch2WithMain)
 target_compile_definitions(characterization_tests PRIVATE
     ATTENTION_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
@@ -86,6 +86,29 @@ set_tests_properties(normalization_peaks PROPERTIES
 # the replication bar is "mainly equivalent", not exact).
 find_package(Python3 COMPONENTS Interpreter)
 if(Python3_Interpreter_FOUND)
+    # Python entry points answer --help too (CLI contract, CLAUDE.md).
+    foreach(script tools/fetch_models.py eval/gated_recognition.py eval/plot_gated_recognition.py)
+        get_filename_component(script_name ${script} NAME_WE)
+        add_test(NAME help_${script_name}
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/${script} --help)
+        set_tests_properties(help_${script_name} PROPERTIES PASS_REGULAR_EXPRESSION "usage")
+    endforeach()
+
+    # M13 gated recognition, smoke: the hog-person processor gated by attention
+    # over a short vtest prefix, scored against its own full-frame baseline. The
+    # CLI runs three times (full-frame + one gated cadence); "summary:" prints
+    # only after both arms scored.
+    add_test(NAME gated_recognition_smoke
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/eval/gated_recognition.py
+                --binary $<TARGET_FILE:attention>
+                --video ${CMAKE_SOURCE_DIR}/data/samples/video/vtest.avi
+                --config ${CMAKE_SOURCE_DIR}/configs/attend.yaml
+                --frames 24 --cadence dwell
+                --out ${CMAKE_BINARY_DIR}/gated_smoke
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(gated_recognition_smoke PROPERTIES
+        PASS_REGULAR_EXPRESSION "summary:")
+
     set(BEHAVIORAL_IMAGES input inputc)
     foreach(img IN LISTS BEHAVIORAL_IMAGES)
         add_test(NAME emit_json_${img}

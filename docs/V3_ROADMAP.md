@@ -246,6 +246,26 @@ seeds+CIs; DAVIS. See `docs/DYNAMIC_IOR_STUDY.md`.
 
 Deliverable: processors + behavior + `docs/GATED_RECOGNITION.md`.
 
+**Status (2026-07-19): done except Tier 3 (deferred to M18 by agreement).**
+Tier 1 (`hog-person`, `haar-face`) and Tier 2 (`dnn-classify`, generic ONNX via
+`cv::dnn`, weights via `tools/fetch_models.py`) ship as registry processors
+runnable headless in `--attend` (`--processors`, `--process-cadence
+dwell|frame|full-frame` — dwell = once per focus visit, the thesis's ~3-frame
+attentive computation; full-frame = the ungated baseline arm). Label memory
+(vote histogram + inspections) lives on object files; the `identification`
+behavior implements recognition-triggered semantic IOR with a give-up rule.
+Interchange grew additive `annotations`/`labels`/`processing` fields (still
+v1). H2 result: **on cluttered multi-object video (vtest) gated recognition
+recovers 51% of all full-frame detections within ±15 frames at 5.8% of the
+recognition pixels** (honestly counted: what the detector actually scanned,
+upscaling included) — H2 strongly supported where it matters. On DAVIS
+single-actor sequences the gap decomposes cleanly into detector-limited
+(parkour: HOG hits 17% of attended crops; every-frame re-inspection lifts
+recall 0.23→0.71) vs allocation-limited (judo: 100% hit rate on only 3 looks —
+salience never prioritizes the actors; a stage-1 problem, M17's top-down
+channel is the fix). DAVIS-2017 adapter + curated person ids pay down the M12
+leftover. Full story: `docs/GATED_RECOGNITION.md`.
+
 ### M14 — The model lab (simulate, compare, combine)
 
 - `configs/models/` presets: `thesis-2004`, `alternatives-suite`, per-operator
@@ -344,7 +364,7 @@ another VLM.
 |---|---|---|
 | `data/samples/` + synthetic generators | replication, IOR sweeps, demos | in repo |
 | MIT1003 | still fixations/scanpaths (M11, M14) | adapter exists; download documented |
-| DAVIS 2017 | video object masks → exact IOR scoring (M12, M13) | adapter to write |
+| DAVIS 2017 | video object masks → exact IOR scoring (M12, M13) | adapter in repo (`eval/datasets/davis2017.py`) |
 | DIEM (or DHF1K) | video gaze (optional M14 extension) | choose when needed; DIEM easiest |
 | KITTI raw (stereo) | stereo video (M15) | adapter to write |
 | PETS2006 | left-luggage scenario (M16) | pointer only |

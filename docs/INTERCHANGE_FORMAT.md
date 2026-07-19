@@ -62,8 +62,9 @@ Field notes:
   (golden files may contain paths from another machine).
 - **`params`** and **`timing_ms`** are generator-specific and not part of the
   comparison contract.
-- Schema changes bump the version (`attention-result/v2`); consumers check the
-  prefix.
+- *Breaking* schema changes bump the version (`attention-result/v2`);
+  consumers check the prefix. Additive optional fields are non-breaking and do
+  **not** bump the version — consumers must ignore fields they don't know.
 
 ## Scanpath format (`attention-scanpath/v1`)
 
@@ -93,3 +94,35 @@ above, written by `--attend --emit-scanpath`:
   are creation-order dependent and not stable across algorithm changes.
 - **`objects`** is the final active world model (object files at stream end).
 - Compared by `eval/compare_scanpath_json.py` (focus position per frame).
+
+### Recognition extensions (M13, additive — only present when processors ran)
+
+When `--attend` runs recognition processors (`--processors hog-person,...`),
+three optional additions appear; consumers that don't know them ignore them:
+
+```json
+  "objects": [
+    { "label": 3, ..., "labels": {"best": "person", "confidence": 0.71,
+                                  "votes": 3, "inspections": 4} }
+  ],
+  "annotations": [
+    { "frame": 12, "object": 3, "processor": "hog-person", "class": "person",
+      "confidence": 0.71, "pixels": 48200, "ms": 2.9,
+      "detections": [ {"box": [x, y, w, h], "confidence": 0.71, "label": "person"} ] }
+  ],
+  "processing": { "processors": [
+    { "name": "hog-person", "calls": 29, "pixels": 1445019, "ms": 84.8 } ] }
+```
+
+- **`objects[].labels`** is the object file's accumulated label memory: the
+  majority-vote class, its mean confidence, votes for it, and how often the
+  object was inspected at all (an inspection with no recognition still counts —
+  evidence of "looked, found nothing").
+- **`annotations`** is the flat, frame-stamped log of every processor firing.
+  `object` is the inspected object file (`-1` = a whole-frame run, the ungated
+  baseline arm of the gated-recognition study). `class` is empty when nothing
+  was recognized. Detection `box`es are in image coordinates in both arms, so
+  gated and full-frame detections compare directly.
+- **`processing`** totals the compute per processor — the cost side of the H2
+  accuracy-vs-compute curves (`pixels` is the hardware-independent measure,
+  `ms` the wall-clock).

@@ -136,33 +136,73 @@ cv::Mat annotate_objects(const attention::system::AttentionSystem& sys)
   return vis;
 }
 
+// Options of the --attend mode (second stage + behavior over a stream).
+struct AttendOptions
+{
+  std::string output_dir;
+  std::string emit_scanpath;
+  bool user_config = false;
+  std::string behavior;
+  float ior_radius = -1.0f;
+  float ior_decay = -1.0f;
+  bool motion_prediction = false;
+  bool appearance_matching = false;
+  std::vector<std::string> processors;   // recognition processors on attended ROIs (M13)
+  std::string process_cadence = "dwell"; // dwell | frame | full-frame
+  float roi_margin = -1.0f;              // <0 = keep the config default
+  int max_frames = 0;                    // 0 = whole stream
+  bool save_frames = true;               // per-frame objects.png (off for sweeps)
+};
+
+attention::system::AttentionSystem::ProcessorCadence parse_cadence(const std::string& name)
+{
+  using Cadence = attention::system::AttentionSystem::ProcessorCadence;
+  if (name == "dwell")
+  {
+    return Cadence::PerDwell;
+  }
+  if (name == "frame")
+  {
+    return Cadence::EveryFrame;
+  }
+  if (name == "full-frame")
+  {
+    return Cadence::FullFrame;
+  }
+  throw std::runtime_error("Unknown --process-cadence '" + name + "' (expected: dwell, frame, full-frame)");
+}
+
 // Run the AttentionSystem (second stage + behavior) over a temporal sequence
 // (image directory or video) and emit its scanpath.
 void process_attend(const std::string& path, attention::pipeline::PipelineConfig& pipeline_config,
-                    const std::string& output_base, const std::string& emit_scanpath, bool user_config,
-                    const std::string& behavior, float ior_radius, float ior_decay, bool motion_prediction,
-                    bool appearance_matching)
+                    const AttendOptions& opt)
 {
-  if (!user_config)
+  if (!opt.user_config)
   {
     enable_feature(pipeline_config, "onset", 1.0f); // motion helps track objects
   }
 
   attention::system::AttentionSystem::Config cfg;
   cfg.pipeline = pipeline_config;
-  cfg.object_store.motion_prediction = motion_prediction;
-  cfg.object_store.appearance_matching = appearance_matching;
-  if (!behavior.empty())
+  cfg.object_store.motion_prediction = opt.motion_prediction;
+  cfg.object_store.appearance_matching = opt.appearance_matching;
+  if (!opt.behavior.empty())
   {
-    cfg.behavior = behavior; // dynamic-IOR ablation: greedy / spatial-ior / object-ior / exploration
+    cfg.behavior = opt.behavior; // dynamic-IOR ablation: greedy / spatial-ior / object-ior / exploration
   }
-  if (ior_radius > 0.0f)
+  if (opt.ior_radius > 0.0f)
   {
-    cfg.ior_params.ior_radius = ior_radius;
+    cfg.ior_params.ior_radius = opt.ior_radius;
   }
-  if (ior_decay > 0.0f)
+  if (opt.ior_decay > 0.0f)
   {
-    cfg.ior_params.ior_decay = ior_decay;
+    cfg.ior_params.ior_decay = opt.ior_decay;
+  }
+  cfg.processors = opt.processors;
+  cfg.processor_cadence = parse_cadence(opt.process_cadence);
+  if (opt.roi_margin >= 0.0f)
+  {
+    cfg.roi_margin = opt.roi_margin;
   }
   attention::system::AttentionSystem sys(cfg);
 
@@ -178,16 +218,20 @@ void process_attend(const std::string& path, attention::pipeline::PipelineConfig
     std::cout << "Attend: video " << path << std::endl;
     source = std::make_unique<attention::pipeline::VideoFrameSource>(path);
   }
+  attention::pipeline::LimitedFrameSource limited(*source, opt.max_frames);
 
-  const std::string out_base = output_base.empty() ? "results/attend" : output_base;
-  sys.process_stream(*source,
+  const std::string out_base = opt.output_dir.empty() ? "results/attend" : opt.output_dir;
+  sys.process_stream(limited,
                      [&](attention::system::AttentionSystem& s)
                      {
                        std::ostringstream name;
                        name << "frame_" << std::setw(4) << std::setfill('0') << s.frame_index();
-                       fs::path dir = fs::path(out_base) / name.str();
-                       fs::create_directories(dir);
-                       cv::imwrite((dir / "objects.png").string(), annotate_objects(s));
+                       if (opt.save_frames)
+                       {
+                         fs::path dir = fs::path(out_base) / name.str();
+                         fs::create_directories(dir);
+                         cv::imwrite((dir / "objects.png").string(), annotate_objects(s));
+                       }
                        const auto* focus = s.current_focus();
                        std::cout << "  " << name.str() << ": " << s.active_files().size() << " objects";
                        if (focus)
@@ -200,11 +244,17 @@ void process_attend(const std::string& path, attention::pipeline::PipelineConfig
 
   std::cout << "Attend complete: " << sys.scanpath().size() << " foci over " << sys.frame_index() << " frames."
             << std::endl;
-
-  if (!emit_scanpath.empty())
+  for (const auto& entry : sys.processor_stats())
   {
-    attention::io::ScanpathWriter::write(sys, emit_scanpath);
-    std::cout << "✓ Saved scanpath: " << emit_scanpath << std::endl;
+    const auto& s = entry.second;
+    std::cout << "  processor " << entry.first << ": " << s.calls << " calls, " << s.pixels << " px, " << std::fixed
+              << std::setprecision(1) << s.ms << " ms" << std::endl;
+  }
+
+  if (!opt.emit_scanpath.empty())
+  {
+    attention::io::ScanpathWriter::write(sys, opt.emit_scanpath);
+    std::cout << "✓ Saved scanpath: " << opt.emit_scanpath << std::endl;
   }
 }
 
@@ -494,7 +544,8 @@ void print_usage(const char* program_name, std::ostream& out = std::cerr)
   out << "  " << program_name << " --sequence <dir|video> [--output dir] [--config yaml]" << std::endl;
   out << "  " << program_name
       << " --attend <dir|video> [--output dir] [--emit-scanpath path] [--config yaml] [--behavior name] "
-         "[--ior-radius px] [--motion-prediction] [--appearance-matching]"
+         "[--ior-radius px] [--motion-prediction] [--appearance-matching] [--processors a,b] "
+         "[--process-cadence dwell|frame|full-frame] [--frames N] [--no-save-frames]"
       << std::endl;
   out << "  " << program_name << " --live <camera|video|dir> [--config configs/live.yaml] [--processors a,b]"
       << std::endl;
@@ -519,9 +570,15 @@ void print_usage(const char* program_name, std::ostream& out = std::cerr)
   out << "  --emit-scanpath <p>  Write the scanpath JSON (with --attend)" << std::endl;
   out << "  --live <src>         Live demo: attention + object-file plugins on camera/video/dir (ESC quits)"
       << std::endl;
-  out << "  --processors <a,b>   Object-file plugins for --live (default: region-descriptor)" << std::endl;
+  out << "  --processors <a,b>   Object-file plugins on attended ROIs (--live and --attend;" << std::endl;
+  out << "                       recognition tier: hog-person, haar-face, see also dnn-classify)" << std::endl;
+  out << "  --process-cadence <c> When processors fire in --attend: dwell (once per ~3-frame focus" << std::endl;
+  out << "                       window, default), frame (every focused frame), full-frame (ungated" << std::endl;
+  out << "                       whole-frame baseline for the gated-recognition comparison)" << std::endl;
+  out << "  --roi-margin <f>     Expand the focus bbox per side before recognition (default: 0.25)" << std::endl;
+  out << "  --no-save-frames     Skip per-frame objects.png in --attend (faster sweeps)" << std::endl;
   out << "  --process-size <N>   Max side of the downscaled processing frame for --live (default: 480)" << std::endl;
-  out << "  --frames <N>         Stop after N frames (--live headless with --no-display)" << std::endl;
+  out << "  --frames <N>         Stop after N frames (--attend, or --live headless with --no-display)" << std::endl;
   out << "  --output <dir>       Specify output directory for batch/sequence mode (default: input_dir/results_batch)"
       << std::endl;
   out << "  --emit-json <path>   Write result JSON + saliency map in the interchange format" << std::endl;
@@ -666,54 +723,66 @@ int main(int argc, char** argv)
         return 1;
       }
       std::string seq_path = argv[2];
-      std::string output_dir;
-      std::string scanpath_path;
-      std::string behavior;
-      float ior_radius = -1.0f;
-      float ior_decay = -1.0f;
-      bool motion_prediction = false;
-      bool appearance_matching = false;
-      bool user_config = false;
+      AttendOptions opt;
       config = attention::config::ConfigLoader::create_default();
       for (int i = 3; i < argc; ++i)
       {
         std::string arg = argv[i];
         if (arg == "--output" && i + 1 < argc)
         {
-          output_dir = argv[++i];
+          opt.output_dir = argv[++i];
         }
         else if (arg == "--config" && i + 1 < argc)
         {
           config = attention::config::ConfigLoader::load(argv[++i]);
-          user_config = true;
+          opt.user_config = true;
         }
         else if (arg == "--emit-scanpath" && i + 1 < argc)
         {
-          scanpath_path = argv[++i];
+          opt.emit_scanpath = argv[++i];
         }
         else if (arg == "--behavior" && i + 1 < argc)
         {
-          behavior = argv[++i];
+          opt.behavior = argv[++i];
         }
         else if (arg == "--ior-radius" && i + 1 < argc)
         {
-          ior_radius = std::stof(argv[++i]);
+          opt.ior_radius = std::stof(argv[++i]);
         }
         else if (arg == "--ior-decay" && i + 1 < argc)
         {
-          ior_decay = std::stof(argv[++i]);
+          opt.ior_decay = std::stof(argv[++i]);
         }
         else if (arg == "--motion-prediction")
         {
-          motion_prediction = true;
+          opt.motion_prediction = true;
         }
         else if (arg == "--appearance-matching")
         {
-          appearance_matching = true;
+          opt.appearance_matching = true;
+        }
+        else if (arg == "--processors" && i + 1 < argc)
+        {
+          opt.processors = split_csv(argv[++i]);
+        }
+        else if (arg == "--process-cadence" && i + 1 < argc)
+        {
+          opt.process_cadence = argv[++i];
+        }
+        else if (arg == "--roi-margin" && i + 1 < argc)
+        {
+          opt.roi_margin = std::stof(argv[++i]);
+        }
+        else if (arg == "--frames" && i + 1 < argc)
+        {
+          opt.max_frames = std::stoi(argv[++i]);
+        }
+        else if (arg == "--no-save-frames")
+        {
+          opt.save_frames = false;
         }
       }
-      process_attend(seq_path, config.pipeline, output_dir, scanpath_path, user_config, behavior, ior_radius, ior_decay,
-                     motion_prediction, appearance_matching);
+      process_attend(seq_path, config.pipeline, opt);
       return 0;
     }
     else if (std::string(argv[1]) == "--stereo")

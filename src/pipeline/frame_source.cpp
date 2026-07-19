@@ -137,6 +137,23 @@ bool VideoSource::next(core::Frame& frame)
   return true;
 }
 
+bool LimitedFrameSource::next(core::Frame& frame)
+{
+  if (remaining_ == 0) // -1 = unlimited, never reaches zero
+  {
+    return false;
+  }
+  if (!source_.next(frame))
+  {
+    return false;
+  }
+  if (remaining_ > 0)
+  {
+    --remaining_;
+  }
+  return true;
+}
+
 std::vector<std::string> collect_image_paths(const std::string& directory)
 {
   std::vector<std::string> image_paths;

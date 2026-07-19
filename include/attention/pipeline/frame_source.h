@@ -104,6 +104,26 @@ class VideoSource : public FrameSource
 };
 
 /**
+ * LimitedFrameSource caps another source at a maximum number of frames —
+ * bounded runs over long videos (experiment sweeps, smoke tests). A limit of
+ * zero or less means unlimited.
+ */
+class LimitedFrameSource : public FrameSource
+{
+ public:
+  LimitedFrameSource(FrameSource& source, int max_frames)
+    : source_(source), remaining_(max_frames <= 0 ? -1 : max_frames)
+  {
+  }
+
+  bool next(core::Frame& frame) override;
+
+ private:
+  FrameSource& source_;
+  int remaining_;
+};
+
+/**
  * Collect all image files (jpg/jpeg/png/bmp) in a directory, sorted by path.
  * Feed the result to ImageListSource.
  */
