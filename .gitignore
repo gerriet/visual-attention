@@ -6,6 +6,7 @@ build/
 *.dylib
 
 # IDE files
+.cache/
 .vscode/
 .idea/
 *.swp
@@ -29,6 +30,10 @@ debug_output/
 data/MIT1003/
 data/PASCAL_VOC/
 data/middlebury/
+data/DAVIS/
+
+# Model weights (tools/fetch_models.py downloads these; never committed)
+models/
 
 # macOS
 .DS_Store
@@ -36,8 +41,8 @@ data/middlebury/
 # Editor backup
 *.bak
 
-# Python eval layer
-eval/.venv/
+# Python eval layer (directory, or a symlink to another worktree's venv)
+eval/.venv
 
 # Personal / private test images (not for distribution)
 data/test_images/gb_profile_social.jpg

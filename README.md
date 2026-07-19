@@ -72,6 +72,11 @@ cmake --build build -j
 # Live overlay on a webcam/video with per-object ROI processors (ESC to quit)
 ./build/attention --live 0 --config configs/live.yaml
 
+# Recognition gated by attention: detectors run only on attended regions,
+# labels accumulate on tracked object files ("person #3")
+./build/attention --attend data/samples/video/vtest.avi \
+    --processors hog-person --behavior identification --no-save-frames
+
 # Emit the interchange format (JSON + 16-bit saliency PNG) for evaluation
 ./build/attention data/test_images/input.png --no-display --emit-json out/result.json
 ```
@@ -126,6 +131,7 @@ scanpath comparator — the project's loose-equivalence replication bar).
 - [INTERCHANGE_FORMAT.md](docs/INTERCHANGE_FORMAT.md) — the result/scanpath format every model emits
 - [thesis_vs_modern.md](docs/thesis_vs_modern.md) — thesis model vs. modern saliency models
 - [ALTERNATIVE_FEATURES.md](docs/ALTERNATIVE_FEATURES.md) · [SELECTION_BACKENDS.md](docs/SELECTION_BACKENDS.md) — pluggable operators / trackers
+- [DYNAMIC_IOR_STUDY.md](docs/DYNAMIC_IOR_STUDY.md) · [GATED_RECOGNITION.md](docs/GATED_RECOGNITION.md) — the H1 and H2 studies
 - [PERFORMANCE.md](docs/PERFORMANCE.md) — timing and optimization notes
 - Roadmaps: [V3_ROADMAP.md](docs/V3_ROADMAP.md) (current) · [V2_ROADMAP.md](docs/V2_ROADMAP.md) (history)
 

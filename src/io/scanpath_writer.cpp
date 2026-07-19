@@ -91,6 +91,8 @@ void ScanpathWriter::write(const system::AttentionSystem& sys, const std::string
   out << "  ],\n";
 
   // Final active object files (the symbolic world model at stream end).
+  // `labels` (the accumulated semantic identity, M13) is additive and only
+  // present once an object has been inspected by a recognition processor.
   out << "  \"objects\": [\n";
   for (size_t i = 0; i < objects.size(); ++i)
   {
@@ -98,15 +100,67 @@ void ScanpathWriter::write(const system::AttentionSystem& sys, const std::string
     out << "    {\"label\": " << o.label << ", \"x\": " << o.centroid.x << ", \"y\": " << o.centroid.y
         << ", \"size\": " << o.size << ", \"saliency\": " << format_float(o.saliency)
         << ", \"avg_saliency\": " << format_float(o.avg_saliency) << ", \"created_frame\": " << o.created_frame
-        << ", \"last_selected_frame\": " << o.last_selected_frame << "}";
+        << ", \"last_selected_frame\": " << o.last_selected_frame;
+    if (o.labels.inspections > 0)
+    {
+      out << ", \"labels\": {\"best\": \"" << escape_json(o.labels.best_label())
+          << "\", \"confidence\": " << format_float(o.labels.best_confidence())
+          << ", \"votes\": " << o.labels.best_count() << ", \"inspections\": " << o.labels.inspections << "}";
+    }
+    out << "}";
     if (i + 1 < objects.size())
     {
       out << ",";
     }
     out << "\n";
   }
-  out << "  ]\n";
-  out << "}\n";
+  out << "  ]";
+
+  // Processor annotations + compute accounting (M13, additive): emitted only
+  // when recognition processors ran. One flat annotation list, frame-stamped;
+  // detection boxes are in image coordinates; object -1 = whole-frame run.
+  const auto& annotations = sys.annotations();
+  if (!annotations.empty())
+  {
+    out << ",\n  \"annotations\": [\n";
+    for (size_t i = 0; i < annotations.size(); ++i)
+    {
+      const auto& a = annotations[i];
+      out << "    {\"frame\": " << a.frame << ", \"object\": " << a.object_label << ", \"processor\": \""
+          << escape_json(a.processor) << "\", \"class\": \"" << escape_json(a.class_label)
+          << "\", \"confidence\": " << format_float(a.confidence) << ", \"pixels\": " << a.pixels
+          << ", \"ms\": " << format_float(static_cast<float>(a.ms)) << ", \"detections\": [";
+      for (size_t d = 0; d < a.detections.size(); ++d)
+      {
+        const auto& det = a.detections[d];
+        out << (d > 0 ? ", " : "") << "{\"box\": [" << det.box.x << ", " << det.box.y << ", " << det.box.width << ", "
+            << det.box.height << "], \"confidence\": " << format_float(det.confidence) << ", \"label\": \""
+            << escape_json(det.label) << "\"}";
+      }
+      out << "]}";
+      if (i + 1 < annotations.size())
+      {
+        out << ",";
+      }
+      out << "\n";
+    }
+    out << "  ]";
+  }
+  const auto& stats = sys.processor_stats();
+  if (!stats.empty())
+  {
+    out << ",\n  \"processing\": {\"processors\": [";
+    bool first = true;
+    for (const auto& entry : stats)
+    {
+      out << (first ? "" : ", ") << "{\"name\": \"" << escape_json(entry.first)
+          << "\", \"calls\": " << entry.second.calls << ", \"pixels\": " << entry.second.pixels
+          << ", \"ms\": " << format_float(static_cast<float>(entry.second.ms)) << "}";
+      first = false;
+    }
+    out << "]}";
+  }
+  out << "\n}\n";
 
   if (!out.good())
   {

@@ -35,8 +35,7 @@ cv::Mat visualize_feature_map(const core::FeatureMap& feature, const std::string
  * @return Visualization as BGR image (heatmap or overlay)
  */
 cv::Mat visualize_saliency_map(const core::SaliencyMap& saliency, const cv::Mat& original = cv::Mat(),
-                               const std::string& window_name = "", bool mark_peaks = false,
-                               bool wait_key = false);
+                               const std::string& window_name = "", bool mark_peaks = false, bool wait_key = false);
 
 /**
  * Create a side-by-side comparison of multiple visualizations.

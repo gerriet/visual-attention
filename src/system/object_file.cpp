@@ -25,6 +25,48 @@ cv::Point2d expected_centroid(const ObjectFile& file, bool use_motion, int steps
 }
 } // namespace
 
+void LabelMemory::add_vote(const std::string& label, float confidence)
+{
+  Vote& vote = votes[label];
+  vote.count += 1;
+  vote.confidence_sum += confidence;
+}
+
+std::string LabelMemory::best_label() const
+{
+  std::string best;
+  int best_count = 0;
+  float best_conf = 0.0f;
+  for (const auto& entry : votes)
+  {
+    if (entry.second.count > best_count ||
+        (entry.second.count == best_count && entry.second.confidence_sum > best_conf))
+    {
+      best = entry.first;
+      best_count = entry.second.count;
+      best_conf = entry.second.confidence_sum;
+    }
+  }
+  return best;
+}
+
+float LabelMemory::best_confidence() const
+{
+  const std::string best = best_label();
+  if (best.empty())
+  {
+    return 0.0f;
+  }
+  const Vote& vote = votes.at(best);
+  return vote.count > 0 ? vote.confidence_sum / vote.count : 0.0f;
+}
+
+int LabelMemory::best_count() const
+{
+  const std::string best = best_label();
+  return best.empty() ? 0 : votes.at(best).count;
+}
+
 ObjectFileStore::ObjectFileStore(const Config& config) : config_(config) {}
 
 ObjectFile ObjectFileStore::make_file(const Cluster& cluster, int frame)
@@ -191,6 +233,26 @@ void ObjectFileStore::mark_selected(int label, int frame)
   {
     file->last_selected_frame = frame;
     file->selection_count += 1;
+  }
+}
+
+void ObjectFileStore::record_inspection(int label)
+{
+  if (ObjectFile* file = find_active(label))
+  {
+    file->labels.add_inspection();
+  }
+}
+
+void ObjectFileStore::add_label_vote(int label, const std::string& class_label, float confidence)
+{
+  if (class_label.empty())
+  {
+    return;
+  }
+  if (ObjectFile* file = find_active(label))
+  {
+    file->labels.add_vote(class_label, confidence);
   }
 }
 
