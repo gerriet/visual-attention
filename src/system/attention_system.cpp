@@ -10,7 +10,8 @@ AttentionSystem::AttentionSystem(const Config& config)
   : config_(config),
     pipeline_(config.pipeline),
     object_store_(config.object_store),
-    behavior_(create_behavior(config.behavior, config.ior_params, config.identification_params))
+    behavior_(create_behavior(config.behavior, config.ior_params, config.identification_params)),
+    history_(config.pipeline.priority)
 {
   for (const auto& name : config_.processors)
   {
@@ -78,9 +79,13 @@ void AttentionSystem::process_second_stage()
     return; // saliency only
   }
 
-  const cv::Mat& saliency = pipeline_.get_saliency_map().map;
-  std::vector<Cluster> clusters = segment(saliency);
+  // M17: the map the second stage sees is the priority map — the pipeline's
+  // (already top-down-adjusted) saliency plus the history/value channels.
+  // With inactive channels this is the pipeline map untouched.
+  const cv::Mat priority = history_.apply(pipeline_.get_saliency_map().map, object_store_.active_files());
+  std::vector<Cluster> clusters = segment(priority);
   object_store_.update(clusters, frame_index_);
+  object_store_.decay_values(config_.pipeline.priority.object_value_decay);
 
   const ObjectFile* focus = behavior_->select_focus(object_store_, frame_index_);
   if (focus != nullptr)
@@ -92,7 +97,11 @@ void AttentionSystem::process_second_stage()
     current_focus_.saliency = focus->saliency;
     has_focus_ = true;
     scanpath_.push_back(current_focus_);
+    // M17 facilitation: being selected accrues value on the object file
+    // (rewards from a task arrive via ObjectFileStore::add_value).
+    object_store_.add_value(focus->label, config_.pipeline.priority.object_value_per_selection);
   }
+  history_.decay_and_record(has_focus_ ? current_focus_.location : cv::Point(), priority.size(), has_focus_);
 
   run_processors();
 }
@@ -200,6 +209,7 @@ void AttentionSystem::reset_stage2()
   processor_stats_.clear();
   last_processed_label_ = -1;
   frames_since_processed_ = 0;
+  history_.reset();
 }
 
 void AttentionSystem::reset()

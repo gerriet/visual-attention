@@ -85,6 +85,7 @@ struct ObjectFile
   std::deque<cv::Point> trajectory;          // recent centroids (most recent last)
   cv::Vec3f appearance = cv::Vec3f(0, 0, 0); // leaky-integrated mean colour (BGR)
   LabelMemory labels;                        // accumulated semantic identity (M13)
+  float value = 0.0f;                        // selection-history / reward value (M17); decays
 
   bool ever_selected() const { return last_selected_frame >= 0; }
 };
@@ -143,6 +144,12 @@ class ObjectFileStore
   // No-ops if the label is not active.
   void record_inspection(int label);
   void add_label_vote(int label, const std::string& class_label, float confidence);
+
+  // Selection-history / value (M17): add value to a file (selection
+  // facilitation, or an external reward such as a target match), and the
+  // per-frame leak applied to every file. No-op if the label is not active.
+  void add_value(int label, float amount);
+  void decay_values(float factor);
 
   const std::vector<ObjectFile>& active_files() const { return active_; }
   const std::vector<ObjectFile>& inactive_files() const { return inactive_; }

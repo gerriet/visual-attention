@@ -1,5 +1,6 @@
 #pragma once
 
+#include "attention/fusion/priority_map.h"
 #include "attention/pipeline/attention_pipeline.h"
 #include "attention/pipeline/frame_source.h"
 #include "attention/system/behavior.h"
@@ -182,6 +183,7 @@ class AttentionSystem
   ObjectFileStore object_store_;
   std::unique_ptr<Behavior> behavior_;
   std::vector<std::unique_ptr<Processor>> processors_;
+  fusion::HistoryChannels history_; // M17 selection-history / value channels
 
   std::vector<Focus> scanpath_;
   Focus current_focus_;

@@ -43,6 +43,12 @@ ConfigLoader::Config ConfigLoader::load(const std::string& yaml_path)
       load_peaks(yaml["peaks"], config.pipeline);
     }
 
+    // Load priority-map channels (M17); absent = pure bottom-up (thesis map)
+    if (yaml["priority"])
+    {
+      load_priority(yaml["priority"], config.pipeline.priority);
+    }
+
     // Load output configuration
     if (yaml["output"])
     {
@@ -67,6 +73,50 @@ ConfigLoader::Config ConfigLoader::create_default()
   config.output_dir = "results/";
   config.display = false;
   return config;
+}
+
+void ConfigLoader::load_priority(const YAML::Node& node, fusion::PriorityConfig& config)
+{
+  if (node["top_down_weight"])
+  {
+    config.top_down_weight = node["top_down_weight"].as<float>();
+  }
+  if (node["top_down_map"])
+  {
+    config.top_down_map_path = node["top_down_map"].as<std::string>();
+  }
+  if (node["target_color"])
+  {
+    config.target_color = node["target_color"].as<std::string>();
+  }
+  if (node["target_color_sigma"])
+  {
+    config.target_color_sigma = node["target_color_sigma"].as<float>();
+  }
+  if (node["object_value_weight"])
+  {
+    config.object_value_weight = node["object_value_weight"].as<float>();
+  }
+  if (node["location_history_weight"])
+  {
+    config.location_history_weight = node["location_history_weight"].as<float>();
+  }
+  if (node["location_history_decay"])
+  {
+    config.location_history_decay = node["location_history_decay"].as<float>();
+  }
+  if (node["location_history_radius"])
+  {
+    config.location_history_radius = node["location_history_radius"].as<float>();
+  }
+  if (node["object_value_per_selection"])
+  {
+    config.object_value_per_selection = node["object_value_per_selection"].as<float>();
+  }
+  if (node["object_value_decay"])
+  {
+    config.object_value_decay = node["object_value_decay"].as<float>();
+  }
 }
 
 void ConfigLoader::load_pipeline(const YAML::Node& node, pipeline::PipelineConfig& config)
