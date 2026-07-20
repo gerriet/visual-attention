@@ -1,0 +1,22 @@
+# Priority-map profile (roadmap M17): colour-guided visual search. The
+# bottom-up saliency map is folded together with a dense top-down channel that
+# scores similarity to a target colour (red here) — turning the master saliency
+# map into a priority map (Guided Search / Awh-Belopolsky-Theeuwes).
+#
+#   ./attention --config configs/find_red.yaml scene.png --no-display
+#
+# Change `target_color` to any "#rrggbb" or named colour (red, green, blue,
+# yellow, orange, purple, cyan, magenta, white, black, gray). To source the
+# top-down channel externally instead (CLIP / detector / LLM relevance map),
+# drop `target_color` and set `top_down_map: <grayscale image>`.
+
+pipeline:
+  fusion: weighted-sum
+  selection: ior
+
+priority:
+  top_down_weight: 1.5
+  target_color: red
+
+output:
+  display: false

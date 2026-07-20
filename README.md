@@ -77,6 +77,10 @@ cmake --build build -j
 ./build/attention --attend data/samples/video/vtest.avi \
     --processors hog-person --behavior identification --no-save-frames
 
+# Priority-map search: fold a top-down task channel (here, a target colour)
+# into the saliency map to guide attention toward the target
+./build/attention --config configs/find_red.yaml data/test_images/inputc.png --no-display
+
 # Emit the interchange format (JSON + 16-bit saliency PNG) for evaluation
 ./build/attention data/test_images/input.png --no-display --emit-json out/result.json
 ```
@@ -132,7 +136,7 @@ scanpath comparator — the project's loose-equivalence replication bar).
 - [INTERCHANGE_FORMAT.md](docs/INTERCHANGE_FORMAT.md) — the result/scanpath format every model emits
 - [thesis_vs_modern.md](docs/thesis_vs_modern.md) — thesis model vs. modern saliency models
 - [ALTERNATIVE_FEATURES.md](docs/ALTERNATIVE_FEATURES.md) · [SELECTION_BACKENDS.md](docs/SELECTION_BACKENDS.md) — pluggable operators / trackers
-- [DYNAMIC_IOR_STUDY.md](docs/DYNAMIC_IOR_STUDY.md) · [GATED_RECOGNITION.md](docs/GATED_RECOGNITION.md) — the H1 and H2 studies
+- [DYNAMIC_IOR_STUDY.md](docs/DYNAMIC_IOR_STUDY.md) · [GATED_RECOGNITION.md](docs/GATED_RECOGNITION.md) · [PRIORITY_MAP.md](docs/PRIORITY_MAP.md) — the H1, H2 and H5 studies
 - [PERFORMANCE.md](docs/PERFORMANCE.md) — timing and optimization notes
 - Roadmaps: [V3_ROADMAP.md](docs/V3_ROADMAP.md) (current) · [V2_ROADMAP.md](docs/V2_ROADMAP.md) (history)
 
