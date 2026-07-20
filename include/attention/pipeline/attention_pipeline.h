@@ -7,6 +7,7 @@
 #include "attention/features/debug_context.h"
 #include "attention/features/feature_extractor.h"
 #include "attention/fusion/fusion_strategy.h"
+#include "attention/fusion/priority_map.h"
 #include "attention/pipeline/frame_source.h"
 #include "attention/selection/selection_strategy.h"
 #include <functional>
@@ -72,6 +73,12 @@ struct PipelineConfig
   // Strategy names
   std::string fusion = "weighted-sum";
   std::string selection = ""; // "nms", "ior", "neural-field"; empty = derive from enable_ior
+
+  // Priority-map channels (M17): top-down task relevance applied after fusion
+  // (the history channels in the same struct are consumed by the
+  // AttentionSystem's second stage). All weights default to 0 — the map stays
+  // the thesis's bottom-up map unless configured otherwise.
+  fusion::PriorityConfig priority;
 
   // Strategy-specific selection parameters as a YAML snippet (empty =
   // strategy defaults); see the strategy headers for keys
@@ -279,6 +286,7 @@ class AttentionPipeline
   std::vector<std::unique_ptr<features::FeatureExtractor>> extractors_;
   std::map<std::string, float> feature_weights_; // instance name -> weight
   std::unique_ptr<fusion::FusionStrategy> fusion_;
+  std::unique_ptr<fusion::TopDownChannel> top_down_; // M17 priority map (may be inactive)
   std::unique_ptr<selection::SelectionStrategy> selection_;
 
   // Current frame being processed

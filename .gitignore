@@ -31,6 +31,7 @@ data/MIT1003/
 data/PASCAL_VOC/
 data/middlebury/
 data/DAVIS/
+data/COCO-Search18/
 
 # Model weights (tools/fetch_models.py downloads these; never committed)
 models/

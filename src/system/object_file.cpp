@@ -256,6 +256,26 @@ void ObjectFileStore::add_label_vote(int label, const std::string& class_label, 
   }
 }
 
+void ObjectFileStore::add_value(int label, float amount)
+{
+  if (ObjectFile* file = find_active(label))
+  {
+    file->value += amount;
+  }
+}
+
+void ObjectFileStore::decay_values(float factor)
+{
+  for (auto& file : active_)
+  {
+    file.value *= factor;
+  }
+  for (auto& file : inactive_)
+  {
+    file.value *= factor;
+  }
+}
+
 ObjectFile* ObjectFileStore::find_active(int label)
 {
   for (auto& file : active_)

@@ -61,6 +61,7 @@ void AttentionPipeline::build_components()
   }
 
   fusion_ = fusion::create_fusion_strategy(config_.fusion);
+  top_down_ = std::make_unique<fusion::TopDownChannel>(config_.priority);
 
   selection::SelectionParams selection_params;
   selection_params.min_distance = config_.peak_min_distance;
@@ -417,7 +418,11 @@ void AttentionPipeline::extract_features(int pyramid_levels)
 
 void AttentionPipeline::integrate_features()
 {
-  saliency_ = core::SaliencyMap(fusion_->fuse(features_, feature_weights_, frame_.size()));
+  cv::Mat fused = fusion_->fuse(features_, feature_weights_, frame_.size());
+  // M17: fold the top-down task-relevance channel into the master map,
+  // turning it into a priority map. Inactive config returns `fused` untouched.
+  fused = top_down_->apply(fused, frame_.image);
+  saliency_ = core::SaliencyMap(fused);
 }
 
 void AttentionPipeline::detect_peaks()

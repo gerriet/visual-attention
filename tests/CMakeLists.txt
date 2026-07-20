@@ -13,7 +13,7 @@ if(NOT Catch2_FOUND)
     FetchContent_MakeAvailable(Catch2)
 endif()
 
-add_executable(characterization_tests test_characterization.cpp test_config.cpp test_selection.cpp test_stereo_onset.cpp test_system.cpp test_processors.cpp test_alt_features.cpp test_kalman_mot.cpp test_normalization.cpp test_recognition.cpp)
+add_executable(characterization_tests test_characterization.cpp test_config.cpp test_selection.cpp test_stereo_onset.cpp test_system.cpp test_processors.cpp test_alt_features.cpp test_kalman_mot.cpp test_normalization.cpp test_recognition.cpp test_priority.cpp)
 target_link_libraries(characterization_tests PRIVATE attention_core Catch2::Catch2WithMain)
 target_compile_definitions(characterization_tests PRIVATE
     ATTENTION_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
@@ -87,7 +87,8 @@ set_tests_properties(normalization_peaks PROPERTIES
 find_package(Python3 COMPONENTS Interpreter)
 if(Python3_Interpreter_FOUND)
     # Python entry points answer --help too (CLI contract, CLAUDE.md).
-    foreach(script tools/fetch_models.py eval/gated_recognition.py eval/plot_gated_recognition.py)
+    foreach(script tools/fetch_models.py eval/gated_recognition.py eval/plot_gated_recognition.py
+            eval/priority_search.py eval/coco_search.py eval/plot_priority_search.py)
         get_filename_component(script_name ${script} NAME_WE)
         add_test(NAME help_${script_name}
             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/${script} --help)
@@ -132,6 +133,17 @@ if(Python3_Interpreter_FOUND)
         add_test(NAME eval_unit
             COMMAND ${EVAL_PYTHON} -m unittest discover -s tests
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/eval)
+
+        # M17 priority-map search, smoke: 1 seed through all four ablation arms
+        # (scene generation needs numpy, hence the venv). "summary:" prints only
+        # after every arm scored.
+        add_test(NAME priority_search_smoke
+            COMMAND ${EVAL_PYTHON} ${CMAKE_SOURCE_DIR}/eval/priority_search.py
+                    --binary $<TARGET_FILE:attention> --seeds 1 --frames 24
+                    --out ${CMAKE_BINARY_DIR}/priority_smoke
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+        set_tests_properties(priority_search_smoke PROPERTIES
+            PASS_REGULAR_EXPRESSION "summary:")
         add_test(NAME eval_report_smoke
             COMMAND ${EVAL_PYTHON} -m attention_eval.report
                     ${CMAKE_SOURCE_DIR}/tests/golden/inputc/result.json

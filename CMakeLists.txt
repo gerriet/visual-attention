@@ -40,6 +40,7 @@ add_library(attention_core STATIC
     src/features/debug_context.cpp
     src/features/feature_registry.cpp
     src/fusion/fusion.cpp
+    src/fusion/priority_map.cpp
     src/selection/selection.cpp
     src/selection/neural_field_selection.cpp
     src/selection/neural_field_3d.cpp

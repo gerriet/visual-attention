@@ -68,12 +68,16 @@ cd eval && .venv/bin/python report_thesis_vs_modern.py
   cross-model or against ground-truth fixations
 - `attention_eval.plots` — saliency montage + metric bar charts (matplotlib,
   optional)
-- `datasets/mit1003.py`, `datasets/middlebury.py`, `datasets/davis2017.py` —
-  dataset adapters (download instructions inside; the DAVIS adapter carries the
-  hand-curated person↔object-id map used by the H2 study)
+- `datasets/mit1003.py`, `datasets/middlebury.py`, `datasets/davis2017.py`,
+  `datasets/cocosearch18.py` — dataset adapters (download instructions inside;
+  the DAVIS adapter carries the hand-curated person↔object-id map used by the
+  H2 study; COCO-Search18 feeds the M17 search study)
 - `dynamic_ior.py` — the M12 dynamic-IOR study (H1), one command per scene
 - `gated_recognition.py`, `plot_gated_recognition.py` — the M13
   gated-recognition study (H2): gated vs full-frame detection, accuracy vs
   compute (see `docs/GATED_RECOGNITION.md`)
+- `priority_search.py`, `coco_search.py` — the M17 priority-map study (H5):
+  synthetic search ablation + COCO-Search18 external validity (see
+  `docs/PRIORITY_MAP.md`)
 
 Run the tests: `cd eval && .venv/bin/python -m unittest discover -s tests`

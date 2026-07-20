@@ -334,6 +334,22 @@ so nothing changes by default).
 Deliverable: a `PriorityMap` fusion stage (channels behind the fusion
 registry) + `docs/PRIORITY_MAP.md`. Reframes the model in current terms.
 
+**Status (2026-07-20): done.** `PriorityConfig` adds the two missing terms as
+opt-in weighted channels — top-down task relevance (a native chroma-weighted
+target-colour channel, plus an external `top_down_map` file that is the
+interchange-boundary slot an M18 CLIP/LLM adapter fills) folded in at fusion,
+and stage-2 history/value (object-value facilitation that rides on object
+files, distinct from IOR, with a reward hook; plus a decaying location map).
+All weights default 0 → the map stays bit-identical to the thesis map
+(goldens unchanged). H5 result: on synthetic search the **dense value-specific
+top-down channel is decisive (time-to-target 33.4 → 0.1 frames)** while
+feature-*dimension* weighting is an honest near-null (28.9, CIs overlap) and
+the history term buys target-hold not acquisition (0.10 → 0.16); on
+**COCO-Search18 a content-blind category prior in the channel cuts mean
+fixations-to-target 9.03 → 7.23 and lifts found@10 0.27 → 0.52** (human 2.58 /
+0.92) — a lower bound on what a semantic source in the same slot (M18) buys.
+COCO-Search18 adapter added. Full story: `docs/PRIORITY_MAP.md`.
+
 ### M18 — VLM front-end: attention as a token-budget allocator (flagship demo)
 
 The timeliest repositioning (H6): the whole instrument as an interpretable,
@@ -368,7 +384,7 @@ another VLM.
 | DIEM (or DHF1K) | video gaze (optional M14 extension) | choose when needed; DIEM easiest |
 | KITTI raw (stereo) | stereo video (M15) | adapter to write |
 | PETS2006 | left-luggage scenario (M16) | pointer only |
-| COCO-Search18 | target-present visual search (M17 top-down ablation) | adapter to write |
+| COCO-Search18 | target-present visual search (M17 top-down ablation) | adapter in repo (`eval/datasets/cocosearch18.py`) |
 | V*Bench / hi-res VQA | VLM token-vs-accuracy curve (M18) | pointer only |
 
 Corpora stay pointed-to, never redistributed (v2 convention).
