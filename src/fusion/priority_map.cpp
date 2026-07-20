@@ -62,16 +62,27 @@ cv::Vec3b parse_colour(const std::string& spec)
   }
   if (spec.size() == 7 && spec[0] == '#')
   {
-    const int r = std::stoi(spec.substr(1, 2), nullptr, 16);
-    const int g = std::stoi(spec.substr(3, 2), nullptr, 16);
-    const int b = std::stoi(spec.substr(5, 2), nullptr, 16);
-    return cv::Vec3b(static_cast<uchar>(b), static_cast<uchar>(g), static_cast<uchar>(r));
+    try
+    {
+      const int r = std::stoi(spec.substr(1, 2), nullptr, 16);
+      const int g = std::stoi(spec.substr(3, 2), nullptr, 16);
+      const int b = std::stoi(spec.substr(5, 2), nullptr, 16);
+      return cv::Vec3b(static_cast<uchar>(b), static_cast<uchar>(g), static_cast<uchar>(r));
+    }
+    catch (const std::exception&)
+    {
+      // Fall through to the friendly error rather than surfacing a raw stoi throw.
+    }
   }
   throw std::runtime_error("Unparseable colour '" + spec + "' (use #rrggbb or a named colour)");
 }
 
 TopDownChannel::TopDownChannel(const PriorityConfig& config) : config_(config)
 {
+  if (!config_.top_down_active())
+  {
+    return; // channel off (weight 0): don't touch a leftover map path or colour
+  }
   if (!config_.top_down_map_path.empty())
   {
     const cv::Mat loaded = cv::imread(config_.top_down_map_path, cv::IMREAD_GRAYSCALE);
@@ -192,7 +203,10 @@ cv::Mat HistoryChannels::apply(const cv::Mat& saliency, const std::vector<system
     }
     priority += config_.object_value_weight * value_map;
   }
-  if (config_.location_history_weight > 0.0f && !location_.empty())
+  // Size-guard the location term: apply() runs at the top of the frame, before
+  // decay_and_record() rebuilds location_ for the current frame — so on a
+  // stream whose resolution changes, last frame's map may not match.
+  if (config_.location_history_weight > 0.0f && location_.size() == saliency.size())
   {
     priority += config_.location_history_weight * location_;
   }

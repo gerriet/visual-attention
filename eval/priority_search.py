@@ -26,9 +26,11 @@ scene generation; scoring is stdlib-only)
 import argparse
 import json
 import os
-import random
 import subprocess
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from study_common import bootstrap_ci  # noqa: E402
 
 ARMS = ["bottom-up", "feature-td", "target-td", "full-priority"]
 
@@ -117,18 +119,6 @@ def score(gt, scanpath, match_radius):
     return float(first), hold
 
 
-def bootstrap_ci(values, iterations=2000, seed=0):
-    if not values:
-        return (0.0, 0.0)
-    rng = random.Random(seed)
-    means = []
-    for _ in range(iterations):
-        sample = [rng.choice(values) for _ in values]
-        means.append(sum(sample) / len(sample))
-    means.sort()
-    return means[int(0.025 * iterations)], means[int(0.975 * iterations)]
-
-
 def study(args):
     results = {arm: {"time": [], "hold": []} for arm in ARMS}
     for seed in range(args.seeds):
@@ -149,16 +139,18 @@ def study(args):
     return results
 
 
-def summarize(results):
+def summarize(results, penalty):
     summary = {}
     for arm in ARMS:
         times, holds = results[arm]["time"], results[arm]["hold"]
         t_lo, t_hi = bootstrap_ci(times)
         h_lo, h_hi = bootstrap_ci(holds)
+        # score() returns exactly `penalty` (= frames) for a never-found run;
+        # anything strictly below it is a genuine acquisition.
         summary[arm] = {
             "time_to_target": sum(times) / len(times), "time_ci": [t_lo, t_hi],
             "hold_fraction": sum(holds) / len(holds), "hold_ci": [h_lo, h_hi],
-            "found_rate": sum(1 for t in times if t < max(times) or t == 0) / len(times),
+            "found_rate": sum(1 for t in times if t < penalty) / len(times),
             "runs": len(times),
         }
     return summary
@@ -193,7 +185,7 @@ def main():
         sys.exit("binary not found: %s (build first: cmake --build build)" % args.binary)
 
     results = study(args)
-    summary = summarize(results)
+    summary = summarize(results, args.frames)
     print(format_table(summary, args.frames))
 
     os.makedirs(args.out, exist_ok=True)

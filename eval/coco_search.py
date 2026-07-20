@@ -24,18 +24,22 @@ One command:  eval/coco_search.py --limit 150
 import argparse
 import json
 import os
-import random
 import subprocess
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from study_common import bootstrap_ci  # noqa: E402
+
 PRIOR_W, PRIOR_H = 336, 210  # prior raster (display aspect); resized by the core
 
+# %(cap)s is the model's fixation budget — the same cap the scores use, so the
+# model never emits more fixations than found@N / mean-ftt account for.
 BOTTOM_UP_YAML = """\
 pipeline:
   fusion: weighted-sum
   selection: ior
 peaks:
-  max_count: 10
+  max_count: %(cap)s
   threshold: 0.05
 output:
   display: false
@@ -118,18 +122,6 @@ def first_hit(fixations, bbox, cap):
     return cap + 1
 
 
-def bootstrap_ci(values, iterations=2000, seed=0):
-    if not values:
-        return (0.0, 0.0)
-    rng = random.Random(seed)
-    means = []
-    for _ in range(iterations):
-        sample = [rng.choice(values) for _ in values]
-        means.append(sum(sample) / len(sample))
-    means.sort()
-    return means[int(0.025 * iterations)], means[int(0.975 * iterations)]
-
-
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -169,18 +161,23 @@ def main():
         w, h = image_size(str(image))
         bbox = records[0]["bbox"]
 
-        # Human baseline: correct trials of this image (1-based fixation index).
+        # Human baseline: correct trials of this image, capped at the same
+        # budget as the model (cap+1 = "not found within budget") so the two
+        # columns are on one scale. The initial central fixation is stripped
+        # inside fixations_to_target, matching the model's first-free-saccade.
         for record in records:
             if record["correct"] != 1:
                 continue
             hit = adapter.fixations_to_target(record, w, h)
-            human.append(hit if hit is not None else args.cap + 1)
+            human.append(min(hit, args.cap + 1) if hit is not None else args.cap + 1)
 
         work = os.path.join(args.out, "runs", "%s_%s" % (task.replace(" ", "_"),
                                                          os.path.splitext(name)[0]))
-        fx = run_model(args.binary, image, BOTTOM_UP_YAML, work, "bottom_up")
+        bottom_up_yaml = BOTTOM_UP_YAML % {"cap": args.cap}
+        fx = run_model(args.binary, image, bottom_up_yaml, work, "bottom_up")
         bottom_up.append(first_hit(fx, bbox, args.cap))
-        prior_yaml = PRIOR_YAML % {"weight": args.top_down_weight, "map": priors[task]}
+        prior_yaml = PRIOR_YAML % {"cap": args.cap, "weight": args.top_down_weight,
+                                   "map": priors[task]}
         fx = run_model(args.binary, image, prior_yaml, work, "prior")
         prior.append(first_hit(fx, bbox, args.cap))
         if (n + 1) % 25 == 0:

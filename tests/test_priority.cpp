@@ -5,6 +5,7 @@
 #include "attention/config/config_loader.h"
 #include "attention/fusion/priority_map.h"
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 #include <cstdio>
 #include <fstream>
 #include <string>
@@ -37,6 +38,30 @@ TEST_CASE("parse_colour: named, hex, and rejection", "[priority]")
   CHECK(fusion::parse_colour("red") == cv::Vec3b(0, 0, 220));
   CHECK(fusion::parse_colour("#0080ff") == cv::Vec3b(255, 128, 0)); // BGR
   CHECK_THROWS_AS(fusion::parse_colour("not-a-colour"), std::runtime_error);
+  // A #-prefixed non-hex spec still surfaces the friendly error, not a raw
+  // stoi std::invalid_argument.
+  CHECK_THROWS_WITH(fusion::parse_colour("#gggggg"), Catch::Matchers::ContainsSubstring("Unparseable"));
+}
+
+TEST_CASE("inactive top-down channel ignores a stale/missing map path", "[priority]")
+{
+  // weight 0 = channel off: a leftover (here missing) map path must not throw
+  // at construction.
+  fusion::PriorityConfig config;
+  config.top_down_map_path = "no/such/map.png";
+  CHECK_NOTHROW(fusion::TopDownChannel(config));
+}
+
+TEST_CASE("location history term is size-guarded against a resolution change", "[priority]")
+{
+  fusion::PriorityConfig config;
+  config.location_history_weight = 1.0f;
+  fusion::HistoryChannels history(config);
+  history.decay_and_record(cv::Point(10, 10), cv::Size(120, 80), true);
+
+  // A later frame at a different resolution must not throw a size mismatch.
+  cv::Mat smaller(40, 60, CV_32F, cv::Scalar(0.5f));
+  CHECK_NOTHROW(history.apply(smaller, {}));
 }
 
 TEST_CASE("inactive channels leave the map untouched (bit-identical default)", "[priority]")

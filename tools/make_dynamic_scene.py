@@ -123,6 +123,10 @@ def main():
                     help="mark this object id as the (red) search target — M17 priority-map study")
     args = ap.parse_args()
 
+    if args.target is not None and not (0 <= args.target < args.objects):
+        ap.error("--target %d is out of range for --objects %d (ids 0..%d)"
+                 % (args.target, args.objects, args.objects - 1))
+
     objects = build_scene(args)
     render(objects, args)
     write_ground_truth(objects, args)

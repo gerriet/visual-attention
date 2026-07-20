@@ -346,7 +346,7 @@ top-down channel is decisive (time-to-target 33.4 → 0.1 frames)** while
 feature-*dimension* weighting is an honest near-null (28.9, CIs overlap) and
 the history term buys target-hold not acquisition (0.10 → 0.16); on
 **COCO-Search18 a content-blind category prior in the channel cuts mean
-fixations-to-target 9.03 → 7.23 and lifts found@10 0.27 → 0.52** (human 3.47 /
+fixations-to-target 9.03 → 7.23 and lifts found@10 0.27 → 0.52** (human 2.58 /
 0.92) — a lower bound on what a semantic source in the same slot (M18) buys.
 COCO-Search18 adapter added. Full story: `docs/PRIORITY_MAP.md`.
 

@@ -73,14 +73,20 @@ def display_to_image(x, y, image_w, image_h):
     return (x - x_off) / scale, (y - y_off) / scale
 
 
-def fixations_to_target(record, image_w, image_h):
-    """1-based index of the first fixation inside the target bbox, or None if
-    the trial never fixates it. Fixations are converted to image coordinates."""
+def fixations_to_target(record, image_w, image_h, skip_initial=True):
+    """Count of search fixations until the first one inside the target bbox, or
+    None if the trial never fixates it. Fixations are converted to image
+    coordinates. COCO-Search18 records begin with the enforced central start
+    fixation (X[0]/Y[0]); skip_initial drops it so the count is comparable to a
+    model whose first fixation is already its first free saccade — the count
+    then means "search saccades to target", 1-based, with the start excluded."""
     bx, by, bw, bh = record["bbox"]
-    for i, (dx, dy) in enumerate(zip(record["X"], record["Y"])):
-        x, y = display_to_image(dx, dy, image_w, image_h)
+    xs, ys = record["X"], record["Y"]
+    start = 1 if skip_initial else 0
+    for i in range(start, len(xs)):
+        x, y = display_to_image(xs[i], ys[i], image_w, image_h)
         if bx <= x <= bx + bw and by <= y <= by + bh:
-            return i + 1
+            return i if skip_initial else i + 1
     return None
 
 

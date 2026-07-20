@@ -88,7 +88,7 @@ find_package(Python3 COMPONENTS Interpreter)
 if(Python3_Interpreter_FOUND)
     # Python entry points answer --help too (CLI contract, CLAUDE.md).
     foreach(script tools/fetch_models.py eval/gated_recognition.py eval/plot_gated_recognition.py
-            eval/priority_search.py eval/coco_search.py)
+            eval/priority_search.py eval/coco_search.py eval/plot_priority_search.py)
         get_filename_component(script_name ${script} NAME_WE)
         add_test(NAME help_${script_name}
             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/${script} --help)

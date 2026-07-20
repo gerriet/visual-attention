@@ -76,9 +76,12 @@ mean fixations-to-target, cap+1 when never found):
 
 | arm | mean fixations-to-target | found@10 |
 |---|---|---|
-| human (1375 correct trials) | 3.47 [3.34, 3.61] | 0.92 |
+| human (1375 correct trials) | 2.58 [2.43, 2.72] | 0.92 |
 | bottom-up | 9.03 [8.43, 9.56] | 0.27 |
 | prior (category prior in the channel) | **7.23 [6.57, 7.89]** | **0.52** |
+
+*(Human fixations-to-target excludes the enforced central start fixation and
+is capped at the model's budget, so all three rows are on one scale.)*
 
 ## Reading the results
 
@@ -112,7 +115,7 @@ found@10 (0.27 → 0.52). Two honest framings:
   patch-similarity, an open-vocabulary detector, an LLM) sees the actual image
   and should do strictly better. That upgrade is M18's, and it needs no core
   change — it writes the same `top_down_map`.
-- The model stays **well short of human** (7.23 vs 3.47; found@10 0.52 vs
+- The model stays **well short of human** (7.23 vs 2.58; found@10 0.52 vs
   0.92). A bottom-up-plus-prior controller is not a search model of human
   gaze, and this milestone does not claim to be one. What H5 claims — that the
   priority terms improve task-driven efficiency, separably — is supported on
