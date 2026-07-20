@@ -12,7 +12,7 @@ namespace selection
 
 /**
  * NeuralField3D: a stack of 2D dynamic neural fields coupled in depth, ported
- * from the dissertation's NeuralField3D (reference/old_code/nf3d.h, thesis
+ * from the dissertation's NeuralField3D (nf3d.h, thesis
  * §6.4). Each depth plane runs the same Amari relaxation and "Backer version"
  * lateral kernel as the 2D field, with two additions that make depth compete:
  *

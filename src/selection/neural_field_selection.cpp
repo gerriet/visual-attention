@@ -1,5 +1,5 @@
 // 2D dynamic neural field selection, ported from the dissertation's
-// NeuralField2D (reference/old_code/nf2d.h) with the two-stage readout of
+// NeuralField2D (nf2d.h) with the two-stage readout of
 // thesis chapters 6/7 in minimal form (activation clusters -> Objectfile-lite
 // -> priority order by mean saliency). Deliberate deviations from the
 // original, within the project's loose-equivalence bar (see V2_ROADMAP.md):

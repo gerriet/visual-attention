@@ -1,5 +1,5 @@
 // 3D dynamic neural field, ported from the dissertation's NeuralField3D
-// (reference/old_code/nf3d.h, thesis §6.4): a stack of 2D Amari fields coupled
+// (nf3d.h, thesis §6.4): a stack of 2D Amari fields coupled
 // by cross-depth inhibition so that at each location a single depth wins. Used
 // for depth-aware selection (NeuralField3DSelection). Deliberate deviations,
 // within the loose-equivalence bar: logistic sigmoid (not the 5-piece

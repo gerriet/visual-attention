@@ -24,5 +24,4 @@ SOFTWARE.
 
 Third-party data bundled under data/samples/ is redistributed from the OpenCV
 project (https://github.com/opencv/opencv) under the Apache License 2.0; see
-data/samples/README.md for attribution. The original 2003-2005 implementation
-under reference/old_code/ is the author's own work, provided for reference.
+data/samples/README.md for attribution.

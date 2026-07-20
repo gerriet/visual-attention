@@ -249,7 +249,7 @@ Generally, **don't deviate** - consistency matters more than personal preference
 
 However, reasonable exceptions:
 - **Generated code** - don't format auto-generated headers
-- **Third-party code** - preserve original formatting in `reference/` directory
+- **Third-party / vendored code** - preserve its original formatting; don't reformat
 - **ASCII art comments** - disable clang-format with `// clang-format off/on`
 - **Alignment for readability** - matrices, lookup tables, bit flags
 

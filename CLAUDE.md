@@ -14,8 +14,10 @@ Development happens on `main`: each milestone/module lands on its own
 `module/<name>` branch and is merged when done. The `v1` tag marks the
 pre-v2 (phase-1) state.
 
-The original 2003–2005 implementation lives in `reference/old_code/` —
-reference only, never compiled (see its README for how to read it).
+The original 2003–2005 dissertation implementation is not bundled; it is
+described in the thesis (open access, linked from the README). Provenance
+comments in the ported selection code cite it by original filename and thesis
+section.
 
 ## Build and test
 
