@@ -25,6 +25,16 @@ PALETTE = [
 ]
 
 
+def object_color(i, args):
+    """Distractors cycle the non-red palette; the search target (if any) is red."""
+    if args.target is None:
+        return PALETTE[i % len(PALETTE)]
+    if i == args.target:
+        return PALETTE[0]  # red — the colour-defined search target
+    distractors = PALETTE[1:]
+    return distractors[i % len(distractors)]
+
+
 def build_scene(args):
     rng = np.random.RandomState(args.seed)
     w, h = args.width, args.height
@@ -39,7 +49,7 @@ def build_scene(args):
             "id": i,
             "pos": pos,
             "vel": vel,
-            "color": PALETTE[i % len(PALETTE)],
+            "color": object_color(i, args),
             "radius": r,
             # One object may be occluded for a window of frames (tests recovery).
             "occluded_from": (args.frames // 3 if (args.occlude and i == 0) else -1),
@@ -90,6 +100,8 @@ def write_ground_truth(objects, args):
         "seed": args.seed, "speed": args.speed,
         "objects": [{"id": o["id"], "positions": o["positions"]} for o in objects],
     }
+    if args.target is not None:
+        gt["target"] = args.target  # additive: the search target's object id (M17)
     with open(os.path.join(args.out, "gt.json"), "w") as fh:
         json.dump(gt, fh, indent=2)
 
@@ -107,6 +119,8 @@ def main():
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--occlude", action="store_true", help="occlude object 0 for a window")
     ap.add_argument("--occlude-len", type=int, default=6)
+    ap.add_argument("--target", type=int, default=None,
+                    help="mark this object id as the (red) search target — M17 priority-map study")
     args = ap.parse_args()
 
     objects = build_scene(args)
