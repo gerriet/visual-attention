@@ -4,10 +4,15 @@ Guidance for Claude Code when working in this repository.
 
 ## What this is
 
-C++17/OpenCV reimplementation of the neural-field visual attention model from
-the 2004 dissertation (Backer), plus a Python evaluation layer. Direction,
-locked decisions, and milestone history (M0–M8): `docs/V2_ROADMAP.md`.
-Development happens on the `v2` branch.
+C++17/OpenCV reimplementation of the two-stage visual attention model from
+the 2004 dissertation (Backer), plus a Python evaluation layer. Current
+direction, open hypotheses (H1–H6), and milestones: `docs/V3_ROADMAP.md`
+(the science phase); the v2 instrument-building history (M0–M9) it builds on:
+`docs/V2_ROADMAP.md`.
+
+Development happens on `main`: each milestone/module lands on its own
+`module/<name>` branch and is merged when done. The `v1` tag marks the
+pre-v2 (phase-1) state.
 
 The original 2003–2005 implementation lives in `reference/old_code/` —
 reference only, never compiled (see its README for how to read it).
@@ -39,8 +44,9 @@ processors are registries — composition is fully driven by `configs/*.yaml`.
 Every model (C++ pipeline or Python model) emits the same interchange format
 (`docs/INTERCHANGE_FORMAT.md`), which is the only thing the evaluation harness
 consumes. The `AttentionSystem` second stage tracks object files across frames
-and selects the focus through a behavior; the live demonstrator (`--live`)
-runs processor plugins on attended native-resolution ROIs only.
+and selects the focus through a behavior. Recognition/analysis processors run
+on attended native-resolution ROIs only — headless under `--attend`
+(attention-gated recognition, M13) and in the live demonstrator (`--live`).
 
 ## Conventions
 

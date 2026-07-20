@@ -58,7 +58,7 @@ flowchart TD
     FU --> SEL[SelectionStrategy<br/>WTA/NMS · 2D neural field · 3D field · Kalman-MOT]
     SEL --> P[Peaks / activation clusters]
     P --> OS[ObjectFileStore<br/>correspondence + tracking]
-    OS --> BH[Behaviour<br/>Exploration: dwell + object-based IoR]
+    OS --> BH[Behaviour registry<br/>exploration · greedy · spatial-ior · object-ior · identification]
     BH --> SP[Focus + scanpath]
     RS[(RunState<br/>field activity · IoR map · object files · prev. frame)]
     RS -.->|carried across frames| SEL
@@ -81,11 +81,15 @@ Per frame of the stream:
 3. `SelectionStrategy` reduces the map to peaks / activation clusters, reading
    and updating `RunState` (neural-field activity, inhibition-of-return) so
    dynamics carry across frames.
-4. The second stage corresponds clusters to `ObjectFile`s, a `Behaviour` picks
-   the focus (dwell + object-based inhibition of return), and the scanpath is
-   extended.
+4. The second stage corresponds clusters to `ObjectFile`s and a `Behaviour`
+   picks the focus. The default (`exploration`) dwells then applies object-based
+   inhibition of return; the M12 ablation arms (`greedy` / `spatial-ior` /
+   `object-ior`) and the M13 `identification` behaviour swap into the same slot.
+   The scanpath is extended.
 5. Optionally, downstream **processors** run only on attended ROIs (the
-   attention premise made concrete: expensive analysis where the system looks).
+   attention premise made concrete: expensive analysis where the system looks) —
+   under `--live` and headless under `--attend`, where gated recognition
+   accumulates their verdicts into per-object label memory (M13).
 
 ## 6. Cross-cutting concepts
 
