@@ -87,10 +87,11 @@ def visual_tokens(backend, views):
 
 
 def target_visible(views, target_box, min_target_px, overlap=0.6):
-    """True if any view shows the target region at usable resolution: the
-    native target box is (mostly) inside the view's source region, and the
-    target's on-screen size clears min_target_px. Models 'downsampling makes
-    the target too small to read'."""
+    """True if any view shows the target region at usable resolution: enough of
+    the native target box lies inside the view's source region, and the *visible
+    portion* is on-screen at least min_target_px. Models 'downsampling makes the
+    target too small to read', and 'a crop that clips most of the target off
+    doesn't count'. None when there is no ground-truth box (visibility unknown)."""
     if target_box is None:
         return None
     tx0, ty0, tx1, ty1 = target_box
@@ -99,12 +100,11 @@ def target_visible(views, target_box, min_target_px, overlap=0.6):
         sx0, sy0, sx1, sy1 = v["source_box"]
         ix0, iy0 = max(tx0, sx0), max(ty0, sy0)
         ix1, iy1 = min(tx1, sx1), min(ty1, sy1)
-        inter = max(0, ix1 - ix0) * max(0, iy1 - iy0)
-        if inter / t_area < overlap:
+        iw, ih = max(0, ix1 - ix0), max(0, iy1 - iy0)
+        if (iw * ih) / t_area < overlap:
             continue
-        shown_w = (tx1 - tx0) * v["scale"]
-        shown_h = (ty1 - ty0) * v["scale"]
-        if min(shown_w, shown_h) >= min_target_px:
+        # On-screen size of the *visible* part, not the full native box.
+        if min(iw * v["scale"], ih * v["scale"]) >= min_target_px:
             return True
     return False
 
@@ -127,17 +127,25 @@ def build_arms(image, fixations, params):
     full_img, full_scale = resized(image, params["full_max_side"])
     full = [make_view(full_img, (0, 0, w, h), full_scale)]
 
-    # fovea: global thumbnail + K native-res crops around the top fixations.
+    # fovea: global thumbnail + up to K native-res crops around the top
+    # fixations, deduplicated so near-coincident fixations don't spend the
+    # budget twice on overlapping pixels.
     global_img, global_scale = resized(image, params["global_side"])
     views = [make_view(global_img, (0, 0, w, h), global_scale)]
     half = params["fovea_side"] // 2
-    for (fx, fy, _value) in fixations[: params["k"]]:
+    kept_centres = []
+    for (fx, fy, _value) in fixations:
+        if len(kept_centres) >= params["k"]:
+            break
         cx, cy = int(round(fx)), int(round(fy))
+        if any(abs(cx - kx) < half and abs(cy - ky) < half for kx, ky in kept_centres):
+            continue  # overlaps an already-kept crop
         x0, y0 = max(0, cx - half), max(0, cy - half)
         x1, y1 = min(w, cx + half), min(h, cy + half)
         if x1 - x0 < 8 or y1 - y0 < 8:
             continue
         views.append(make_view(image.crop((x0, y0, x1, y1)), (x0, y0, x1, y1), 1.0))
+        kept_centres.append((cx, cy))
     fovea = views
 
     # uniform: whole image downsampled to match the fovea arm's token budget.
@@ -170,10 +178,12 @@ def run_item(backend, image, fixations, item, params):
                 "answer": item["answer"],
             },
         }
-        letter = backend.answer(payload)
-        chosen = item["choices"][ord(letter) - 65] if 0 <= ord(letter) - 65 < len(item["choices"]) else None
+        letter = backend.answer(payload)  # may be None (abstain -> scored wrong)
+        chosen = None
+        if letter is not None and 0 <= ord(letter) - 65 < len(item["choices"]):
+            chosen = item["choices"][ord(letter) - 65]
         rows[name] = {
-            "correct": int(chosen == item["answer"]),
+            "correct": int(chosen is not None and chosen == item["answer"]),
             "tokens": tokens,
             "token_fraction": tokens / full_tokens if full_tokens else 0.0,
             "real_tokens": backend.count_tokens(payload) if params["count_tokens"] else None,
@@ -207,26 +217,36 @@ def synthetic_item(params):
 
 def summarize(results):
     summary = {}
+    have_real = bool(results) and all(r["full-res"]["real_tokens"] for r in results)
     for arm in ("full-res", "uniform", "fovea"):
         acc = [r[arm]["correct"] for r in results]
         frac = [r[arm]["token_fraction"] for r in results]
         lo, hi = bootstrap_ci(acc)
-        summary[arm] = {
+        row = {
             "accuracy": sum(acc) / len(acc) if acc else 0.0,
             "accuracy_ci": [lo, hi],
             "mean_token_fraction": sum(frac) / len(frac) if frac else 0.0,
             "n": len(acc),
         }
+        if have_real:
+            # Real token fraction vs the same item's full-res real tokens.
+            real_frac = [r[arm]["real_tokens"] / r["full-res"]["real_tokens"] for r in results]
+            row["mean_real_tokens"] = sum(r[arm]["real_tokens"] for r in results) / len(results)
+            row["mean_real_token_fraction"] = sum(real_frac) / len(real_frac)
+        summary[arm] = row
     return summary
 
 
 def format_table(summary):
-    header = "%-10s %10s %18s %16s" % ("arm", "accuracy", "95% CI", "token-fraction")
+    have_real = "mean_real_token_fraction" in summary["full-res"]
+    header = "%-10s %10s %18s %16s%s" % (
+        "arm", "accuracy", "95% CI", "token-fraction", "  real-fraction" if have_real else "")
     lines = ["VLM front-end (H6): accuracy vs visual-token budget", header, "-" * len(header)]
     for arm in ("full-res", "uniform", "fovea"):
         s = summary[arm]
-        lines.append("%-10s %10.3f  [%5.3f,%5.3f] %16.3f" % (
-            arm, s["accuracy"], s["accuracy_ci"][0], s["accuracy_ci"][1], s["mean_token_fraction"]))
+        extra = "  %13.3f" % s["mean_real_token_fraction"] if have_real else ""
+        lines.append("%-10s %10.3f  [%5.3f,%5.3f] %16.3f%s" % (
+            arm, s["accuracy"], s["accuracy_ci"][0], s["accuracy_ci"][1], s["mean_token_fraction"], extra))
     return "\n".join(lines)
 
 
@@ -275,6 +295,9 @@ def main():
         from datasets import vstar
         if not vstar.available():
             sys.exit("V*Bench not found under data/vstar_bench — see eval/datasets/vstar.py")
+        if args.backend == "mock":
+            print("WARNING: the mock backend cannot score V*Bench — it carries no target boxes, "
+                  "so every arm reports chance. Use --backend claude for real numbers.", file=sys.stderr)
         Image = _pil()
         items = vstar.iter_items(category=args.category)
         for n, item in enumerate(items):
@@ -296,19 +319,24 @@ def main():
     with open(os.path.join(args.out, "summary.json"), "w") as fh:
         json.dump({"config": {k: v for k, v in vars(args).items()},
                    "backend": args.backend, "summary": summary}, fh, indent=2)
-    print("summary: %s" % os.path.join(args.out, "summary.json"))
+    # Per-item rows too (real_tokens land here when --count-tokens is on).
+    with open(os.path.join(args.out, "results.json"), "w") as fh:
+        json.dump(results, fh, indent=2)
     if args.json:
         print(json.dumps(summary, indent=2))
 
     if args.check:
         # End-to-end sanity: on the synthetic item the attention crop must
-        # deliver the target the token-matched uniform downsample loses.
+        # deliver the target the token-matched uniform downsample loses. Runs
+        # *before* the success banner so the exit code governs the CTest gate.
         fovea, uniform = summary["fovea"]["accuracy"], summary["uniform"]["accuracy"]
         if not (fovea > uniform):
             sys.exit("check failed: fovea accuracy %.3f did not beat uniform %.3f" % (fovea, uniform))
         if summary["fovea"]["mean_token_fraction"] >= 0.9:
             sys.exit("check failed: fovea used %.3f of full-res tokens (no saving)"
                      % summary["fovea"]["mean_token_fraction"])
+
+    print("summary: %s" % os.path.join(args.out, "summary.json"))
 
 
 if __name__ == "__main__":

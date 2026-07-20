@@ -155,8 +155,12 @@ if(Python3_Interpreter_FOUND)
                     --binary $<TARGET_FILE:attention> --demo --check
                     --out ${CMAKE_BINARY_DIR}/vlm_smoke
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+        # Gate on the exit code: --check prints "summary:" only after passing,
+        # and sys.exit(...) on failure — do NOT set PASS_REGULAR_EXPRESSION
+        # (it would make CTest ignore the exit code). FAIL_REGULAR_EXPRESSION
+        # catches an unraised traceback too.
         set_tests_properties(vlm_frontend_smoke PROPERTIES
-            PASS_REGULAR_EXPRESSION "summary:")
+            FAIL_REGULAR_EXPRESSION "check failed;Traceback;Error")
         add_test(NAME eval_report_smoke
             COMMAND ${EVAL_PYTHON} -m attention_eval.report
                     ${CMAKE_SOURCE_DIR}/tests/golden/inputc/result.json
