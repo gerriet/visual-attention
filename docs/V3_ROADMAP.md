@@ -374,6 +374,26 @@ reimplementation" to "a stateful, object-based attention front-end for large
 vision models." Guard against the non-goal: stay the *controller*, don't become
 another VLM.
 
+**Status (2026-07-20): instrument built + verified end-to-end on a mock; real
+V\*Bench run gated on a keyed VLM.** The first cut rides the existing
+`--emit-json` interchange (no new C++ mode; the full C++ virtual fovea stays
+M15's): `eval/vlm_frontend.py` crops K native-res fovea windows around the top
+saliency fixations plus one low-res global view, and scores three arms
+(`full-res` / `uniform`-at-matched-budget / `fovea`) with a pluggable
+`VLMBackend` (`mock` default + `claude`, anthropic SDK, opus-4-8, base64 blocks,
+real `count_tokens`). Token cost is reported both as a provider-independent
+patch estimate (CI-safe) and the backend's real token count when keyed; only the
+fraction vs full-res is compared. The **mock answers correctly iff the target is
+delivered at usable resolution**, so the synthetic `--demo --check` smoke is a
+genuine end-to-end test — and it already shows the H6 shape: **fovea holds 100%
+accuracy at 27% of full-res tokens where the token-matched uniform downsample
+drops to 0%** (a crop lands on the small salient target the downsample loses).
+Crops are bottom-up now with the M17 `top_down_map` slot wired for
+question-conditioned (H5×H6) crops later. V\*Bench adapter added
+(`eval/datasets/vstar.py`). This env has no VLM credentials, so the real
+V\*Bench numbers + figure land on a keyed run. Full story:
+`docs/VLM_FRONT_END.md`.
+
 ## Datasets
 
 | Dataset | For | Status |
@@ -385,7 +405,7 @@ another VLM.
 | KITTI raw (stereo) | stereo video (M15) | adapter to write |
 | PETS2006 | left-luggage scenario (M16) | pointer only |
 | COCO-Search18 | target-present visual search (M17 top-down ablation) | adapter in repo (`eval/datasets/cocosearch18.py`) |
-| V*Bench / hi-res VQA | VLM token-vs-accuracy curve (M18) | pointer only |
+| V*Bench / hi-res VQA | VLM token-vs-accuracy curve (M18) | adapter in repo (`eval/datasets/vstar.py`) |
 
 Corpora stay pointed-to, never redistributed (v2 convention).
 

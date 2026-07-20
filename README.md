@@ -136,7 +136,7 @@ scanpath comparator — the project's loose-equivalence replication bar).
 - [INTERCHANGE_FORMAT.md](docs/INTERCHANGE_FORMAT.md) — the result/scanpath format every model emits
 - [thesis_vs_modern.md](docs/thesis_vs_modern.md) — thesis model vs. modern saliency models
 - [ALTERNATIVE_FEATURES.md](docs/ALTERNATIVE_FEATURES.md) · [SELECTION_BACKENDS.md](docs/SELECTION_BACKENDS.md) — pluggable operators / trackers
-- [DYNAMIC_IOR_STUDY.md](docs/DYNAMIC_IOR_STUDY.md) · [GATED_RECOGNITION.md](docs/GATED_RECOGNITION.md) · [PRIORITY_MAP.md](docs/PRIORITY_MAP.md) — the H1, H2 and H5 studies
+- [DYNAMIC_IOR_STUDY.md](docs/DYNAMIC_IOR_STUDY.md) · [GATED_RECOGNITION.md](docs/GATED_RECOGNITION.md) · [PRIORITY_MAP.md](docs/PRIORITY_MAP.md) · [VLM_FRONT_END.md](docs/VLM_FRONT_END.md) — the H1, H2, H5 and H6 studies
 - [PERFORMANCE.md](docs/PERFORMANCE.md) — timing and optimization notes
 - Roadmaps: [V3_ROADMAP.md](docs/V3_ROADMAP.md) (current) · [V2_ROADMAP.md](docs/V2_ROADMAP.md) (history)
 
