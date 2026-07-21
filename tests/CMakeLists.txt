@@ -88,7 +88,8 @@ find_package(Python3 COMPONENTS Interpreter)
 if(Python3_Interpreter_FOUND)
     # Python entry points answer --help too (CLI contract, CLAUDE.md).
     foreach(script tools/fetch_models.py eval/gated_recognition.py eval/plot_gated_recognition.py
-            eval/priority_search.py eval/coco_search.py eval/plot_priority_search.py)
+            eval/priority_search.py eval/coco_search.py eval/plot_priority_search.py
+            eval/vlm_frontend.py eval/plot_vlm_frontend.py)
         get_filename_component(script_name ${script} NAME_WE)
         add_test(NAME help_${script_name}
             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/${script} --help)
@@ -144,6 +145,22 @@ if(Python3_Interpreter_FOUND)
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
         set_tests_properties(priority_search_smoke PROPERTIES
             PASS_REGULAR_EXPRESSION "summary:")
+
+        # M18 VLM front-end, smoke: the synthetic-item end-to-end check on the
+        # mock backend (needs PIL, hence the venv; no dataset, no API key). The
+        # attention fovea crop must deliver the small target the token-matched
+        # uniform downsample loses — --check exits non-zero otherwise.
+        add_test(NAME vlm_frontend_smoke
+            COMMAND ${EVAL_PYTHON} ${CMAKE_SOURCE_DIR}/eval/vlm_frontend.py
+                    --binary $<TARGET_FILE:attention> --demo --check
+                    --out ${CMAKE_BINARY_DIR}/vlm_smoke
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+        # Gate on the exit code: --check prints "summary:" only after passing,
+        # and sys.exit(...) on failure — do NOT set PASS_REGULAR_EXPRESSION
+        # (it would make CTest ignore the exit code). FAIL_REGULAR_EXPRESSION
+        # catches an unraised traceback too.
+        set_tests_properties(vlm_frontend_smoke PROPERTIES
+            FAIL_REGULAR_EXPRESSION "check failed;Traceback;Error")
         add_test(NAME eval_report_smoke
             COMMAND ${EVAL_PYTHON} -m attention_eval.report
                     ${CMAKE_SOURCE_DIR}/tests/golden/inputc/result.json
