@@ -103,26 +103,38 @@ def idt_fixations(samples, size, dispersion_frac=0.05, min_duration_s=0.1,
     min_samples = max(2, int(round(min_duration_s * sample_rate)))
 
     pts = np.asarray(samples, dtype=np.float64)
-    # Keep on-screen, finite samples.
-    ok = np.isfinite(pts).all(axis=1) & (pts[:, 0] >= 0) & (pts[:, 0] < w) \
+    # A sample is valid if it is finite and on-screen. Invalid samples (blinks,
+    # off-screen excursions) are NOT deleted — they break temporal contiguity,
+    # ending the current fixation. Deleting them would fuse the fixations on
+    # either side of a blink into one, corrupting the sequence.
+    valid = np.isfinite(pts).all(axis=1) & (pts[:, 0] >= 0) & (pts[:, 0] < w) \
         & (pts[:, 1] >= 0) & (pts[:, 1] < h)
-    pts = pts[ok]
 
     fixations = []
-    i, n = 0, len(pts)
+    n = len(pts)
+    i = 0
     while i < n:
-        j = i + min_samples
-        if j > n:
-            break
-        window = pts[i:j]
-        if _dispersion(window) > disp_thresh:
+        if not valid[i]:
             i += 1
             continue
-        # Grow the window while dispersion stays under threshold.
-        while j < n and _dispersion(pts[i:j + 1]) <= disp_thresh:
-            j += 1
-        fixations.append((float(pts[i:j, 0].mean()), float(pts[i:j, 1].mean())))
-        i = j
+        # Longest run of contiguous valid samples starting at i.
+        run_end = i
+        while run_end < n and valid[run_end]:
+            run_end += 1
+        # I-DT within this contiguous run only.
+        k = i
+        while k < run_end:
+            j = k + min_samples
+            if j > run_end:
+                break
+            if _dispersion(pts[k:j]) > disp_thresh:
+                k += 1
+                continue
+            while j < run_end and _dispersion(pts[k:j + 1]) <= disp_thresh:
+                j += 1
+            fixations.append((float(pts[k:j, 0].mean()), float(pts[k:j, 1].mean())))
+            k = j
+        i = run_end
     return fixations
 
 
@@ -153,18 +165,30 @@ def _extract_eye_samples(mat):
 def iter_scanpaths(stimulus_stem, size, root=DEFAULT_ROOT):
     """Yield (subject, [(x, y), ...]) ordered fixation sequences for one
     stimulus, one entry per observer under DATA/. `size` is the stimulus (w, h).
-    Needs scipy."""
+    Needs scipy.
+
+    Warns once if the DATA files exist but no observer yields a fixation — the
+    signal that the eyeData column/coordinate assumption (EYE_X_COL / EYE_Y_COL,
+    see module docstring) does not match this archive."""
+    import sys
     from scipy.io import loadmat  # optional dep — see eval/requirements.txt
 
     data_root = Path(root) / "DATA"
     if not data_root.is_dir():
         raise FileNotFoundError(
             f"MIT1003 DATA archive not found under {data_root} — see this module's docstring")
+    saw_file, yielded = False, False
     for subject_dir in sorted(p for p in data_root.iterdir() if p.is_dir()):
         mat_path = subject_dir / f"{stimulus_stem}.mat"
         if not mat_path.exists():
             continue
+        saw_file = True
         samples = _extract_eye_samples(loadmat(str(mat_path)))
         fixations = idt_fixations(samples, size)
         if fixations:
+            yielded = True
             yield subject_dir.name, fixations
+    if saw_file and not yielded:
+        print("WARNING: MIT1003 DATA files for '%s' yielded no fixations — the eyeData "
+              "column/coordinate assumption may not match this archive (see datasets/mit1003.py)"
+              % stimulus_stem, file=sys.stderr)

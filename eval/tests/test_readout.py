@@ -47,6 +47,13 @@ class TestStochastic(unittest.TestCase):
         b = readout.sample_paths(m, seed=2, count=1, n=4)
         self.assertNotEqual(a, b)
 
+    def test_flat_map_samples_uniformly(self):
+        # Proportional-to-saliency sampling on a flat map is ~uniform
+        # (regression: a min-subtraction would zero a flat map and break this).
+        flat = np.ones((20, 20))
+        xs = [p[0][0] for p in readout.sample_paths(flat, seed=3, count=300, size=(20, 20), n=1)]
+        self.assertTrue(6 < float(np.mean(xs)) < 14)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -74,7 +74,11 @@ def interobserver_ceiling(human_paths, size):
     for i, held in enumerate(human_paths):
         others = human_paths[:i] + human_paths[i + 1:]
         rows.append(score_vs_humans(held, others, size))
-    return {k: float(np.nanmean([r[k] for r in rows])) for k in MM_DIMS + ("scanmatch",)}
+    ceiling = {}
+    for k in MM_DIMS + ("scanmatch",):
+        vals = [r[k] for r in rows if not np.isnan(r[k])]
+        ceiling[k] = float(np.mean(vals)) if vals else float("nan")  # guard all-NaN slice
+    return ceiling
 
 
 def random_path(size, n, rng):
@@ -131,12 +135,15 @@ def python_model_map(name, image_array):
 def run_mit1003(args):
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from datasets import mit1003
-    from attention_eval.models import MODELS, load_image_rgb
+    from attention_eval.models import MODELS
+    from attention_eval.models.base import load_image_rgb  # not re-exported by the package
 
     if not (mit1003.available() and mit1003.scanpaths_available()):
         sys.exit("MIT1003 stimuli + DATA archive required — see eval/datasets/mit1003.py")
 
-    operators = [m for m in ("spectral-residual", "center-bias", "deepgaze") if m in MODELS]
+    # Every registered Python saliency model is a fair scanpath peer (this picks
+    # up DeepGaze under its real key 'deepgaze-iie' when torch + weights are present).
+    operators = sorted(MODELS)
     per_arm = {}
 
     def record(arm, row):
@@ -236,7 +243,7 @@ def demo(args):
 # --- aggregate + report ------------------------------------------------------
 
 ARM_ORDER = ["inter-observer", "thesis-objfile", "thesis-wta", "thesis-stoch-best",
-             "spectral-residual-wta", "center-bias-wta", "deepgaze-wta", "center", "random"]
+             "spectral-residual-wta", "center-bias-wta", "deepgaze-iie-wta", "center", "random"]
 
 
 def summarize(per_arm):

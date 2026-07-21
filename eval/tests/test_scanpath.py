@@ -67,6 +67,14 @@ class TestMultiMatch(unittest.TestCase):
         self.assertTrue(math.isnan(mm["shape"]))
         self.assertAlmostEqual(mm["position"], 1.0, places=6)
 
+    def test_position_sees_terminal_divergence(self):
+        # Two paths identical except the final fixation: position must drop
+        # (regression: it once compared only saccade-start fixations).
+        a = [(0, 0), (10, 10), (20, 20)]
+        b = [(0, 0), (10, 10), (99, 99)]
+        self.assertLess(scanpath.multimatch(a, b, self.size)["position"],
+                        scanpath.multimatch(a, a, self.size)["position"])
+
     def test_empty_is_nan(self):
         mm = scanpath.multimatch([], [(5, 5)], self.size)
         self.assertTrue(math.isnan(mm["position"]))
@@ -93,6 +101,13 @@ class TestScanMatch(unittest.TestCase):
 
     def test_empty_is_nan(self):
         self.assertTrue(math.isnan(scanpath.scanmatch([], [(1, 1)], self.size)))
+
+    def test_length_mismatch_penalized_by_gaps(self):
+        # A short path gapping past a long human sequence is normalized by the
+        # longer length (regression: min(m,n) normalization inflated this).
+        short = [(10, 10), (30, 30), (50, 50)]
+        long_seq = short + [(x * 7 % 100, x * 5 % 100) for x in range(9)]
+        self.assertLess(scanpath.scanmatch(short, long_seq, self.size), 0.65)
 
 
 if __name__ == "__main__":

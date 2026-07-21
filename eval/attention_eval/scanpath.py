@@ -145,11 +145,11 @@ def multimatch(path_a, path_b, size):
         return {"shape": nan, "direction": nan, "length": nan, "position": nan}
 
     sacc_a, sacc_b = _saccades(path_a), _saccades(path_b)
-    # Align the saccade-vector sequences by vector-difference cost.
+    # Shape/direction/length: align the saccade-vector sequences.
     cost = [[math.hypot(ax - bx, ay - by) for (bx, by) in sacc_b] for (ax, ay) in sacc_a]
     pairs = _dtw_path(cost)
 
-    shape, direction, length, position = [], [], [], []
+    shape, direction, length = [], [], []
     for i, j in pairs:
         ax, ay = sacc_a[i]
         bx, by = sacc_b[j]
@@ -159,10 +159,11 @@ def multimatch(path_a, path_b, size):
         if amp_a > 1e-9 and amp_b > 1e-9:
             cos = max(-1.0, min(1.0, (ax * bx + ay * by) / (amp_a * amp_b)))
             direction.append(1.0 - math.acos(cos) / math.pi)
-        # Position: distance between the aligned saccades' start fixations.
-        px, py = path_a[i]
-        qx, qy = path_b[j]
-        position.append(1.0 - math.hypot(px - qx, py - qy) / diag)
+
+    # Position: align the full *fixation* sequences (so both endpoints, including
+    # the terminal fixation, count) by Euclidean cost.
+    pos_cost = [[math.hypot(ax - bx, ay - by) for (bx, by) in path_b] for (ax, ay) in path_a]
+    position = [1.0 - pos_cost[i][j] / diag for i, j in _dtw_path(pos_cost)]
 
     def clamp_mean(values):
         return max(0.0, sum(values) / len(values)) if values else nan
@@ -207,6 +208,9 @@ def scanmatch(path_a, path_b, size, grid=8, gap=0.2):
             dp[i][j] = max(dp[i - 1][j - 1] + sub(seq_a[i - 1], seq_b[j - 1]),
                            dp[i - 1][j] - gap,
                            dp[i][j - 1] - gap)
-    # Per-aligned-element score in [-1, 1], mapped to [0, 1].
-    per_element = dp[m][n] / min(m, n)
+    # Normalize by the *longer* sequence (Cristino's convention): a short path
+    # that gaps past most of a long human sequence is penalized for the gaps,
+    # not flattered by dividing out its own length. Per-element score in
+    # [-1, 1], mapped to [0, 1].
+    per_element = dp[m][n] / max(m, n)
     return max(0.0, min(1.0, (per_element + 1.0) / 2.0))

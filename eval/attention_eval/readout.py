@@ -22,9 +22,12 @@ import numpy as np
 
 
 def _prepare(saliency):
-    """Non-negative float saliency, so argmax/sampling are well defined."""
-    m = np.asarray(saliency, dtype=np.float64)
-    m = m - m.min()
+    """Non-negative float saliency, so argmax/sampling are well defined.
+    Clamps negatives to 0 (NOT a min-subtraction, which would distort the
+    sampling distribution) and scales by the peak — a constant factor that
+    leaves the sampling *distribution* proportional to the saliency itself.
+    Returns a fresh array (never a view of the caller's map)."""
+    m = np.maximum(np.asarray(saliency, dtype=np.float64), 0.0)
     peak = m.max()
     return m / peak if peak > 0 else m
 
@@ -54,7 +57,7 @@ def wta_ior(saliency, size=None, n=10, ior_frac=0.08, ior_strength=1.0):
     """Deterministic winner-take-all + IOR scanpath: the top `n` peaks, each
     followed by Gaussian inhibition. `ior_frac` is the IOR radius as a fraction
     of the map's shorter side. Returns [(x, y), ...] in `size` coords."""
-    m = _prepare(saliency).copy()
+    m = _prepare(saliency)  # already a fresh array — safe to mutate for IOR
     radius = max(1.0, ior_frac * min(m.shape))
     fixations = []
     for _ in range(n):
@@ -69,17 +72,20 @@ def wta_ior(saliency, size=None, n=10, ior_frac=0.08, ior_strength=1.0):
 def stochastic(saliency, rng, size=None, n=10, ior_frac=0.08, ior_strength=1.0):
     """Stochastic readout: sample each fixation proportional to the (IOR-
     suppressed) saliency, using the given numpy RandomState. One draw of the
-    generative distribution."""
-    m = _prepare(saliency).copy()
+    generative distribution. Inverse-CDF sampling (cumsum + searchsorted)
+    avoids rng.choice's per-call probability re-validation over a full-res map."""
+    m = _prepare(saliency)
     radius = max(1.0, ior_frac * min(m.shape))
-    h, w = m.shape
+    w = m.shape[1]
     fixations = []
     for _ in range(n):
-        total = m.sum()
+        flat = m.ravel()
+        total = flat.sum()
         if total <= 0:
             break
-        idx = rng.choice(m.size, p=(m.ravel() / total))
-        row, col = divmod(int(idx), w)
+        idx = int(np.searchsorted(np.cumsum(flat), rng.random() * total))
+        idx = min(idx, flat.size - 1)
+        row, col = divmod(idx, w)
         fixations.append(_scale(row, col, m.shape, size))
         _inhibit(m, row, col, radius, ior_strength)
     return fixations
