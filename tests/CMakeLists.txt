@@ -161,6 +161,20 @@ if(Python3_Interpreter_FOUND)
         # catches an unraised traceback too.
         set_tests_properties(vlm_frontend_smoke PROPERTIES
             FAIL_REGULAR_EXPRESSION "check failed;Traceback;Error")
+
+        # M11 scanpaths vs human: --help (imports numpy, hence the venv) + the
+        # synthetic stack check (ceiling and map-driven readout clear the
+        # floors; MultiMatch/ScanMatch/readout/ceiling exercised end to end,
+        # no dataset/scipy/binary). Gated on the exit code like vlm above.
+        add_test(NAME help_scanpath_vs_human
+            COMMAND ${EVAL_PYTHON} ${CMAKE_SOURCE_DIR}/eval/scanpath_vs_human.py --help)
+        set_tests_properties(help_scanpath_vs_human PROPERTIES PASS_REGULAR_EXPRESSION "usage")
+        add_test(NAME scanpath_vs_human_smoke
+            COMMAND ${EVAL_PYTHON} ${CMAKE_SOURCE_DIR}/eval/scanpath_vs_human.py --demo --check
+                    --out ${CMAKE_BINARY_DIR}/scanpath_smoke
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+        set_tests_properties(scanpath_vs_human_smoke PROPERTIES
+            FAIL_REGULAR_EXPRESSION "check failed;Traceback;Error")
         add_test(NAME eval_report_smoke
             COMMAND ${EVAL_PYTHON} -m attention_eval.report
                     ${CMAKE_SOURCE_DIR}/tests/golden/inputc/result.json

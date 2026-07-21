@@ -69,10 +69,12 @@ cd eval && .venv/bin/python report_thesis_vs_modern.py
 - `attention_eval.plots` — saliency montage + metric bar charts (matplotlib,
   optional)
 - `datasets/mit1003.py`, `datasets/middlebury.py`, `datasets/davis2017.py`,
-  `datasets/cocosearch18.py`, `datasets/vstar.py` — dataset adapters (download
-  instructions inside; the DAVIS adapter carries the hand-curated
-  person↔object-id map used by the H2 study; COCO-Search18 feeds the M17 search
-  study; V\*Bench feeds the M18 VLM front-end)
+  `datasets/cocosearch18.py`, `datasets/vstar.py`, `datasets/cat2000.py` —
+  dataset adapters (download instructions inside; DAVIS carries the hand-curated
+  person↔object-id map for H2; COCO-Search18 feeds the M17 search study; V\*Bench
+  feeds the M18 VLM front-end; MIT1003+CAT2000 feed the M11 human-scanpath study)
+- `attention_eval.readout` — generic WTA+IOR scanpath readout + stochastic
+  sampler over any interchange saliency map (M11)
 - `dynamic_ior.py` — the M12 dynamic-IOR study (H1), one command per scene
 - `gated_recognition.py`, `plot_gated_recognition.py` — the M13
   gated-recognition study (H2): gated vs full-frame detection, accuracy vs
@@ -83,6 +85,9 @@ cd eval && .venv/bin/python report_thesis_vs_modern.py
 - `vlm_backends.py`, `vlm_frontend.py`, `plot_vlm_frontend.py` — the M18 VLM
   front-end study (H6): attention as a VLM token-budget allocator, backend-
   agnostic (mock default, Claude pluggable); see `docs/VLM_FRONT_END.md`
+- `scanpath_vs_human.py` — the M11 human-scanpath study (H4): the thesis model
+  on the floor↔ceiling axis via MultiMatch/ScanMatch; see
+  `docs/SCANPATH_VS_HUMAN.md`
 - `study_common.py` — shared study helpers (bootstrap CIs)
 
 Run the tests: `cd eval && .venv/bin/python -m unittest discover -s tests`

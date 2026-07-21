@@ -5,6 +5,10 @@ pillow>=10.0
 # Optional: plots (attention_eval.plots). Install to render montages/bar charts.
 matplotlib>=3.7
 
+# Optional: reading MIT1003 / CAT2000 MATLAB .mat scanpath archives
+# (datasets/mit1003.py, datasets/cat2000.py) for the M11 human-comparison study.
+scipy>=1.10
+
 # Optional: the DeepGaze learned-model adapter (attention_eval.models.deepgaze)
 # needs torch and the deepgaze_pytorch package — install separately:
 #   pip install torch

@@ -177,6 +177,27 @@ Deliverable: `docs/SCANPATH_VS_HUMAN.md` — metric tables + montages; the
 thesis model placed on the floor↔ceiling axis, scored as a sample of a
 distribution. Done when the comparison runs end-to-end from one command.
 
+**Status (2026-07-21): instrument built + verified end-to-end on synthetic
+data; real MIT1003 run gated on the dataset + DATA archive + scipy.** In-repo
+MultiMatch (4 spatial dims, DTW-aligned) and ScanMatch (Needleman-Wunsch,
+signed substitution matrix) live in `eval/attention_eval/scanpath.py`; a generic
+WTA+IOR readout + a seeded stochastic sampler
+(`eval/attention_eval/readout.py`) turn any saliency map into a scanpath — and
+give H4 its ablation for free: the same thesis map read out by WTA
+(`--emit-json`) vs the object-file second stage (`--attend`), no new C++ code.
+The MIT1003 adapter now recovers per-observer ordered sequences from the raw
+DATA/ archive via an I-DT fixation filter (scipy, unit-tested against a
+synthetic .mat); a CAT2000 adapter adds a second dataset — but note CAT2000's
+public release ships pooled fixation *locations*, not ordered per-observer
+scanpaths, so it's the saliency/coverage cross-check while MIT1003 carries the
+ordered comparison. `eval/scanpath_vs_human.py` runs the full floor↔ceiling
+axis (inter-observer LOO ceiling; thesis-objfile / thesis-wta / per-operator
+WTA / stochastic-best; center + random floors) in one command; its synthetic
+`--demo --check` validates the whole scoring stack (ceiling and map-driven
+readout clear the floors) and is a CTest gate. No dataset/scipy in this env at
+build, so the real MIT1003 table lands on a keyed download. Full story:
+`docs/SCANPATH_VS_HUMAN.md`.
+
 ### M12 — The dynamic-IOR proving ground (H1 — the centerpiece)
 
 Three arms, identical everywhere except inhibition:
@@ -399,7 +420,8 @@ V\*Bench numbers + figure land on a keyed run. Full story:
 | Dataset | For | Status |
 |---|---|---|
 | `data/samples/` + synthetic generators | replication, IOR sweeps, demos | in repo |
-| MIT1003 | still fixations/scanpaths (M11, M14) | adapter exists; download documented |
+| MIT1003 | still fixations/scanpaths (M11, M14) | adapter in repo (maps + per-observer sequences via DATA/ + scipy) |
+| CAT2000 | second stills dataset (M11 cross-check) | adapter in repo (`eval/datasets/cat2000.py`; pooled fixation locations + maps) |
 | DAVIS 2017 | video object masks → exact IOR scoring (M12, M13) | adapter in repo (`eval/datasets/davis2017.py`) |
 | DIEM (or DHF1K) | video gaze (optional M14 extension) | choose when needed; DIEM easiest |
 | KITTI raw (stereo) | stereo video (M15) | adapter to write |
