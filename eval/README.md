@@ -82,7 +82,8 @@ cd eval && .venv/bin/python report_thesis_vs_modern.py
   `docs/PRIORITY_MAP.md`)
 - `vlm_backends.py`, `vlm_frontend.py`, `plot_vlm_frontend.py` — the M18 VLM
   front-end study (H6): attention as a VLM token-budget allocator, backend-
-  agnostic (mock default, Claude pluggable); see `docs/VLM_FRONT_END.md`
+  agnostic (local Ollama/Qwen default, Claude pluggable, mock for CI); see
+  `docs/VLM_FRONT_END.md`
 - `study_common.py` — shared study helpers (bootstrap CIs)
 
 Run the tests: `cd eval && .venv/bin/python -m unittest discover -s tests`

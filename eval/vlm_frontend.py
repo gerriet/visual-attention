@@ -23,14 +23,16 @@ estimate (always) and the backend's real count_tokens() (when it has one).
 Only the token *fraction* vs full-res is compared, so the patch constant
 cancels.
 
-The VLM is pluggable (eval/vlm_backends.py). The default `mock` backend answers
-correctly iff the target is delivered at usable resolution — so the harness is
-testable end to end without a model, and the real Claude run just swaps the
-backend. On V*Bench (no target box) the mock scores at chance across arms; use
---backend claude for real numbers.
+The VLM is pluggable (eval/vlm_backends.py). The default `ollama` backend runs
+a local open-weights VLM (qwen3.8:27b) — free, reproducible, and its real token
+count comes back with every answer; `--backend claude` swaps in Claude. The
+`mock` backend answers correctly iff the target is delivered at usable
+resolution, so the harness is testable end to end without any model (the CI
+smoke runs on it); on V*Bench (no target box) the mock scores at chance.
 
+  eval/vlm_frontend.py --vstar --limit 50 --count-tokens    # local Ollama
   eval/vlm_frontend.py --vstar --limit 50 --backend claude
-  eval/vlm_frontend.py --demo            # synthetic, mock, no dataset/key
+  eval/vlm_frontend.py --demo --backend mock                # synthetic, no model
 """
 
 import argparse
@@ -255,9 +257,11 @@ def main():
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--binary", default="build/attention")
     ap.add_argument("--out", default="results/vlm_frontend")
-    ap.add_argument("--backend", default="mock", help="mock | claude")
+    ap.add_argument("--backend", default="ollama", help="ollama (default; local) | claude | mock")
+    ap.add_argument("--model", default=None,
+                    help="backend model (defaults: ollama qwen3.8:27b, claude claude-opus-5)")
     ap.add_argument("--vstar", action="store_true", help="run over V*Bench (data/vstar_bench)")
-    ap.add_argument("--demo", action="store_true", help="run one synthetic item (mock, no dataset/key)")
+    ap.add_argument("--demo", action="store_true", help="run one synthetic item (no dataset; with --backend mock, no model)")
     ap.add_argument("--limit", type=int, default=50, help="max V*Bench items (0 = all)")
     ap.add_argument("--category", default=None, help="V*Bench category filter")
     ap.add_argument("--k", type=int, default=3, help="number of fovea crops")
@@ -275,7 +279,7 @@ def main():
 
     if not os.path.exists(args.binary):
         sys.exit("binary not found: %s (build first: cmake --build build)" % args.binary)
-    backend = create_backend(args.backend)
+    backend = create_backend(args.backend, **({"model": args.model} if args.model else {}))
     params = {
         "k": args.k, "fovea_side": args.fovea_side, "global_side": args.global_side,
         "full_max_side": args.full_max_side, "min_target_px": args.min_target_px,
@@ -297,7 +301,7 @@ def main():
             sys.exit("V*Bench not found under data/vstar_bench — see eval/datasets/vstar.py")
         if args.backend == "mock":
             print("WARNING: the mock backend cannot score V*Bench — it carries no target boxes, "
-                  "so every arm reports chance. Use --backend claude for real numbers.", file=sys.stderr)
+                  "so every arm reports chance. Use --backend ollama or claude for real numbers.", file=sys.stderr)
         Image = _pil()
         items = vstar.iter_items(category=args.category)
         for n, item in enumerate(items):
@@ -318,7 +322,8 @@ def main():
     os.makedirs(args.out, exist_ok=True)
     with open(os.path.join(args.out, "summary.json"), "w") as fh:
         json.dump({"config": {k: v for k, v in vars(args).items()},
-                   "backend": args.backend, "summary": summary}, fh, indent=2)
+                   "backend": args.backend, "model": getattr(backend, "model", None),
+                   "summary": summary}, fh, indent=2)
     # Per-item rows too (real_tokens land here when --count-tokens is on).
     with open(os.path.join(args.out, "results.json"), "w") as fh:
         json.dump(results, fh, indent=2)
