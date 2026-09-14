@@ -49,7 +49,7 @@ draws in CI without any API. When a backend has a real tokenizer (Claude's
 *fraction* vs full-res is reported, so the patch constant cancels.
 
 The VLM is pluggable (`eval/vlm_backends.py`): a `VLMBackend` interface with a
-`mock` default and a `claude` backend (anthropic SDK, `claude-opus-4-8`, base64
+`mock` default and a `claude` backend (anthropic SDK, `claude-opus-5`, base64
 image blocks). This keeps the core dependency-free and CI-safe — the model lives
 Python-side behind the interchange boundary, exactly like the other modern
 models in this repo.

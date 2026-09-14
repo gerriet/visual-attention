@@ -380,7 +380,7 @@ V\*Bench run gated on a keyed VLM.** The first cut rides the existing
 M15's): `eval/vlm_frontend.py` crops K native-res fovea windows around the top
 saliency fixations plus one low-res global view, and scores three arms
 (`full-res` / `uniform`-at-matched-budget / `fovea`) with a pluggable
-`VLMBackend` (`mock` default + `claude`, anthropic SDK, opus-4-8, base64 blocks,
+`VLMBackend` (`mock` default + `claude`, anthropic SDK, opus-5, base64 blocks,
 real `count_tokens`). Token cost is reported both as a provider-independent
 patch estimate (CI-safe) and the backend's real token count when keyed; only the
 fraction vs full-res is compared. The **mock answers correctly iff the target is

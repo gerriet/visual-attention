@@ -15,7 +15,7 @@ Backends:
           testable end to end without a model — the fovea arm scores only when
           attention actually lands on the target, exactly the H6 effect.
   claude  Claude via the anthropic SDK (base64 image blocks, model
-          claude-opus-4-8); real count_tokens(). Gated on the SDK + a key.
+          claude-opus-5); real count_tokens(). Gated on the SDK + a key.
 
 The token *fraction* (fovea vs full-res) is what H6 reports, so the absolute
 patch size below cancels for a fixed backend.
@@ -91,14 +91,14 @@ class MockVLM(VLMBackend):
 
 class ClaudeVLM(VLMBackend):
     """Claude via the anthropic SDK — base64 image blocks, model
-    claude-opus-4-8. Real count_tokens(). Constructed only when the SDK is
+    claude-opus-5. Real count_tokens(). Constructed only when the SDK is
     importable; the SDK resolves credentials from the environment or an
     `ant auth login` profile, and a missing credential surfaces as a 401 on the
     first request (not at construction)."""
 
     name = "claude"
 
-    def __init__(self, model="claude-opus-4-8"):
+    def __init__(self, model="claude-opus-5"):
         try:
             import anthropic
         except ImportError as e:
@@ -140,8 +140,15 @@ class ClaudeVLM(VLMBackend):
         return messages
 
     def answer(self, payload):
+        # Thinking is on by default on claude-opus-5 and shares the max_tokens
+        # budget with the answer, so a 16-token cap is spent entirely on an
+        # empty thinking block and no letter comes back. Disabled here (legal
+        # at the default `high` effort): the arms differ only in what the model
+        # can *see*, so extended reasoning would confound the H6 comparison —
+        # and a one-letter answer has nothing to reason about.
         response = self._client.messages.create(
             model=self.model, max_tokens=16,
+            thinking={"type": "disabled"},
             messages=self._blocks(payload),
         )
         text = "".join(b.text for b in response.content if b.type == "text").strip().upper()
