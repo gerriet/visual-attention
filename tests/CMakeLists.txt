@@ -147,12 +147,13 @@ if(Python3_Interpreter_FOUND)
             PASS_REGULAR_EXPRESSION "summary:")
 
         # M18 VLM front-end, smoke: the synthetic-item end-to-end check on the
-        # mock backend (needs PIL, hence the venv; no dataset, no API key). The
+        # mock backend (needs PIL, hence the venv; no dataset, no model — the
+        # mock is explicit since the harness defaults to a local Ollama). The
         # attention fovea crop must deliver the small target the token-matched
         # uniform downsample loses — --check exits non-zero otherwise.
         add_test(NAME vlm_frontend_smoke
             COMMAND ${EVAL_PYTHON} ${CMAKE_SOURCE_DIR}/eval/vlm_frontend.py
-                    --binary $<TARGET_FILE:attention> --demo --check
+                    --binary $<TARGET_FILE:attention> --demo --check --backend mock
                     --out ${CMAKE_BINARY_DIR}/vlm_smoke
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
         # Gate on the exit code: --check prints "summary:" only after passing,

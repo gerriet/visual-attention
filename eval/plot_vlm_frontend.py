@@ -30,6 +30,8 @@ def main():
         data = json.load(fh)
     summary = data["summary"]
     backend = data.get("backend", "?")
+    if data.get("model"):
+        backend += " (%s)" % data["model"]
 
     import matplotlib
     matplotlib.use("Agg")

@@ -1,8 +1,9 @@
 # Attention as a VLM token-budget allocator (M18, H6)
 
 *Status: instrument built and verified end-to-end on a mock backend, 2026-07.
-The real V\*Bench measurement is gated on a VLM backend + credentials (see
-"Running it for real"); the headline numbers land when that runs.*
+Since 2026-09 the default backend is a local open-weights VLM (Ollama,
+`qwen3.8:27b`), so the real V\*Bench measurement needs no credentials (see
+"Running it for real"); the headline numbers land when the full run completes.*
 
 **H6 — Attention as a VLM token budget.** *Feeding a vision-language model only
 the attended ROIs (fovea) plus a low-res global view preserves task accuracy at
@@ -45,12 +46,15 @@ harness.
 **Token accounting, two ways.** A provider-independent patch estimate (≈ one
 visual token per 28×28 px, Qwen2-VL-style) is always computed, so the curve
 draws in CI without any API. When a backend has a real tokenizer (Claude's
-`count_tokens()`), that authoritative number is recorded too. Only the token
-*fraction* vs full-res is reported, so the patch constant cancels.
+`count_tokens()`, or the `prompt_eval_count` Ollama returns with every answer),
+that authoritative number is recorded too. Only the token *fraction* vs full-res
+is reported, so the patch constant cancels.
 
-The VLM is pluggable (`eval/vlm_backends.py`): a `VLMBackend` interface with a
-`mock` default and a `claude` backend (anthropic SDK, `claude-opus-4-8`, base64
-image blocks). This keeps the core dependency-free and CI-safe — the model lives
+The VLM is pluggable (`eval/vlm_backends.py`): a `VLMBackend` interface with an
+`ollama` default (a local VLM over Ollama's HTTP API, `qwen3.8:27b`, stdlib
+only), a `claude` backend (anthropic SDK, `claude-opus-5`, base64 image blocks),
+and the `mock` the CI smoke runs on. This keeps the core dependency-free and
+CI-safe — the model lives
 Python-side behind the interchange boundary, exactly like the other modern
 models in this repo.
 
@@ -82,8 +86,8 @@ item (the point is to exercise the pipeline, not to prove H6); the real evidence
 is the V\*Bench run below.
 
 ```bash
-# the end-to-end demo (mock; no dataset, no key) — also the CI smoke via --check
-eval/vlm_frontend.py --demo --check
+# the end-to-end demo (mock; no dataset, no model) — also the CI smoke via --check
+eval/vlm_frontend.py --demo --check --backend mock
 ```
 
 ## Running it for real (V\*Bench)
@@ -98,14 +102,28 @@ shine. It's public and small (~200 items). Adapter:
 # 1. get the data
 huggingface-cli download craigwu/vstar_bench --repo-type dataset \
     --local-dir data/vstar_bench
-# 2. a real VLM backend (Claude): install the SDK + provide a key
-eval/.venv/bin/pip install anthropic
-export ANTHROPIC_API_KEY=...     # or `ant auth login` with the Anthropic CLI
+# 2. a real VLM — the default is local and free (Ollama, open weights)
+ollama pull qwen3.8:27b          # any vision model works: --model <tag>
 # 3. run the three-arm study + curve
-eval/vlm_frontend.py --vstar --backend claude --count-tokens --limit 0
+eval/vlm_frontend.py --vstar --count-tokens --limit 0
 eval/plot_vlm_frontend.py results/vlm_frontend/summary.json \
     --out docs/images/vlm_frontend_tradeoff.png
+
+# or with Claude: install the SDK + provide a key
+eval/.venv/bin/pip install anthropic
+export ANTHROPIC_API_KEY=...     # or `ant auth login` with the Anthropic CLI
+eval/vlm_frontend.py --vstar --backend claude --count-tokens --limit 0
 ```
+
+**Ollama specifics.** qwen3.8 under Ollama spends one visual token per 32×32 px
+(measured: a 448² image is 196 image + ~44 text tokens), and Ollama silently
+downscales any image beyond a 64×64-token grid (~2048 px/side). The full-res
+arm's default cap (`--full-max-side 1512`) stays under that, so full-res really
+is full-res — raise it past ~2048 and it no longer is. The backend asks for an
+8192-token context and warns if a prompt reaches it (Ollama truncates
+silently). A 4-bit 27B is weaker in absolute terms than a frontier API model;
+H6 compares arms *within* one model, so report the exact model tag and
+quantization alongside the numbers.
 
 The prediction (H6): **fovea tracks full-res accuracy while using a small
 fraction of the tokens, and uniform-at-the-same-budget lags well behind** —
@@ -113,11 +131,9 @@ because the answer-bearing region survives at native resolution in a crop but
 dissolves under uniform downsampling. This section will carry the measured
 numbers and the real-backend figure once that run completes.
 
-*Why the numbers aren't here yet:* this environment has no VLM credentials (`ant`
-here is Apache Ant, not the Anthropic CLI; `ANTHROPIC_API_KEY` is unset; the
-`anthropic` SDK isn't installed). The instrument is complete and verified on the
-mock; the measurement is one keyed run away — the same gating pattern as M13's
-DNN weights.
+*Why the numbers aren't here yet:* the instrument was built in an environment
+with no VLM credentials, so it was verified on the mock only. The local
+`ollama` backend (2026-09) removes that gate; the full V\*Bench run is pending.
 
 ## Honest limitations (to report with the real numbers)
 
@@ -136,8 +152,9 @@ DNN weights.
 
 ## Files
 
-- `eval/vlm_backends.py` — the `VLMBackend` interface, `mock` + `claude` backends, token estimate
+- `eval/vlm_backends.py` — the `VLMBackend` interface, `ollama` + `claude` + `mock` backends, token estimate
 - `eval/vlm_frontend.py` — the three-arm harness (crop / assemble / score), `--demo` + `--vstar`
 - `eval/datasets/vstar.py` — V\*Bench adapter
 - `eval/plot_vlm_frontend.py` — the accuracy-vs-token-budget figure
-- CTest `vlm_frontend_smoke` (`--demo --check`) + help tests
+- CTest `vlm_frontend_smoke` (`--demo --check --backend mock`) + help tests;
+  `eval/tests/test_vlm_backends.py` (the ollama backend against a faked HTTP API)

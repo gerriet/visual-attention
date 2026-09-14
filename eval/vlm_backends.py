@@ -15,21 +15,51 @@ Backends:
           testable end to end without a model — the fovea arm scores only when
           attention actually lands on the target, exactly the H6 effect.
   claude  Claude via the anthropic SDK (base64 image blocks, model
-          claude-opus-4-8); real count_tokens(). Gated on the SDK + a key.
+          claude-opus-5); real count_tokens(). Gated on the SDK + a key.
+  ollama  a local VLM served by Ollama (default qwen3.8:27b) over its HTTP API,
+          stdlib only; the real token count comes back with every answer. The
+          harness default: free, local, open weights.
 
 The token *fraction* (fovea vs full-res) is what H6 reports, so the absolute
 patch size below cancels for a fixed backend.
 """
 
+import base64
 import hashlib
 import io
+import json
 import os
 import re
+import sys
+import urllib.request
 
 # One visual token per ~28x28 px patch — a Qwen2-VL-style proxy (14px ViT
 # patches merged 2x2). Provider-independent; only ratios are reported, so the
-# constant cancels. Claude's real tokenizer is used when the claude backend runs.
+# constant cancels. qwen3.8 under Ollama measures 32 px; the real count is
+# recorded with --count-tokens on the claude and ollama backends.
 VISUAL_TOKEN_PATCH = 28
+
+
+def _png_base64(image):
+    buffer = io.BytesIO()
+    image.convert("RGB").save(buffer, format="PNG")
+    return base64.standard_b64encode(buffer.getvalue()).decode()
+
+
+def _prompt_text(payload):
+    lettered = "\n".join("%s. %s" % (chr(65 + i), c) for i, c in enumerate(payload["choices"]))
+    return "%s\n\n%s\n\nAnswer with the single letter of the correct option only." % (
+        payload["question"], lettered)
+
+
+def _parse_letter(text, n_choices):
+    """The first isolated option letter in a reply (not part of a longer word
+    like "ANSWER"), or None — an abstention, which the harness scores wrong."""
+    valid = {chr(65 + i) for i in range(n_choices)}
+    for match in re.finditer(r"(?<![A-Z])([A-Z])(?![A-Z])", text.strip().upper()):
+        if match.group(1) in valid:
+            return match.group(1)
+    return None
 
 
 class VLMBackend:
@@ -91,14 +121,14 @@ class MockVLM(VLMBackend):
 
 class ClaudeVLM(VLMBackend):
     """Claude via the anthropic SDK — base64 image blocks, model
-    claude-opus-4-8. Real count_tokens(). Constructed only when the SDK is
+    claude-opus-5. Real count_tokens(). Constructed only when the SDK is
     importable; the SDK resolves credentials from the environment or an
     `ant auth login` profile, and a missing credential surfaces as a 401 on the
     first request (not at construction)."""
 
     name = "claude"
 
-    def __init__(self, model="claude-opus-4-8"):
+    def __init__(self, model="claude-opus-5"):
         try:
             import anthropic
         except ImportError as e:
@@ -115,49 +145,109 @@ class ClaudeVLM(VLMBackend):
         cached = payload.get("_claude_messages")
         if cached is not None:
             return cached
-        import base64
-
-        blocks = []
-        for image in payload["images"]:
-            buffer = io.BytesIO()
-            image.convert("RGB").save(buffer, format="PNG")
-            blocks.append({
-                "type": "image",
-                "source": {
-                    "type": "base64",
-                    "media_type": "image/png",
-                    "data": base64.standard_b64encode(buffer.getvalue()).decode(),
-                },
-            })
-        lettered = "\n".join("%s. %s" % (chr(65 + i), c) for i, c in enumerate(payload["choices"]))
-        blocks.append({
-            "type": "text",
-            "text": "%s\n\n%s\n\nAnswer with the single letter of the correct option only."
-                    % (payload["question"], lettered),
-        })
+        blocks = [{
+            "type": "image",
+            "source": {"type": "base64", "media_type": "image/png", "data": _png_base64(image)},
+        } for image in payload["images"]]
+        blocks.append({"type": "text", "text": _prompt_text(payload)})
         messages = [{"role": "user", "content": blocks}]
         payload["_claude_messages"] = messages
         return messages
 
     def answer(self, payload):
+        # Thinking is on by default on claude-opus-5 and shares the max_tokens
+        # budget with the answer, so a 16-token cap is spent entirely on an
+        # empty thinking block and no letter comes back. Disabled here (legal
+        # at the default `high` effort): the arms differ only in what the model
+        # can *see*, so extended reasoning would confound the H6 comparison —
+        # and a one-letter answer has nothing to reason about.
         response = self._client.messages.create(
             model=self.model, max_tokens=16,
+            thinking={"type": "disabled"},
             messages=self._blocks(payload),
         )
-        text = "".join(b.text for b in response.content if b.type == "text").strip().upper()
-        valid = {chr(65 + i) for i in range(len(payload["choices"]))}
-        # An isolated option letter (not part of a longer word like "ANSWER").
-        for match in re.finditer(r"(?<![A-Z])([A-Z])(?![A-Z])", text):
-            if match.group(1) in valid:
-                return match.group(1)
-        return None  # no parseable option letter — abstain (scored wrong)
+        text = "".join(b.text for b in response.content if b.type == "text")
+        return _parse_letter(text, len(payload["choices"]))
 
     def count_tokens(self, payload):
         result = self._client.messages.count_tokens(model=self.model, messages=self._blocks(payload))
         return result.input_tokens
 
 
-_BACKENDS = {"mock": MockVLM, "claude": ClaudeVLM}
+class OllamaVLM(VLMBackend):
+    """A local VLM served by Ollama over its HTTP API (stdlib only, no SDK),
+    default qwen3.8:27b. Greedy decoding with thinking off — as for claude, the
+    arms may differ only in what the model can see. count_tokens() is the answer
+    call's own prompt_eval_count (text + image tokens, the model's real
+    tokenizer), so it costs no extra request.
+
+    Two silent Ollama behaviours to know about: it downscales any image beyond
+    a 64x64-token grid (~2048 px/side for qwen3.8 — keep --full-max-side below
+    that or the full-res arm isn't full-res), and it truncates a prompt that
+    overflows num_ctx (warned on stderr below)."""
+
+    name = "ollama"
+
+    def __init__(self, model="qwen3.8:27b", host=None, num_ctx=8192, timeout=900):
+        self.model = model
+        host = (host or os.environ.get("OLLAMA_HOST") or "localhost:11434").rstrip("/")
+        self.host = host if "://" in host else "http://" + host
+        self.num_ctx = num_ctx
+        self.timeout = timeout
+        # Fail here, with the fix spelled out, rather than on the first item.
+        try:
+            models = self._request("/api/tags").get("models", [])
+        except OSError as e:
+            raise RuntimeError("ollama backend: no server at %s — start it with `ollama serve` "
+                               "(or set OLLAMA_HOST)" % self.host) from e
+        entry = next((m for m in models if m.get("name") in (model, model + ":latest")), None)
+        if entry is None:
+            have = ", ".join(sorted(m.get("name", "?") for m in models)) or "none"
+            raise RuntimeError("ollama backend: model '%s' not available (have: %s) — `ollama pull %s`"
+                               % (model, have, model))
+        # Older servers don't list capabilities; assume vision + thinking then.
+        capabilities = entry.get("capabilities", ["vision", "thinking"])
+        if "vision" not in capabilities:
+            raise RuntimeError("ollama backend: model '%s' has no vision capability" % model)
+        self._can_think = "thinking" in capabilities
+
+    def _request(self, path, body=None):
+        data = json.dumps(body).encode() if body is not None else None
+        request = urllib.request.Request(self.host + path, data=data,
+                                         headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(request, timeout=self.timeout) as response:
+            return json.load(response)
+
+    def _chat(self, payload):
+        """One /api/chat round trip per payload, memoized on it: answer() and
+        count_tokens() share the same response."""
+        cached = payload.get("_ollama_response")
+        if cached is not None:
+            return cached
+        body = {
+            "model": self.model,
+            "stream": False,
+            "options": {"temperature": 0, "num_predict": 16, "num_ctx": self.num_ctx},
+            "messages": [{"role": "user", "content": _prompt_text(payload),
+                          "images": [_png_base64(image) for image in payload["images"]]}],
+        }
+        if self._can_think:
+            body["think"] = False  # else a 16-token cap is spent on reasoning
+        response = self._request("/api/chat", body)
+        if response.get("prompt_eval_count", 0) >= self.num_ctx - 16:
+            print("WARNING: ollama prompt reached num_ctx=%d and was likely truncated "
+                  "(images dropped) — raise num_ctx" % self.num_ctx, file=sys.stderr)
+        payload["_ollama_response"] = response
+        return response
+
+    def answer(self, payload):
+        return _parse_letter(self._chat(payload)["message"]["content"], len(payload["choices"]))
+
+    def count_tokens(self, payload):
+        return self._chat(payload).get("prompt_eval_count")
+
+
+_BACKENDS = {"mock": MockVLM, "claude": ClaudeVLM, "ollama": OllamaVLM}
 
 
 def create_backend(name, **kwargs):
