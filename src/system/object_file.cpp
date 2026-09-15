@@ -25,6 +25,16 @@ cv::Point2d expected_centroid(const ObjectFile& file, bool use_motion, int steps
   return cv::Point2d(p1.x + s * (p1.x - p0.x), p1.y + s * (p1.y - p0.y));
 }
 
+// Fold a duplicate file's history into the one that stays: object-based IOR
+// keeps the latest selection, the value and age carry over.
+void absorb(ObjectFile& kept, const ObjectFile& gone)
+{
+  kept.last_selected_frame = std::max(kept.last_selected_frame, gone.last_selected_frame);
+  kept.selection_count += gone.selection_count;
+  kept.value = std::max(kept.value, gone.value);
+  kept.created_frame = std::min(kept.created_frame, gone.created_frame);
+}
+
 // The file's speed over its last trajectory step (px/frame); 0 without history.
 double last_speed(const ObjectFile& file)
 {
@@ -218,6 +228,10 @@ void ObjectFileStore::update(const std::vector<Cluster>& clusters, int frame)
   }
 
   active_ = std::move(next_active);
+  if (config_.persistent_identity)
+  {
+    merge_duplicates();
+  }
 
   // Age out inactive files unseen for too long — unless memory is persistent.
   if (!config_.persistent_identity)
@@ -226,6 +240,70 @@ void ObjectFileStore::update(const std::vector<Cluster>& clusters, int frame)
                                    { return frame - f.last_seen_frame > config_.max_inactive_age; }),
                     inactive_.end());
   }
+}
+
+void ObjectFileStore::merge_duplicates()
+{
+  std::vector<bool> dropped(active_.size(), false);
+  for (size_t i = 0; i < active_.size(); ++i)
+  {
+    for (size_t j = i + 1; j < active_.size() && !dropped[i]; ++j)
+    {
+      const ObjectFile& a = active_[i];
+      const ObjectFile& b = active_[j];
+      if (dropped[j] || cv::norm(a.appearance) == 0.0 || cv::norm(b.appearance) == 0.0)
+      {
+        continue; // no descriptor to judge by
+      }
+      const double inter = (a.bbox & b.bbox).area();
+      const double smaller = std::min(a.bbox.area(), b.bbox.area());
+      if (smaller <= 0.0 || inter < 0.5 * smaller || cv::norm(a.appearance - b.appearance) >= config_.reid_colour_gate)
+      {
+        continue; // not the same place, or doesn't look the same
+      }
+      const size_t keep = a.label < b.label ? i : j;
+      const size_t drop = keep == i ? j : i;
+      absorb(active_[keep], active_[drop]);
+      dropped[drop] = true;
+    }
+  }
+  std::vector<ObjectFile> merged;
+  merged.reserve(active_.size());
+  for (size_t i = 0; i < active_.size(); ++i)
+  {
+    if (!dropped[i])
+    {
+      merged.push_back(active_[i]);
+    }
+  }
+  active_ = std::move(merged);
+
+  // An inactive look-alike last seen within the correspondence radius of an
+  // active file is the same object: fold it in, so a later revival can't flip
+  // the object back to the old duplicate's label.
+  inactive_.erase(std::remove_if(inactive_.begin(), inactive_.end(),
+                                 [&](const ObjectFile& f)
+                                 {
+                                   if (cv::norm(f.appearance) == 0.0)
+                                   {
+                                     return false;
+                                   }
+                                   for (auto& a : active_)
+                                   {
+                                     const bool alike =
+                                         cv::norm(a.appearance) > 0.0 &&
+                                         cv::norm(a.appearance - f.appearance) < config_.reid_colour_gate;
+                                     const double d = cv::norm(cv::Point2d(a.centroid.x, a.centroid.y) -
+                                                               cv::Point2d(f.centroid.x, f.centroid.y));
+                                     if (alike && d < config_.correspondence_radius)
+                                     {
+                                       absorb(a, f);
+                                       return true;
+                                     }
+                                   }
+                                   return false;
+                                 }),
+                  inactive_.end());
 }
 
 int ObjectFileStore::nearest_inactive(const Cluster& cluster, int frame) const

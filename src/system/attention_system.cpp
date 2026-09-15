@@ -49,15 +49,19 @@ void AttentionSystem::apply_config_yaml(const std::string& yaml, Config& cfg)
   {
     return;
   }
-  reject_unknown_keys(
-      node,
-      {"segment_fraction", "segment_min", "min_cluster_size", "segment_close", "max_cluster_fraction", "object_files"},
-      "attention_system");
+  reject_unknown_keys(node,
+                      {"segment_fraction", "segment_min", "min_cluster_size", "segment_close", "max_cluster_fraction",
+                       "proto_objects", "proto_min_contrast", "proto_tolerance", "proto_window", "object_files"},
+                      "attention_system");
   read_param(node, "segment_fraction", cfg.segment_fraction);
   read_param(node, "segment_min", cfg.segment_min);
   read_param(node, "min_cluster_size", cfg.min_cluster_size);
   read_param(node, "segment_close", cfg.segment_close);
   read_param(node, "max_cluster_fraction", cfg.max_cluster_fraction);
+  read_param(node, "proto_objects", cfg.proto_objects);
+  read_param(node, "proto_min_contrast", cfg.proto_min_contrast);
+  read_param(node, "proto_tolerance", cfg.proto_tolerance);
+  read_param(node, "proto_window", cfg.proto_window);
 
   const YAML::Node files = node["object_files"];
   if (!files)
@@ -94,7 +98,129 @@ AttentionSystem::AttentionSystem(const Config& config)
   }
 }
 
+namespace
+{
+// Per-channel median colour of an 8-bit image: the frame's figure-ground
+// estimate (objects rarely cover half the view).
+cv::Vec3f median_colour(const cv::Mat& image)
+{
+  std::vector<cv::Mat> channels;
+  cv::split(image, channels);
+  cv::Vec3f median(0.0f, 0.0f, 0.0f);
+  for (int c = 0; c < std::min(3, static_cast<int>(channels.size())); ++c)
+  {
+    int hist[256] = {0};
+    for (int y = 0; y < channels[c].rows; ++y)
+    {
+      const uchar* row = channels[c].ptr<uchar>(y);
+      for (int x = 0; x < channels[c].cols; ++x)
+      {
+        ++hist[row[x]];
+      }
+    }
+    const int half = static_cast<int>(channels[c].total() / 2);
+    int seen = 0;
+    int v = 0;
+    while (v < 255 && seen + hist[v] <= half)
+    {
+      seen += hist[v++];
+    }
+    median[c] = static_cast<float>(v);
+  }
+  return median;
+}
+
+// Per-pixel colour distance (L2, 0-255 scale) of `image` to `colour`.
+cv::Mat colour_distance(const cv::Mat& image, const cv::Vec3f& colour)
+{
+  std::vector<cv::Mat> channels;
+  cv::split(image, channels);
+  cv::Mat sum = cv::Mat::zeros(image.size(), CV_32F);
+  for (int c = 0; c < std::min(3, static_cast<int>(channels.size())); ++c)
+  {
+    cv::Mat diff;
+    channels[c].convertTo(diff, CV_32F, 1.0, -colour[c]);
+    sum += diff.mul(diff);
+  }
+  cv::sqrt(sum, sum);
+  return sum;
+}
+
+cv::Vec3f mean_colour(const cv::Mat& image, const cv::Mat& mask)
+{
+  const cv::Scalar m = cv::mean(image, mask);
+  return cv::Vec3f(static_cast<float>(m[0]), static_cast<float>(m[1]), static_cast<float>(m[2]));
+}
+} // namespace
+
+std::vector<Cluster> AttentionSystem::proto_objects(const cv::Mat& region, const cv::Mat& image, const Cluster& cluster,
+                                                    const cv::Vec3f& ground) const
+{
+  // A fill covering more than this share of its window has flooded the
+  // background rather than traced an object.
+  constexpr double kLeakFraction = 0.6;
+  constexpr int kMaxObjectsPerCluster = 4;
+
+  const int mx = static_cast<int>(config_.proto_window * cluster.bbox.width);
+  const int my = static_cast<int>(config_.proto_window * cluster.bbox.height);
+  const cv::Rect window =
+      cv::Rect(cluster.bbox.x - mx, cluster.bbox.y - my, cluster.bbox.width + 2 * mx, cluster.bbox.height + 2 * my) &
+      cv::Rect(0, 0, image.cols, image.rows);
+  const cv::Mat distance = colour_distance(image, ground);
+  cv::Mat remaining = region.clone();
+  std::vector<Cluster> objects;
+  bool untextured = false; // a figure seed that wouldn't grow (texture): keep the salient cluster
+  for (int i = 0; i < kMaxObjectsPerCluster && cv::countNonZero(remaining) >= config_.min_cluster_size; ++i)
+  {
+    double contrast = 0.0;
+    cv::Point seed;
+    cv::minMaxLoc(distance, nullptr, &contrast, nullptr, &seed, remaining);
+    if (contrast < config_.proto_min_contrast)
+    {
+      break; // nothing left that stands out from the ground
+    }
+    cv::Mat roi = image(window).clone(); // floodFill wants a mutable image even with MASK_ONLY
+    cv::Mat fill = cv::Mat::zeros(window.height + 2, window.width + 2, CV_8U);
+    const double t = config_.proto_tolerance;
+    cv::floodFill(roi, fill, seed - window.tl(), cv::Scalar(), nullptr, cv::Scalar(t, t, t), cv::Scalar(t, t, t),
+                  8 | cv::FLOODFILL_MASK_ONLY | cv::FLOODFILL_FIXED_RANGE | (255 << 8));
+    const cv::Mat grown = fill(cv::Rect(1, 1, window.width, window.height));
+    cv::Mat grown_full = cv::Mat::zeros(region.size(), CV_8U);
+    grown.copyTo(grown_full(window));
+    remaining.setTo(0, grown_full);
+    remaining.at<uchar>(seed) = 0; // progress even if the fill were empty
+    const int area = cv::countNonZero(grown);
+    if (area > kLeakFraction * window.area())
+    {
+      continue; // flooded the window: background
+    }
+    if (area < config_.min_cluster_size)
+    {
+      untextured = true;
+      continue;
+    }
+    Cluster object = cluster;
+    const cv::Moments m = cv::moments(grown, true);
+    object.size = area;
+    object.bbox = cv::boundingRect(grown) + window.tl();
+    object.centroid =
+        cv::Point(static_cast<int>(m.m10 / m.m00 + 0.5) + window.x, static_cast<int>(m.m01 / m.m00 + 0.5) + window.y);
+    object.appearance = mean_colour(image, grown_full);
+    objects.push_back(object);
+  }
+  if (objects.empty() && untextured)
+  {
+    objects.push_back(cluster);
+  }
+  return objects;
+}
+
 std::vector<Cluster> AttentionSystem::segment(const cv::Mat& saliency) const
+{
+  return segment(saliency, pipeline_.get_frame().image);
+}
+
+std::vector<Cluster> AttentionSystem::segment(const cv::Mat& saliency, const cv::Mat& image) const
 {
   std::vector<Cluster> clusters;
   if (saliency.empty())
@@ -125,8 +251,9 @@ std::vector<Cluster> AttentionSystem::segment(const cv::Mat& saliency) const
   // The native frame, at saliency resolution, gives each cluster an appearance
   // descriptor (mean colour) for identity-stable correspondence (M12) — computed
   // only over the already-selected regions, at no extra segmentation cost.
-  const cv::Mat& image = pipeline_.get_frame().image;
   const bool have_image = !image.empty() && image.size() == saliency.size();
+  const bool proto = config_.proto_objects && have_image && image.depth() == CV_8U;
+  const cv::Vec3f ground = proto ? median_colour(image) : cv::Vec3f();
 
   cv::Mat labels, stats, centroids;
   const int num_labels = cv::connectedComponentsWithStats(mask, labels, stats, centroids, 8, CV_32S);
@@ -147,11 +274,47 @@ std::vector<Cluster> AttentionSystem::segment(const cv::Mat& saliency) const
     cluster.mean_saliency = static_cast<float>(cv::mean(saliency, region)[0]);
     if (have_image)
     {
-      const cv::Scalar mean_colour = cv::mean(image, region);
-      cluster.appearance = cv::Vec3f(static_cast<float>(mean_colour[0]), static_cast<float>(mean_colour[1]),
-                                     static_cast<float>(mean_colour[2]));
+      cluster.appearance = mean_colour(image, region);
     }
-    clusters.push_back(cluster);
+    if (proto)
+    {
+      for (const auto& object : proto_objects(region, image, cluster, ground))
+      {
+        clusters.push_back(object);
+      }
+    }
+    else
+    {
+      clusters.push_back(cluster);
+    }
+  }
+  if (proto)
+  {
+    // Fragments of one object grow into the same proto-object: keep the most
+    // salient of any heavily overlapping pair, or of a pair where one sits
+    // mostly inside the other and looks the same (a partial growth). A
+    // different-looking object inside another's box (a phone in a hand) stays.
+    std::stable_sort(clusters.begin(), clusters.end(),
+                     [](const Cluster& a, const Cluster& b) { return a.mean_saliency > b.mean_saliency; });
+    std::vector<Cluster> kept;
+    for (const auto& c : clusters)
+    {
+      const bool duplicate = std::any_of(
+          kept.begin(), kept.end(),
+          [&](const Cluster& k)
+          {
+            const double inter = (c.bbox & k.bbox).area();
+            const double uni = c.bbox.area() + k.bbox.area() - inter;
+            const double smaller = std::min(c.bbox.area(), k.bbox.area());
+            const bool alike = cv::norm(c.appearance - k.appearance) < config_.object_store.reid_colour_gate;
+            return (uni > 0.0 && inter / uni > 0.5) || (smaller > 0.0 && inter >= 0.8 * smaller && alike);
+          });
+      if (!duplicate)
+      {
+        kept.push_back(c);
+      }
+    }
+    clusters = std::move(kept);
   }
   return clusters;
 }

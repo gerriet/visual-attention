@@ -130,8 +130,9 @@ class ObjectFileStore
     // (colour < reid_colour_veto) and (b) are either inside a gate that widens
     // with the time the file was unseen (correspondence_radius + gate_growth ×
     // its last speed × frames gone) or a clear look-alike (colour <
-    // reid_colour_gate). Inactive files never age out. Default off: the
-    // thesis's radius-gated revival with ageing.
+    // reid_colour_gate). Inactive files never age out, and two active
+    // look-alike files on one object are merged into the older one. Default
+    // off: the thesis's radius-gated revival with ageing.
     bool persistent_identity = false;
     double reid_colour_gate = 25.0; // colour L2 (0-255): a look-alike, revived wherever it reappears
     double reid_colour_veto = 60.0; // colour L2 (0-255): looks different — never the same object
@@ -179,6 +180,12 @@ class ObjectFileStore
   // nearest-within-radius rule, or the persistent-identity rule (see Config).
   int nearest_inactive(const Cluster& cluster, int frame) const;
   int reidentify(const Cluster& cluster, int frame) const;
+  // Persistent identity: fold two active look-alike files on one object
+  // (overlapping boxes) into the older one, and an inactive look-alike last
+  // seen within the correspondence radius of an active file into that file —
+  // otherwise both would persist, alternate, and object-based IOR would
+  // inhibit the object one file at a time.
+  void merge_duplicates();
 
   Config config_;
   std::vector<ObjectFile> active_;

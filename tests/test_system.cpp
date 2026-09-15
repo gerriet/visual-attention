@@ -284,6 +284,95 @@ TEST_CASE("segmentation: closing bridges an object's fragments, oversized region
   CHECK(clusters(4, 0.25f) == 1); // and the diffuse region dropped
 }
 
+TEST_CASE("proto-objects: one cluster per object, touching objects apart, background dropped",
+          "[system][segment][proto]")
+{
+  // Two touching disks (red, blue) on a dark ground, salient only along two
+  // broken onset arcs each, plus a salient blob over empty background.
+  cv::Mat image(200, 300, CV_8UC3, cv::Scalar(25, 25, 25));
+  const cv::Point red_centre(100, 100), blue_centre(139, 100);
+  const cv::Scalar red(60, 60, 230), blue(240, 110, 70); // BGR
+  cv::circle(image, red_centre, 20, red, cv::FILLED);
+  cv::circle(image, blue_centre, 20, blue, cv::FILLED);
+  cv::Mat saliency = cv::Mat::zeros(image.size(), CV_32F);
+  for (const cv::Point& centre : {red_centre, blue_centre})
+  {
+    cv::ellipse(saliency, centre, cv::Size(20, 20), 0, 10, 160, cv::Scalar(1.0), 3);
+    cv::ellipse(saliency, centre, cv::Size(20, 20), 0, 190, 340, cv::Scalar(1.0), 3);
+  }
+  cv::circle(saliency, cv::Point(250, 50), 10, cv::Scalar(0.8), cv::FILLED);
+
+  system::AttentionSystem::Config cfg;
+  // Thesis path: the touching disks' arcs meet at the contact point, so it
+  // yields two clusters that each span *both* objects, plus the blob.
+  CHECK(system::AttentionSystem(cfg).segment(saliency, image).size() == 3);
+
+  cfg.proto_objects = true;
+  const auto objects = system::AttentionSystem(cfg).segment(saliency, image);
+  REQUIRE(objects.size() == 2);
+  for (const auto& object : objects)
+  {
+    const bool is_red = cv::norm(object.centroid - red_centre) < cv::norm(object.centroid - blue_centre);
+    CHECK(cv::norm(object.centroid - (is_red ? red_centre : blue_centre)) <= 2.0);
+    const cv::Scalar colour = is_red ? red : blue;
+    CHECK(cv::norm(object.appearance - cv::Vec3f(static_cast<float>(colour[0]), static_cast<float>(colour[1]),
+                                                 static_cast<float>(colour[2]))) < 10.0);
+  }
+}
+
+TEST_CASE("persistent identity folds a second file on one object into the first", "[system][objectfile][identity]")
+{
+  // One red object; on frame 1 a second, look-alike cluster appears on it (a
+  // partial fragment). Without merging, both files persist.
+  const cv::Vec3f red(60, 60, 230);
+  auto active_after = [&](bool persistent)
+  {
+    system::ObjectFileStore::Config cfg;
+    cfg.appearance_matching = true;
+    cfg.persistent_identity = persistent;
+    system::ObjectFileStore store(cfg);
+    system::Cluster whole = coloured_at(100, 100, red);
+    whole.bbox = cv::Rect(90, 90, 20, 20);
+    store.update({whole}, 0);
+    const int label = store.active_files().front().label;
+    system::Cluster fragment = coloured_at(104, 102, red);
+    fragment.bbox = cv::Rect(100, 98, 8, 8);
+    store.update({whole, fragment}, 1);
+    return std::make_pair(store.active_files().size(), label == store.active_files().front().label);
+  };
+
+  const auto persistent = active_after(true);
+  CHECK(persistent.first == 1u);
+  CHECK(persistent.second); // the older label survives
+  CHECK(active_after(false).first == 2u);
+}
+
+TEST_CASE("persistent identity folds an inactive duplicate into the active file", "[system][objectfile][identity]")
+{
+  // A second, look-alike file is born on a fragment just beside the object
+  // (no box overlap), then the fragment vanishes: its inactive file would
+  // otherwise wait to be revived on the object instead of the real file.
+  const cv::Vec3f red(60, 60, 230);
+  auto inactive_after = [&](bool persistent)
+  {
+    system::ObjectFileStore::Config cfg;
+    cfg.appearance_matching = true;
+    cfg.persistent_identity = persistent;
+    system::ObjectFileStore store(cfg);
+    system::Cluster whole = coloured_at(100, 100, red);
+    whole.bbox = cv::Rect(90, 90, 20, 20);
+    system::Cluster fragment = coloured_at(100, 125, red);
+    fragment.bbox = cv::Rect(95, 120, 10, 10);
+    store.update({whole}, 0);
+    store.update({whole, fragment}, 1);
+    store.update({whole}, 2);
+    return store.inactive_files().size();
+  };
+
+  CHECK(inactive_after(true) == 0u);
+  CHECK(inactive_after(false) == 1u);
+}
+
 TEST_CASE("AttentionSystem produces a scanpath over the motion sequence", "[system]")
 {
   const fs::path dir = fs::path(ATTENTION_SOURCE_DIR) / "data" / "test_images" / "motion_seq";
