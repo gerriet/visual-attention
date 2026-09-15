@@ -89,6 +89,14 @@ large learned models lack and increasingly need.
   the attended ROIs (fovea) plus a low-res global view preserves task accuracy
   at a large fraction of the visual tokens/FLOPs of the full-resolution image,
   and the saving grows with input resolution.
+- **H7 — Object files as a video token cache (H1 × H6).** At a matched
+  visual-token budget per video, an object-file front-end (object-based IOR +
+  persistent object files) answers object-centric questions better than
+  budget-matched uniform frame sampling and better than a spatial-IOR
+  front-end; the gap grows with object count and speed, and shrinks with
+  tracking errors (every identity switch is a re-send). *Where the second
+  stage earns its keep: M12 showed object-IOR only ties space-IOR on
+  exploration; H7 tests the predicted win — persistent, identity-keyed memory.*
 
 ## Milestones
 
@@ -392,9 +400,64 @@ accuracy at 27% of full-res tokens where the token-matched uniform downsample
 drops to 0%** (a crop lands on the small salient target the downsample loses).
 Crops are bottom-up now with the M17 `top_down_map` slot wired for
 question-conditioned (H5×H6) crops later. V\*Bench adapter added
-(`eval/datasets/vstar.py`). The real V\*Bench numbers + figure land on the
-full local (Ollama) run. Full story:
+(`eval/datasets/vstar.py`). **First real numbers (2026-09-15, local Qwen,
+pilot scale, with an oracle-crop arm and the question-conditioned `fovea-td`
+arm — VLM grounding on the global view → M17 `top_down_map` → crops; V\*Bench +
+HR-Bench 8K):** oracle crops beat full resolution on single-target questions at
+a third of the tokens (1.00 vs 0.85), so the front-end works when attention
+lands; bottom-up crops rarely land (10% of targets covered); grounding lifts
+coverage to 65% and accuracy 0.45 → 0.70 but doesn't yet beat the same-budget
+uniform arm; relational questions favour the whole view. Full story:
 `docs/VLM_FRONT_END.md`.
+
+### M19 — Object files as a video token cache (H7 = H1 × H6)
+
+Why: M18 works on stills, where the second stage is idle — a single image is a
+stream of length one, so object files, IOR and identity never engage, and the
+still-image gains come from *what* to look at (top-down), not from attention
+dynamics. The system's distinctive part — tracked object files, object-based
+IOR, persistent memory — shows its advantage only on dynamic scenes. M12's
+honest result says where to look: object-IOR only ties space-IOR on
+*exploration*; the predicted win is persistent identity-keyed memory vs
+necessarily-decaying spatial memory. A video VLM front-end is exactly the task
+that needs it: a video VLM pays tokens per frame, and deciding which pixels to
+(re)send requires knowing *what* has been seen, not *where* — spatial memory
+cannot tell "the same object moved" from "a new object arrived", so it either
+re-sends moved objects (wasted tokens) or suppresses newcomers that appear
+where an old crop was (misses). Paper A leads with this; the still-image study
+is its per-frame component.
+
+Arms (same VLM, same question, matched budget except the reference):
+`frames-full` (T native frames — the naive reference, ~10× the budget),
+`frames-uniform` (the same T frames downsampled to the budget — the standard
+video-VLM input), `space-ior` (overview + K crops at spatial-IOR fixations,
+deduplicated by *location*), `object-ior` (overview + K crops, one per *object
+file*), `oracle` (one crop per ground-truth object). Later: question-
+conditioned crops (M18's `fovea-td`), re-send-on-change, object files as text
+memory.
+
+Stages:
+1. **Synthetic (v1):** `tools/make_dynamic_scene.py --tags --late` — disks
+   carrying a small code legible only at native resolution, some arriving
+   mid-video; `eval/vlm_video.py` asks per object "what code is on the
+   ⟨colour⟩ disk?". Sweeps: speed × object count × K, ≥ 10 seeds.
+2. **Real video:** DAVIS-2017 with templated questions from the masks.
+3. **Working memory:** object files (labels, trajectories) handed to the VLM
+   as text next to the crops — closes M13 Tier 3; re-send on appearance change.
+
+Metrics: accuracy vs visual tokens; objects delivered legibly; crop
+efficiency (crops spent on not-yet-seen objects); M12's scanpath coverage /
+latency / waste for context. Honesty: publish the regimes where space-IOR ties
+or wins (slow scenes, few objects) and the cost of label switches.
+Deliverable: `docs/VLM_VIDEO.md`.
+
+**Status (2026-09-15): brief agreed; v1 (synthetic) in progress on
+`module/video-token-cache`.** First mock finding: with a perfect tracker,
+identity-keyed crops deliver ~0.97 of the codes vs ~0.5 for location-keyed
+ones at the same budget — the lever is real — but the thesis object files lose
+it to segmentation fragments (a moving disk splits into onset crescents) and
+revival past the fixed radius; opt-in persistent identity and segmentation
+settings are the fix in progress.
 
 ## Datasets
 
@@ -408,6 +471,8 @@ full local (Ollama) run. Full story:
 | PETS2006 | left-luggage scenario (M16) | pointer only |
 | COCO-Search18 | target-present visual search (M17 top-down ablation) | adapter in repo (`eval/datasets/cocosearch18.py`) |
 | V*Bench / hi-res VQA | VLM token-vs-accuracy curve (M18) | adapter in repo (`eval/datasets/vstar.py`) |
+| HR-Bench 4K/8K | the same at higher resolution (M18) | adapter in repo (`eval/datasets/hrbench.py`) |
+| Synthetic tagged dynamic scenes | video token cache (M19) | generator in repo (`tools/make_dynamic_scene.py --tags`) |
 
 Corpora stay pointed-to, never redistributed (v2 convention).
 
@@ -424,7 +489,7 @@ Corpora stay pointed-to, never redistributed (v2 convention).
 
 ## Recommended order & rationale
 
-**M10 → M10b → M12 → M13 → M17 → M11 → M14 → M15 → M18 → M16.**
+**M10 → M10b → M12 → M13 → M17 → M11 → M14 → M15 → M18 → M19 → M16.**
 Replication first (anchors credibility, and its stimulus generators feed M12).
 Then the selection backends (M10b), because the headline H1 study wants them as
 baselines and the Kalman backend hands M12 its occlusion handling. Then the H1
