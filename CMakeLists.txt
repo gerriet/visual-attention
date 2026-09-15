@@ -63,6 +63,28 @@ target_include_directories(attention_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/inc
 target_include_directories(attention_core SYSTEM PUBLIC ${OpenCV_INCLUDE_DIRS})
 target_link_libraries(attention_core PUBLIC ${OpenCV_LIBS} ${YAML_CPP_TARGET})
 
+# Bake the linked OpenCV's own haarcascades directory into the build, so the
+# haar-face processor finds its cascade without $ATTENTION_HAAR_DIR even when
+# OpenCV is keg-only or versioned (e.g. Homebrew opencv@4) and therefore on
+# none of the fixed search paths. The unresolved OpenCV_DIR prefix comes first:
+# OpenCV_INSTALL_PATH is symlink-resolved (a versioned Homebrew Cellar path
+# that a `brew upgrade` + cleanup deletes), the opt/ symlink stays valid.
+get_filename_component(_opencv_prefix "${OpenCV_DIR}/../../.." ABSOLUTE)
+set(ATTENTION_OPENCV_HAAR_DIR "")
+foreach(_haar_dir "${_opencv_prefix}/share/opencv4/haarcascades"
+                  "${OpenCV_INSTALL_PATH}/share/opencv4/haarcascades"
+                  "${OpenCV_INSTALL_PATH}/share/opencv/haarcascades")
+    if(NOT ATTENTION_OPENCV_HAAR_DIR AND EXISTS "${_haar_dir}/haarcascade_frontalface_default.xml")
+        set(ATTENTION_OPENCV_HAAR_DIR "${_haar_dir}")
+    endif()
+endforeach()
+if(ATTENTION_OPENCV_HAAR_DIR)
+    target_compile_definitions(attention_core PRIVATE ATTENTION_OPENCV_HAAR_DIR="${ATTENTION_OPENCV_HAAR_DIR}")
+    message(STATUS "Haar cascades: ${ATTENTION_OPENCV_HAAR_DIR}")
+else()
+    message(STATUS "Haar cascades: not found under OpenCV (haar-face needs $ATTENTION_HAAR_DIR)")
+endif()
+
 if(OpenMP_CXX_FOUND)
     target_link_libraries(attention_core PUBLIC OpenMP::OpenMP_CXX)
     message(STATUS "OpenMP enabled for parallel processing")

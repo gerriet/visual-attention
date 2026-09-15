@@ -211,7 +211,8 @@ class HogPerson : public Processor
 
 // haar-face: OpenCV's Haar-cascade frontal-face detector on the attended
 // region. The cascade XML ships with every OpenCV install (not with this
-// repo); locate it via $ATTENTION_HAAR_DIR or the usual install locations.
+// repo); locate it via $ATTENTION_HAAR_DIR, then the linked OpenCV's own
+// directory (baked in by CMake), then the usual install locations.
 class HaarFace : public Processor
 {
  public:
@@ -282,6 +283,9 @@ class HaarFace : public Processor
     {
       dirs.push_back(env);
     }
+#ifdef ATTENTION_OPENCV_HAAR_DIR
+    dirs.push_back(ATTENTION_OPENCV_HAAR_DIR); // the linked OpenCV's own, baked in by CMake
+#endif
     dirs.insert(dirs.end(),
                 {"/opt/homebrew/opt/opencv/share/opencv4/haarcascades", "/usr/local/share/opencv4/haarcascades",
                  "/usr/share/opencv4/haarcascades", "/usr/share/opencv/haarcascades"});
