@@ -54,7 +54,7 @@ automatically for the tests).
 
 ```bash
 # Debian/Ubuntu:  sudo apt-get install cmake g++ libopencv-dev libyaml-cpp-dev
-# macOS:          brew install cmake opencv yaml-cpp
+# macOS:          brew install cmake opencv@4 yaml-cpp   (Homebrew's `opencv` is 5.x)
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j
 ```
