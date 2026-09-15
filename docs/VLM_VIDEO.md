@@ -1,8 +1,10 @@
 # Object files as a video token cache (M19, H7)
 
-*Status: v1 harness built and verified on the mock backend, 2026-09-15; first
-findings below are about what reaches the VLM (the mock is a legibility
-oracle). Real-VLM (Qwen) runs, larger sweeps and DAVIS-2017 are next.*
+*Status (2026-09-15): harness built; model-free findings (the mock is a
+legibility oracle) and real-VLM results (local Qwen) on synthetic scenes and
+DAVIS-2017 below. With a real VLM the H7 effect holds on the synthetic scenes
+(identity-keyed crops 0.95 vs location-keyed 0.80 vs budget-matched frames
+0.27, chance 0.25); DAVIS at 480p does not separate the arms.*
 
 **H7 — Object files as a video token cache (H1 × H6).** *At a matched
 visual-token budget per video, an object-file front-end (object-based IOR +
@@ -215,6 +217,25 @@ on distinct objects; persistent identity adds a little on top. Without
 proto-objects neither memory helps — the thesis segmentation's fragments and
 background clusters swamp both.
 
+### With a real VLM (Qwen)
+
+`qwen3.8:27b` (Q4_K_M, local Ollama), the same 10 scenes, six questions each,
+≈ 530 real tokens per question in every arm:
+
+| Arm (same budget) | Qwen accuracy (60 questions) | 95% CI | delivered (mock rule) |
+|---|---|---|---|
+| frames-uniform | 0.27 | [0.17, 0.38] | 0.00 |
+| space-ior | 0.80 | [0.70, 0.90] | 0.63 |
+| **object-ior** | **0.95** | [0.88, 1.00] | 0.90 |
+| oracle | 1.00 | | 1.00 |
+
+The real VLM confirms the model-free result: budget-matched frames sit at
+chance (0.25), and identity-keyed crops beat location-keyed ones by 15 points
+at the same budget. The 95% intervals (bootstrap over questions — scenes are
+the natural unit, so optimistic) only just touch. Qwen does a little better
+than the mock's legibility rule in the crop arms (it sometimes reads a partly
+clipped code), but the ordering and the gap match.
+
 ## DAVIS-2017: real video (model-free)
 
 `eval/vlm_video_davis.py` runs the same arms on the 30 val sequences (61
@@ -243,10 +264,20 @@ shirt), so crops cover less of it (object-ior crop coverage 0.99 → 0.41).
 Proto-objects are for flat-coloured objects; DAVIS runs use persistent
 identity alone.
 
+**With Qwen** (30 sequences, 46 "which of these can be seen" questions,
+chance 0.25): frames-full 0.98 (1687 real tokens per question), frames-uniform
+0.98 (348), space-ior 0.96 (330), object-ior 0.96 (328), oracle 0.98 (280).
+At 480p the category question is easy from any arm — budget-matched frames
+cost a fifth of full frames and lose nothing. The only misses are the scooter
+in *scooter-black* (every arm) and a phone in *lab-coat* (both attention arms;
+too small for their crops). DAVIS at this resolution is a real-video check of
+the machinery, not a test of H7.
+
 ## Next
 
-1. **Real accuracy:** the arms on Qwen — synthetic (`attend_proto.yaml`) and
-   DAVIS (`attend_identity.yaml`); more seeds; speed × object count × K.
+1. **Sweeps:** more seeds, speed × object count × K, and code sizes around
+   the VLM's reading threshold — the effect should grow with busier scenes
+   and smaller detail.
 2. **Identity on real video** is the open problem: stronger appearance than
    mean colour (histograms / per-feature signatures), a segmentation that
    copes with texture, and fewer background fixations.
@@ -259,9 +290,11 @@ identity alone.
 
 ```bash
 # mock (legibility oracle), with the perfect-tracker decomposition arms
-eval/vlm_video.py --backend mock --seeds 5 --gt-identity --config configs/attend_proto.yaml
+eval/vlm_video.py --backend mock --seeds 10 --gt-identity --config configs/attend_proto.yaml \
+    --tag-size 8 --min-target-px 5
 # real VLM (local Qwen via Ollama), real token counts
-eval/vlm_video.py --seeds 10 --count-tokens --config configs/attend_proto.yaml
+eval/vlm_video.py --seeds 10 --count-tokens --config configs/attend_proto.yaml \
+    --tag-size 8 --min-target-px 5 --arms frames-uniform,space-ior,object-ior,oracle
 # DAVIS-2017 val (data under data/DAVIS — see eval/datasets/davis2017.py)
 eval/vlm_video_davis.py --backend mock --gt-identity --config configs/attend_identity.yaml
 eval/vlm_video_davis.py --count-tokens --config configs/attend_identity.yaml
