@@ -50,13 +50,21 @@ draws in CI without any API. When a backend has a real tokenizer (Claude's
 that authoritative number is recorded too. Only the token *fraction* vs full-res
 is reported, so the patch constant cancels.
 
+**Target diagnostics.** V\*Bench annotates each question's targets (a sidecar
+JSON per image with one box per target; two-object questions carry two). Where
+boxes exist, every row records per arm whether the targets were *delivered*
+legibly (the mock's criterion below), whether a fovea *crop* — not the global
+view — covered them (`crop_hit`), and the rank of the first fixation whose
+window covers them (`target_rank`, so coverage by the top K can be read off for
+any K). That separates the two ways the fovea arm can fail — attention missed
+the target, or the VLM misread a crop it was given.
+
 The VLM is pluggable (`eval/vlm_backends.py`): a `VLMBackend` interface with an
 `ollama` default (a local VLM over Ollama's HTTP API, `qwen3.8:27b`, stdlib
 only), a `claude` backend (anthropic SDK, `claude-opus-5`, base64 image blocks),
 and the `mock` the CI smoke runs on. This keeps the core dependency-free and
-CI-safe — the model lives
-Python-side behind the interchange boundary, exactly like the other modern
-models in this repo.
+CI-safe — the model lives Python-side behind the interchange boundary, exactly
+like the other modern models in this repo.
 
 ## The mock is a real test
 
@@ -67,6 +75,8 @@ pipeline testable end to end without a model: the fovea arm scores only when an
 attention crop actually lands on the target, which is the H6 effect itself. It
 also models the failure mode honestly — a uniform downsample that shrinks the
 target below the legibility floor is scored blind, just as a real VLM would be.
+On V\*Bench the same rule makes the mock a model-free *legibility oracle*: its
+accuracy per arm is that arm's delivered rate.
 
 Synthetic demo (one high-res image, a small salient marker among clutter, mock
 backend):
@@ -142,6 +152,14 @@ with no VLM credentials, so it was verified on the mock only. The local
   accuracy drops. This is precisely the gap the M17 top-down channel closes —
   and the reason the H5×H6 arm (question-conditioned crops) is the natural next
   step, not an afterthought. Report the bottom-up ceiling honestly first.
+  *Measured (2026-09, all 191 V\*Bench items, model-free target
+  diagnostics):* the first fixation's 336-px window covers the annotated target
+  on 2% of items, the top 3 on 7%, the top 10 on 22% — 78% of targets are never
+  covered by the pipeline's 10 fixations (V\*Bench targets are small: median
+  36 px on the short side). By the legibility oracle, bottom-up crops deliver
+  the target *less* often than a same-budget uniform downsample (12% vs 17% at
+  ~20% of full-res tokens). On V\*Bench, bottom-up crops alone are not
+  expected to beat uniform; the top-down channel is the necessary next step.
 - **The controller isn't free.** The token *saving* is measured on the VLM side;
   the attention pipeline that picks the crops costs its own compute
   (`docs/PERFORMANCE.md`). The argument scales as the VLM gets more expensive per
@@ -154,7 +172,8 @@ with no VLM credentials, so it was verified on the mock only. The local
 
 - `eval/vlm_backends.py` — the `VLMBackend` interface, `ollama` + `claude` + `mock` backends, token estimate
 - `eval/vlm_frontend.py` — the three-arm harness (crop / assemble / score), `--demo` + `--vstar`
-- `eval/datasets/vstar.py` — V\*Bench adapter
+- `eval/datasets/vstar.py` — V\*Bench adapter (questions + target boxes)
 - `eval/plot_vlm_frontend.py` — the accuracy-vs-token-budget figure
 - CTest `vlm_frontend_smoke` (`--demo --check --backend mock`) + help tests;
-  `eval/tests/test_vlm_backends.py` (the ollama backend against a faked HTTP API)
+  `eval/tests/test_vlm_backends.py` (the ollama backend against a faked HTTP API),
+  `eval/tests/test_vlm_frontend.py` (target diagnostics, V\*Bench boxes)
