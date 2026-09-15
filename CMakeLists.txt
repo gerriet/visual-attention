@@ -5,7 +5,10 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Find dependencies
+# Find dependencies. OpenCV 4 is pinned (the code predates the 5.0 API); once
+# Homebrew's default `opencv` moved to 5.x, `brew install opencv@4` became the
+# supported route, and that formula is keg-only — hence the explicit prefix.
+list(APPEND CMAKE_PREFIX_PATH "/opt/homebrew/opt/opencv@4")
 find_package(OpenCV 4 REQUIRED)
 find_package(OpenMP)
 
