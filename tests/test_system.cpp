@@ -6,6 +6,7 @@
 #include "attention/system/object_file.h"
 #include <catch2/catch_test_macros.hpp>
 #include <filesystem>
+#include <stdexcept>
 
 namespace fs = std::filesystem;
 using namespace attention;
@@ -170,6 +171,117 @@ TEST_CASE("appearance matching keeps object identity through a crossing", "[syst
 
   const auto position_only = red_label_after_crossing(false);
   CHECK(position_only.second != position_only.first); // identity swapped at the crossing
+}
+
+namespace
+{
+system::Cluster coloured_at(int x, int y, const cv::Vec3f& colour)
+{
+  system::Cluster c = cluster_at(x, y, 0.8f);
+  c.appearance = colour;
+  return c;
+}
+} // namespace
+
+TEST_CASE("persistent identity re-identifies an object after a long gap", "[system][objectfile][identity]")
+{
+  // A red object is seen for three frames, then goes unobserved for 37 (past
+  // max_inactive_age), and reappears after a bounce — nowhere near where
+  // straight-line extrapolation puts it. A blue object stays in view.
+  const cv::Vec3f red(60, 60, 230), blue(240, 110, 70);
+  auto relabelled = [&](bool persistent)
+  {
+    system::ObjectFileStore::Config cfg;
+    cfg.motion_prediction = true;
+    cfg.appearance_matching = true;
+    cfg.persistent_identity = persistent;
+    system::ObjectFileStore store(cfg);
+    for (int f = 0; f < 3; ++f)
+    {
+      store.update({coloured_at(100 + 6 * f, 100, red), coloured_at(400, 300, blue)}, f);
+    }
+    const int red_label = label_near(store, {112, 100});
+    const int blue_label = label_near(store, {400, 300});
+    for (int f = 3; f < 40; ++f)
+    {
+      store.update({coloured_at(400, 300, blue)}, f);
+    }
+    store.update({coloured_at(150, 180, red), coloured_at(400, 300, blue)}, 40);
+    CHECK(label_near(store, {400, 300}) == blue_label);
+    return label_near(store, {150, 180}) != red_label;
+  };
+
+  CHECK_FALSE(relabelled(true)); // same object file: identity held across the gap
+  CHECK(relabelled(false));      // thesis default: aged out, a new file
+}
+
+TEST_CASE("persistent identity gives a newcomer of another colour its own file", "[system][objectfile][identity]")
+{
+  // Red vanishes; a green object appears where red was. Radius-only revival
+  // hands the newcomer red's identity; the colour veto doesn't.
+  const cv::Vec3f red(60, 60, 230), green(60, 200, 60);
+  auto newcomer_label_is_red = [&](bool persistent)
+  {
+    system::ObjectFileStore::Config cfg;
+    cfg.appearance_matching = true;
+    cfg.persistent_identity = persistent;
+    system::ObjectFileStore store(cfg);
+    for (int f = 0; f < 3; ++f)
+    {
+      store.update({coloured_at(100, 100, red)}, f);
+    }
+    const int red_label = label_near(store, {100, 100});
+    store.update({}, 3);
+    store.update({coloured_at(104, 100, green)}, 4);
+    return label_near(store, {104, 100}) == red_label;
+  };
+
+  CHECK_FALSE(newcomer_label_is_red(true));
+  CHECK(newcomer_label_is_red(false));
+}
+
+TEST_CASE("attention_system config section: parsed, defaults kept, typos rejected", "[system][config]")
+{
+  system::AttentionSystem::Config cfg;
+  system::AttentionSystem::apply_config_yaml(
+      "segment_fraction: 0.25\n"
+      "object_files:\n"
+      "  persistent_identity: true\n"
+      "  correspondence_radius: 45\n",
+      cfg);
+  CHECK(cfg.segment_fraction == 0.25f);
+  CHECK(cfg.object_store.persistent_identity);
+  CHECK(cfg.object_store.correspondence_radius == 45.0);
+  CHECK(cfg.object_store.max_inactive_age == system::ObjectFileStore::Config{}.max_inactive_age);
+
+  system::AttentionSystem::Config untouched;
+  system::AttentionSystem::apply_config_yaml("", untouched);
+  CHECK_FALSE(untouched.object_store.persistent_identity);
+
+  CHECK_THROWS_AS(system::AttentionSystem::apply_config_yaml("object_files:\n  reid_color_gate: 20\n", cfg),
+                  std::runtime_error);
+  CHECK_THROWS_AS(system::AttentionSystem::apply_config_yaml("segmnt_fraction: 0.2\n", cfg), std::runtime_error);
+}
+
+TEST_CASE("segmentation: closing bridges an object's fragments, oversized regions are dropped", "[system][segment]")
+{
+  // Two crescents of one moving disk, 6 px apart, and a diffuse region
+  // covering 60% of the map.
+  cv::Mat saliency = cv::Mat::zeros(200, 300, CV_32F);
+  cv::rectangle(saliency, cv::Rect(40, 40, 12, 30), cv::Scalar(1.0f), cv::FILLED);
+  cv::rectangle(saliency, cv::Rect(58, 40, 12, 30), cv::Scalar(1.0f), cv::FILLED);
+  cv::rectangle(saliency, cv::Rect(120, 0, 180, 200), cv::Scalar(0.6f), cv::FILLED);
+  auto clusters = [&](int close, float max_fraction)
+  {
+    system::AttentionSystem::Config cfg;
+    cfg.segment_close = close;
+    cfg.max_cluster_fraction = max_fraction;
+    return system::AttentionSystem(cfg).segment(saliency).size();
+  };
+
+  CHECK(clusters(0, 0.0f) == 3);  // thesis default: two fragments + the diffuse region
+  CHECK(clusters(4, 0.0f) == 2);  // the fragments bridged into one object
+  CHECK(clusters(4, 0.25f) == 1); // and the diffuse region dropped
 }
 
 TEST_CASE("AttentionSystem produces a scanpath over the motion sequence", "[system]")

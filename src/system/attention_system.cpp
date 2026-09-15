@@ -1,10 +1,85 @@
 #include "attention/system/attention_system.h"
+#include "attention/config/yaml_reader.h"
 #include <algorithm>
+#include <limits>
+#include <set>
+#include <stdexcept>
+#include <string>
 
 namespace attention
 {
 namespace system
 {
+
+namespace
+{
+// A config section may carry only these keys; anything else is a typo, which
+// must not pass silently (it would quietly keep the default).
+void reject_unknown_keys(const YAML::Node& node, const std::set<std::string>& known, const std::string& where)
+{
+  if (!node.IsMap())
+  {
+    throw std::runtime_error(where + ": expected a mapping");
+  }
+  for (const auto& entry : node)
+  {
+    const std::string key = entry.first.as<std::string>();
+    if (known.count(key) == 0)
+    {
+      std::string list;
+      for (const auto& k : known)
+      {
+        list += (list.empty() ? "" : ", ") + k;
+      }
+      throw std::runtime_error(where + ": unknown key '" + key + "' (known: " + list + ")");
+    }
+  }
+}
+} // namespace
+
+void AttentionSystem::apply_config_yaml(const std::string& yaml, Config& cfg)
+{
+  using attention::config::read_param;
+  if (yaml.empty())
+  {
+    return;
+  }
+  const YAML::Node node = YAML::Load(yaml);
+  if (node.IsNull())
+  {
+    return;
+  }
+  reject_unknown_keys(
+      node,
+      {"segment_fraction", "segment_min", "min_cluster_size", "segment_close", "max_cluster_fraction", "object_files"},
+      "attention_system");
+  read_param(node, "segment_fraction", cfg.segment_fraction);
+  read_param(node, "segment_min", cfg.segment_min);
+  read_param(node, "min_cluster_size", cfg.min_cluster_size);
+  read_param(node, "segment_close", cfg.segment_close);
+  read_param(node, "max_cluster_fraction", cfg.max_cluster_fraction);
+
+  const YAML::Node files = node["object_files"];
+  if (!files)
+  {
+    return;
+  }
+  reject_unknown_keys(
+      files,
+      {"correspondence_radius", "max_inactive_age", "motion_prediction", "appearance_matching", "appearance_weight",
+       "persistent_identity", "reid_colour_gate", "reid_colour_veto", "gate_growth"},
+      "attention_system.object_files");
+  ObjectFileStore::Config& store = cfg.object_store;
+  read_param(files, "correspondence_radius", store.correspondence_radius);
+  read_param(files, "max_inactive_age", store.max_inactive_age);
+  read_param(files, "motion_prediction", store.motion_prediction);
+  read_param(files, "appearance_matching", store.appearance_matching);
+  read_param(files, "appearance_weight", store.appearance_weight);
+  read_param(files, "persistent_identity", store.persistent_identity);
+  read_param(files, "reid_colour_gate", store.reid_colour_gate);
+  read_param(files, "reid_colour_veto", store.reid_colour_veto);
+  read_param(files, "gate_growth", store.gate_growth);
+}
 
 AttentionSystem::AttentionSystem(const Config& config)
   : config_(config),
@@ -36,6 +111,16 @@ std::vector<Cluster> AttentionSystem::segment(const cv::Mat& saliency) const
 
   const double thresh = std::max(static_cast<double>(config_.segment_min), config_.segment_fraction * max_val);
   cv::Mat mask = saliency > thresh; // CV_8U
+  if (config_.segment_close > 0)
+  {
+    // Bridge an object's fragments (e.g. a moving disk's leading and trailing
+    // onset crescents) into one cluster, hence one object file.
+    const int k = 2 * config_.segment_close + 1;
+    cv::morphologyEx(mask, mask, cv::MORPH_CLOSE, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(k, k)));
+  }
+  const int max_area = config_.max_cluster_fraction > 0.0f
+                           ? static_cast<int>(config_.max_cluster_fraction * static_cast<float>(mask.total()))
+                           : std::numeric_limits<int>::max();
 
   // The native frame, at saliency resolution, gives each cluster an appearance
   // descriptor (mean colour) for identity-stable correspondence (M12) — computed
@@ -48,9 +133,9 @@ std::vector<Cluster> AttentionSystem::segment(const cv::Mat& saliency) const
   for (int label = 1; label < num_labels; ++label) // 0 == background
   {
     const int area = stats.at<int>(label, cv::CC_STAT_AREA);
-    if (area < config_.min_cluster_size)
+    if (area < config_.min_cluster_size || area > max_area)
     {
-      continue;
+      continue; // too small to track, or too large to be an object
     }
     Cluster cluster;
     cluster.size = area;

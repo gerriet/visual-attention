@@ -55,6 +55,12 @@ ConfigLoader::Config ConfigLoader::load(const std::string& yaml_path)
       load_output(yaml["output"], config);
     }
 
+    // Second-stage section, kept raw for the system module (M19)
+    if (yaml["attention_system"])
+    {
+      config.attention_system_yaml = YAML::Dump(yaml["attention_system"]);
+    }
+
     return config;
   }
   catch (const YAML::Exception& e)

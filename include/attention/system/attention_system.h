@@ -98,6 +98,12 @@ class AttentionSystem
     float segment_fraction = 0.35f; // threshold as a fraction of the map's max
     float segment_min = 0.1f;       // absolute threshold floor
     int min_cluster_size = 20;      // ignore clusters smaller than this (px)
+    // Opt-in (M19): bridge an object's fragments before labelling — a moving
+    // uniform disk, salient only at its leading and trailing edges, falls apart
+    // into two crescents that would each get an object file — and drop regions
+    // too large to be an object (diffuse background saliency). 0 = off (thesis).
+    int segment_close = 0;             // morphological closing radius (px)
+    float max_cluster_fraction = 0.0f; // max cluster area, as a fraction of the map
 
     // Recognition processors on attended ROIs (M13). Empty = none. ROIs are
     // taken from the pipeline frame (native resolution in --attend, which does
@@ -112,6 +118,18 @@ class AttentionSystem
     // exactly once and deadlock unlabeled.
     int process_repeat_frames = 3;
   };
+
+  /**
+   * Apply a config file's `attention_system:` section (raw YAML, as kept by
+   * ConfigLoader) to `config`. Keys: segment_fraction, segment_min,
+   * min_cluster_size, segment_close, max_cluster_fraction, and
+   * object_files: { correspondence_radius,
+   * max_inactive_age, motion_prediction, appearance_matching,
+   * appearance_weight, persistent_identity, reid_colour_gate,
+   * reid_colour_veto, gate_growth }. Absent keys keep their defaults; an
+   * unknown key throws std::runtime_error (a typo must not pass silently).
+   */
+  static void apply_config_yaml(const std::string& yaml, Config& config);
 
   using FocusCallback = std::function<void(AttentionSystem&)>;
 
@@ -164,10 +182,11 @@ class AttentionSystem
   int frame_index() const { return frame_index_; }
   const Config& config() const { return config_; }
 
- private:
-  // Segment the fused saliency map into candidate object clusters.
+  // Segment a fused saliency (priority) map into candidate object clusters —
+  // what the second stage does every frame; public for tests.
   std::vector<Cluster> segment(const cv::Mat& saliency) const;
 
+ private:
   // Run the second stage for the current pipeline frame.
   void process_second_stage();
 

@@ -1,5 +1,6 @@
 #include "attention/system/object_file.h"
 #include <algorithm>
+#include <limits>
 
 namespace attention
 {
@@ -22,6 +23,16 @@ cv::Point2d expected_centroid(const ObjectFile& file, bool use_motion, int steps
   const cv::Point& p0 = file.trajectory[file.trajectory.size() - 2];
   const int s = std::max(1, std::min(steps, 8)); // clamp wild extrapolation
   return cv::Point2d(p1.x + s * (p1.x - p0.x), p1.y + s * (p1.y - p0.y));
+}
+
+// The file's speed over its last trajectory step (px/frame); 0 without history.
+double last_speed(const ObjectFile& file)
+{
+  if (file.trajectory.size() < 2)
+  {
+    return 0.0;
+  }
+  return cv::norm(file.trajectory[file.trajectory.size() - 1] - file.trajectory[file.trajectory.size() - 2]);
 }
 } // namespace
 
@@ -183,29 +194,16 @@ void ObjectFileStore::update(const std::vector<Cluster>& clusters, int frame)
     }
   }
 
-  // Unmatched clusters: revive a nearby inactive file if one exists (within the
-  // correspondence radius), otherwise create a new file.
+  // Unmatched clusters: revive a matching inactive file if one exists,
+  // otherwise create a new file.
   for (int c = 0; c < nc; ++c)
   {
     if (cluster_to_file[c] != -1)
     {
       continue;
     }
-    int best = -1;
-    double best_dist = radius;
-    for (int i = 0; i < static_cast<int>(inactive_.size()); ++i)
-    {
-      // Extrapolate the inactive file forward over the frames it was gone, so an
-      // object that kept moving while occluded is revived at where it should be.
-      const int gone = std::max(1, frame - inactive_[i].last_seen_frame);
-      const cv::Point2d predicted = expected_centroid(inactive_[i], config_.motion_prediction, gone);
-      const double d = cv::norm(predicted - cv::Point2d(clusters[c].centroid.x, clusters[c].centroid.y));
-      if (d < best_dist)
-      {
-        best_dist = d;
-        best = i;
-      }
-    }
+    const int best =
+        config_.persistent_identity ? reidentify(clusters[c], frame) : nearest_inactive(clusters[c], frame);
     if (best != -1)
     {
       ObjectFile revived = inactive_[best];
@@ -221,10 +219,68 @@ void ObjectFileStore::update(const std::vector<Cluster>& clusters, int frame)
 
   active_ = std::move(next_active);
 
-  // Age out inactive files unseen for too long.
-  inactive_.erase(std::remove_if(inactive_.begin(), inactive_.end(), [&](const ObjectFile& f)
-                                 { return frame - f.last_seen_frame > config_.max_inactive_age; }),
-                  inactive_.end());
+  // Age out inactive files unseen for too long — unless memory is persistent.
+  if (!config_.persistent_identity)
+  {
+    inactive_.erase(std::remove_if(inactive_.begin(), inactive_.end(), [&](const ObjectFile& f)
+                                   { return frame - f.last_seen_frame > config_.max_inactive_age; }),
+                    inactive_.end());
+  }
+}
+
+int ObjectFileStore::nearest_inactive(const Cluster& cluster, int frame) const
+{
+  int best = -1;
+  double best_dist = config_.correspondence_radius;
+  for (int i = 0; i < static_cast<int>(inactive_.size()); ++i)
+  {
+    // Extrapolate the inactive file forward over the frames it was gone, so an
+    // object that kept moving while occluded is revived at where it should be.
+    const int gone = std::max(1, frame - inactive_[i].last_seen_frame);
+    const cv::Point2d predicted = expected_centroid(inactive_[i], config_.motion_prediction, gone);
+    const double d = cv::norm(predicted - cv::Point2d(cluster.centroid.x, cluster.centroid.y));
+    if (d < best_dist)
+    {
+      best_dist = d;
+      best = i;
+    }
+  }
+  return best;
+}
+
+int ObjectFileStore::reidentify(const Cluster& cluster, int frame) const
+{
+  int best = -1;
+  double best_cost = std::numeric_limits<double>::max();
+  for (int i = 0; i < static_cast<int>(inactive_.size()); ++i)
+  {
+    const ObjectFile& file = inactive_[i];
+    const int gone = std::max(1, frame - file.last_seen_frame);
+    const cv::Point2d predicted = expected_centroid(file, config_.motion_prediction, gone);
+    const double d = cv::norm(predicted - cv::Point2d(cluster.centroid.x, cluster.centroid.y));
+    // Appearance rules only when both sides carry a descriptor (a cluster
+    // segmented without its frame has none); otherwise the position gate alone.
+    const bool compare_look = cv::norm(file.appearance) > 0.0 && cv::norm(cluster.appearance) > 0.0;
+    const double colour = compare_look ? cv::norm(file.appearance - cluster.appearance) : 0.0;
+    if (compare_look && colour >= config_.reid_colour_veto)
+    {
+      continue; // looks different: a different object, however close
+    }
+    // Where it could be by now: the gate widens with the time it was unseen.
+    const double gate = config_.correspondence_radius + config_.gate_growth * last_speed(file) * gone;
+    const bool look_alike = compare_look && colour < config_.reid_colour_gate;
+    if (d >= gate && !look_alike)
+    {
+      continue;
+    }
+    const double cost = d + config_.appearance_weight * colour;
+    if (cost < best_cost)
+    {
+      best_cost = cost;
+      best = i;
+    }
+  }
+  return best;
 }
 
 void ObjectFileStore::mark_selected(int label, int frame)
