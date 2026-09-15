@@ -20,9 +20,11 @@ Download (small — ~200 items, a few hundred MB of images):
 or clone the HF dataset repo. Data is pointed to, never redistributed.
 
 Each record's `text` bundles the question, the lettered options, and an
-instruction line; parse() splits them. There is no target bounding box in this
-mirror — the mock VLM's visibility path is exercised by a synthetic item in
-the front-end harness, not by these records.
+instruction line; parse() splits them. Each image has a sidecar JSON with the
+target object names and boxes (`bbox`, [x, y, w, h] in native px, one per
+target — two-object questions carry two); iter_items exposes them as
+`target_boxes` (x0, y0, x1, y1) for the front-end's delivered / crop-hit
+diagnostics.
 """
 
 import json
@@ -58,8 +60,8 @@ def parse(text):
 
 def iter_items(root=DEFAULT_ROOT, category=None):
     """Yield dicts: {image (Path), question, choices, answer (str), answer_letter,
-    category, question_id}. `category` filters to 'direct_attributes' or
-    'relative_position'."""
+    category, question_id, target_boxes (list or None)}. `category` filters to
+    'direct_attributes' or 'relative_position'."""
     root = Path(root)
     listing = root / "test_questions.jsonl"
     if not listing.exists():
@@ -74,12 +76,25 @@ def iter_items(root=DEFAULT_ROOT, category=None):
             letter = record["label"].strip()
             index = ord(letter) - 65
             answer = choices[index] if 0 <= index < len(choices) else letter
+            image = root / record["image"]
             yield {
-                "image": root / record["image"],
+                "image": image,
                 "question": question,
                 "choices": choices,
                 "answer": answer,
                 "answer_letter": letter,
                 "category": record["category"],
                 "question_id": record["question_id"],
+                "target_boxes": target_boxes(image),
             }
+
+
+def target_boxes(image_path):
+    """The annotated targets as (x0, y0, x1, y1) native-px boxes, read from the
+    image's sidecar JSON, or None when there is no sidecar."""
+    sidecar = Path(image_path).with_suffix(".json")
+    if not sidecar.exists():
+        return None
+    with open(sidecar) as fh:
+        boxes = json.load(fh).get("bbox") or []
+    return [(x, y, x + w, y + h) for x, y, w, h in boxes] or None

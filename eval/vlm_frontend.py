@@ -28,7 +28,13 @@ a local open-weights VLM (qwen3.8:27b) — free, reproducible, and its real toke
 count comes back with every answer; `--backend claude` swaps in Claude. The
 `mock` backend answers correctly iff the target is delivered at usable
 resolution, so the harness is testable end to end without any model (the CI
-smoke runs on it); on V*Bench (no target box) the mock scores at chance.
+smoke runs on it); on V*Bench it becomes a model-free legibility oracle.
+
+Where targets are annotated (V*Bench ships boxes), each row also records per
+arm whether the targets were delivered legibly, whether a fovea *crop* covered
+them (crop_hit), and the rank of the first fixation whose window covers them
+(target_rank) — separating "attention missed the target" from "the VLM misread
+it".
 
   eval/vlm_frontend.py --vstar --limit 50 --count-tokens    # local Ollama
   eval/vlm_frontend.py --vstar --limit 50 --backend claude
@@ -88,15 +94,43 @@ def visual_tokens(backend, views):
     return sum(backend.estimate_visual_tokens(v["image"].size) for v in views)
 
 
-def target_visible(views, target_box, min_target_px, overlap=0.6):
-    """True if any view shows the target region at usable resolution: enough of
-    the native target box lies inside the view's source region, and the *visible
-    portion* is on-screen at least min_target_px. Models 'downsampling makes the
-    target too small to read', and 'a crop that clips most of the target off
-    doesn't count'. None when there is no ground-truth box (visibility unknown)."""
-    if target_box is None:
+def target_visible(views, target_boxes, min_target_px, overlap=0.6):
+    """True if every target region is shown at usable resolution by some view:
+    enough of the native target box lies inside the view's source region, and
+    the *visible portion* is on-screen at least min_target_px. Models
+    'downsampling makes the target too small to read', and 'a crop that clips
+    most of the target off doesn't count'. Every box must pass — a
+    relative-position question needs both objects. None when there is no
+    ground-truth box (visibility unknown)."""
+    if not target_boxes:
         return None
-    tx0, ty0, tx1, ty1 = target_box
+    return all(_box_visible(views, box, min_target_px, overlap) for box in target_boxes)
+
+
+def target_fixation_rank(fixations, target_boxes, fovea_side, size, overlap=0.6):
+    """Crop-hit diagnostic independent of K: the 1-based rank of the first
+    fixation whose fovea window covers the target (for several boxes, the rank
+    by which all are covered), or None if no fixation's window ever does.
+    'Covered by top-K' is then rank <= K, ignoring build_arms' crop dedup."""
+    if not target_boxes:
+        return None
+    w, h = size
+    half = fovea_side // 2
+    worst = 0
+    for box in target_boxes:
+        for n, (fx, fy, _value) in enumerate(fixations, 1):
+            cx, cy = int(round(fx)), int(round(fy))
+            window = (max(0, cx - half), max(0, cy - half), min(w, cx + half), min(h, cy + half))
+            if _box_visible([make_view(None, window, 1.0)], box, 0, overlap):
+                worst = max(worst, n)
+                break
+        else:
+            return None
+    return worst
+
+
+def _box_visible(views, box, min_target_px, overlap):
+    tx0, ty0, tx1, ty1 = box
     t_area = max(1, (tx1 - tx0) * (ty1 - ty0))
     for v in views:
         sx0, sy0, sx1, sy1 = v["source_box"]
@@ -167,18 +201,16 @@ def run_item(backend, image, fixations, item, params):
     """Score all three arms on one (image, question). Returns per-arm dict."""
     arms = build_arms(image, fixations, params)
     full_tokens = visual_tokens(backend, arms["full-res"])
+    boxes = item.get("target_boxes")
     rows = {}
     for name, views in arms.items():
         tokens = visual_tokens(backend, views)
+        visible = target_visible(views, boxes, params["min_target_px"])
         payload = {
             "images": [v["image"] for v in views],
             "question": item["question"],
             "choices": item["choices"],
-            "oracle": {
-                "target_visible": target_visible(views, item.get("target_box"),
-                                                 params["min_target_px"]),
-                "answer": item["answer"],
-            },
+            "oracle": {"target_visible": visible, "answer": item["answer"]},
         }
         letter = backend.answer(payload)  # may be None (abstain -> scored wrong)
         chosen = None
@@ -189,7 +221,19 @@ def run_item(backend, image, fixations, item, params):
             "tokens": tokens,
             "token_fraction": tokens / full_tokens if full_tokens else 0.0,
             "real_tokens": backend.count_tokens(payload) if params["count_tokens"] else None,
+            "target_visible": visible,
         }
+    # Where the targets are annotated: did an attention crop (not the global
+    # view) cover them, and how deep in the scanpath does coverage come? This
+    # separates "attention missed the target" from "the VLM misread it".
+    if boxes:
+        rows["fovea"]["crop_hit"] = target_visible(arms["fovea"][1:], boxes, 0)
+    rows["item"] = {
+        "question_id": item.get("question_id"),
+        "category": item.get("category"),
+        "n_fixations": len(fixations),
+        "target_rank": target_fixation_rank(fixations, boxes, params["fovea_side"], image.size),
+    }
     return rows
 
 
@@ -212,7 +256,7 @@ def synthetic_item(params):
         "question": "What is the colour of the small square marker?",
         "choices": ["red", "green", "blue", "yellow"],
         "answer": "red",
-        "target_box": (tx, ty, tx + 26, ty + 26),
+        "target_boxes": [(tx, ty, tx + 26, ty + 26)],
     }
     return img, item
 
@@ -235,20 +279,50 @@ def summarize(results):
             real_frac = [r[arm]["real_tokens"] / r["full-res"]["real_tokens"] for r in results]
             row["mean_real_tokens"] = sum(r[arm]["real_tokens"] for r in results) / len(results)
             row["mean_real_token_fraction"] = sum(real_frac) / len(real_frac)
+        # Where targets are annotated: how often this arm delivered them
+        # legibly, and accuracy split on that.
+        seen = [r[arm] for r in results if r[arm].get("target_visible") is not None]
+        if seen:
+            row["delivered_rate"] = _mean([int(x["target_visible"]) for x in seen])
+            row["accuracy_if_delivered"] = _mean([x["correct"] for x in seen if x["target_visible"]])
+            row["accuracy_if_missed"] = _mean([x["correct"] for x in seen if not x["target_visible"]])
         summary[arm] = row
+    boxed = [r for r in results if r["fovea"].get("crop_hit") is not None]
+    if boxed:
+        ranks = [r["item"]["target_rank"] for r in boxed]
+        summary["fovea"]["crop_hit_rate"] = _mean([int(r["fovea"]["crop_hit"]) for r in boxed])
+        summary["targets"] = {
+            "n": len(boxed),
+            "covered_by_top": {str(k): _mean([int(x is not None and x <= k) for x in ranks])
+                               for k in (1, 3, 5, 10)},
+            "never_covered": _mean([int(x is None) for x in ranks]),
+        }
     return summary
+
+
+def _mean(values):
+    return sum(values) / len(values) if values else None
 
 
 def format_table(summary):
     have_real = "mean_real_token_fraction" in summary["full-res"]
-    header = "%-10s %10s %18s %16s%s" % (
-        "arm", "accuracy", "95% CI", "token-fraction", "  real-fraction" if have_real else "")
+    have_boxes = "delivered_rate" in summary["full-res"]
+    header = "%-10s %10s %18s %16s%s%s" % (
+        "arm", "accuracy", "95% CI", "token-fraction", "  real-fraction" if have_real else "",
+        "  delivered" if have_boxes else "")
     lines = ["VLM front-end (H6): accuracy vs visual-token budget", header, "-" * len(header)]
     for arm in ("full-res", "uniform", "fovea"):
         s = summary[arm]
         extra = "  %13.3f" % s["mean_real_token_fraction"] if have_real else ""
+        extra += "  %9.3f" % s["delivered_rate"] if have_boxes else ""
         lines.append("%-10s %10.3f  [%5.3f,%5.3f] %16.3f%s" % (
             arm, s["accuracy"], s["accuracy_ci"][0], s["accuracy_ci"][1], s["mean_token_fraction"], extra))
+    if "targets" in summary:
+        t, top = summary["targets"], summary["targets"]["covered_by_top"]
+        lines.append("fovea crop-hit %.3f; target covered by fixation #1 %.2f, top-3 %.2f, top-5 %.2f, "
+                     "top-10 %.2f, never %.2f (n=%d)" % (summary["fovea"]["crop_hit_rate"], top["1"],
+                                                         top["3"], top["5"], top["10"],
+                                                         t["never_covered"], t["n"]))
     return "\n".join(lines)
 
 
@@ -269,7 +343,7 @@ def main():
     ap.add_argument("--global-side", type=int, default=512, help="low-res global view long side (px)")
     ap.add_argument("--full-max-side", type=int, default=1512, help="full-res arm cap (px)")
     ap.add_argument("--proc-max-side", type=int, default=1024, help="attention processing cap (px)")
-    ap.add_argument("--min-target-px", type=int, default=24, help="mock: target must show at least this big")
+    ap.add_argument("--min-target-px", type=int, default=24, help="legibility floor (on-screen px) for the delivered / mock oracle")
     ap.add_argument("--config", default=None, help="pipeline config for --emit-json")
     ap.add_argument("--count-tokens", action="store_true", help="also record the backend's real count_tokens()")
     ap.add_argument("--check", action="store_true",
@@ -300,8 +374,9 @@ def main():
         if not vstar.available():
             sys.exit("V*Bench not found under data/vstar_bench — see eval/datasets/vstar.py")
         if args.backend == "mock":
-            print("WARNING: the mock backend cannot score V*Bench — it carries no target boxes, "
-                  "so every arm reports chance. Use --backend ollama or claude for real numbers.", file=sys.stderr)
+            print("NOTE: the mock on V*Bench is a legibility oracle — an arm scores iff its views "
+                  "deliver the annotated targets (--min-target-px); use --backend ollama or claude "
+                  "for real accuracy.", file=sys.stderr)
         Image = _pil()
         items = vstar.iter_items(category=args.category)
         for n, item in enumerate(items):
