@@ -123,15 +123,135 @@ of fixations still land on no object. The size cap has no downside.
 to tied-or-better in the regimes it was built for — see
 `docs/DYNAMIC_IOR_STUDY.md`, "Persistent identity (M19)".
 
+## Proto-objects: segmentation that knows what an object is
+
+The per-frame feature maps show why blind closing can't be the answer. On
+these scenes the colour channel is a smooth gradient, eccentricity is blank,
+**symmetry fires in the empty space *between* the disks** (a large branch-
+shaped response — the off-object fixations), and **onset draws a hollow ring
+around each moving disk** (its arcs are the fragments). Salient pixels alone
+don't say where an object is.
+
+`attention_system.proto_objects` (opt-in, `configs/attend_proto.yaml`) turns
+each salient cluster into the object(s) under it, in the spirit of Walther &
+Koch's proto-objects: seed at the cluster pixel whose colour differs most from
+the frame's median colour (a figure-ground estimate) — a cluster where nothing
+does is background (a motion ghost, the symmetry branch) and is dropped; grow
+the object from the seed by colour (flood fill in a window around the cluster;
+a fill that floods the window is background too); re-seed on what's left, so
+a cluster spanning touching objects yields each; merge results that grew into
+the same object. Under persistent identity, the store also folds a second
+look-alike file on one object into the first (active duplicates with
+overlapping boxes, and inactive ones last seen within the correspondence
+radius).
+
+Mock, 5 scenes, persistent identity on:
+
+| Segmentation | object-ior (perfect tracker) | space-ior (perfect tracker) | labels / object | off-object | latency (obj, space) |
+|---|---|---|---|---|---|
+| thesis | 0.47 (0.97) | 0.50 (0.97) | 4.5, 3.2 | 0.20, 0.27 | 3.8, 5.3 |
+| closing 8 + size cap | 0.57 (0.73) | 0.33 (0.67) | 1.6, 1.6 | 0.27, 0.24 | — |
+| proto-objects | **0.67** (1.00) | 0.60 (1.00) | 2.6, 1.7 | **0.01**, 0.02 | 1.4, 2.5 |
+
+Proto-objects all but remove off-object fixations, keep the perfect-tracker
+ceiling at 1.00 (closing merged neighbours), and put `object-ior` ahead of
+`space-ior` — with object-based attention reaching new objects sooner (1.4 vs
+2.5 frames). Identity is better but not solved: ≈ 2.6 labels per object
+remain, and the duplicate folding barely moved it — the rest is files
+trading places between objects, not duplicates.
+
+## Calibrated to the VLM: 8-px codes
+
+The first real-VLM run (local Qwen) at the default 20-px code size hit the
+ceiling: Qwen read the codes even from the budget-matched downsampled frames
+(3 scenes: frames-uniform 0.94, every crop arm 1.00) — the mock's legibility
+floor was far too strict, as on V\*Bench. A probe (one scene per size, six
+questions per cell, chance 0.25) found the regime H7 needs:
+
+| Code size | native crop | frame at the frames-uniform scale (0.30) | overview (0.40) |
+|---|---|---|---|
+| 8 px | **1.00** | 0.17 | 0.33 |
+| 10 px | 1.00 | 0.33 | 0.67 |
+| 12 px | 1.00 | 0.33 | 1.00 |
+| 14 px | 1.00 | 0.50 | 1.00 |
+
+At 8 px (a code box of 11 × 5 px) Qwen reads every code from a native crop and
+is at chance on the downsampled views. The M19 runs therefore use
+`--tag-size 8 --min-target-px 5` (the mock's floor then agrees with Qwen).
+
+Mock, 10 scenes, persistent identity + proto-objects (`attend_proto.yaml`):
+
+| Arm (same budget unless noted) | delivered | 95% CI |
+|---|---|---|
+| frames-full (~11× the budget) | 1.00 | |
+| frames-uniform | 0.00 | |
+| space-ior | 0.63 | [0.52, 0.75] |
+| **object-ior** | **0.90** | [0.82, 0.97] |
+| space-ior / object-ior with a perfect tracker | 1.00 / 1.00 | |
+| oracle | 1.00 | |
+
+**This is the H7 effect, model-free:** at the same budget, identity-keyed crops
+deliver 0.90 of the codes and location-keyed crops 0.63 — non-overlapping
+intervals — while budget-matched frames deliver none. The scanpaths say why:
+with the small code the disks stay near-uniform at the 320-px processing scale
+and identity holds (1.4 distinct labels per object, no off-object fixations);
+object-based IOR wastes almost no fixations on already-seen objects (0.01 vs
+0.21) and reaches new ones sooner (1.0 vs 2.5 frames). Both behaviors attend
+every object; the difference is purely which crops each memory spends the
+budget on.
+
+Which part does it? The same 10 scenes (mock), one component at a time:
+
+| Configuration | object-ior | space-ior | labels / object (object-ior) | off-object (object-ior) |
+|---|---|---|---|---|
+| thesis object files + tracking aids | 0.45 | 0.52 | 3.8 | 0.32 |
+| + persistent identity | 0.48 | 0.50 | 3.9 | 0.28 |
+| + proto-objects | 0.87 | 0.63 | 1.6 | 0.00 |
+| + proto-objects + persistent identity | **0.90** | 0.63 | 1.4 | 0.00 |
+
+Proto-object segmentation carries the effect: once each object is one clean
+cluster, the object files hold identity and object-based IOR spends the budget
+on distinct objects; persistent identity adds a little on top. Without
+proto-objects neither memory helps — the thesis segmentation's fragments and
+background clusters swamp both.
+
+## DAVIS-2017: real video (model-free)
+
+`eval/vlm_video_davis.py` runs the same arms on the 30 val sequences (61
+annotated objects, hand-labelled with categories from mask overlays in
+`eval/datasets/davis2017.py`). Crops cover the attended object (the object
+file's box plus a margin, capped at 224 px); an object is *delivered* when a
+view shows ≥ 60% of its mask with its shorter side ≥ 24 px on screen.
+
+| Arm | delivered (61 objects) | small objects (5) | tokens vs frames-full |
+|---|---|---|---|
+| frames-full | 1.00 | 1.00 | 1.00 |
+| frames-uniform | 0.95 | 0.40 | 0.17 |
+| space-ior | 0.93 | 0.20 | 0.14 |
+| object-ior | 0.93 | 0.20 | 0.14 |
+| perfect tracker (either behavior) | 0.95 | 0.40 | 0.12 |
+| oracle (each object where it is largest) | 0.98 | 0.80 | 0.12 |
+
+(Persistent identity; the thesis object files give nearly the same table.) At
+480p DAVIS barely separates the arms: its objects are large, the overview
+frame alone shows most of them, and only five count as small — too few to
+compare, though the oracle row shows crops *can* deliver them. Identity on real video is poor in every configuration
+(13–16 labels per attended object, 57–75% of fixations off the annotated
+objects: real saliency lands on busy backgrounds), and proto-objects *hurt*
+here — the colour fill traces only a homogeneous part of a textured object (a
+shirt), so crops cover less of it (object-ior crop coverage 0.99 → 0.41).
+Proto-objects are for flat-coloured objects; DAVIS runs use persistent
+identity alone.
+
 ## Next
 
-1. **Segmentation that separates touching objects** — colour-connected
-   proposals or a watershed split instead of blind closing — and a
-   confirmation rule for crops (an object file must be seen for a few frames
-   before it earns a crop), so junk regions stop consuming the budget.
-2. **Real accuracy:** the same arms on Qwen (local, `--backend ollama`), more
-   seeds, sweeps over speed × object count × K.
-3. **Real video:** DAVIS-2017 with templated questions from the masks.
+1. **Real accuracy:** the arms on Qwen — synthetic (`attend_proto.yaml`) and
+   DAVIS (`attend_identity.yaml`); more seeds; speed × object count × K.
+2. **Identity on real video** is the open problem: stronger appearance than
+   mean colour (histograms / per-feature signatures), a segmentation that
+   copes with texture, and fewer background fixations.
+3. **Harder real video:** DAVIS full resolution, or video QA where small
+   objects matter.
 4. **Object files as working memory:** labels and trajectories handed to the
    VLM as text next to the crops (closes M13 Tier 3); re-send on change.
 
@@ -139,20 +259,25 @@ to tied-or-better in the regimes it was built for — see
 
 ```bash
 # mock (legibility oracle), with the perfect-tracker decomposition arms
-eval/vlm_video.py --backend mock --seeds 5 --gt-identity
-# persistent identity + segmentation knobs
-eval/vlm_video.py --backend mock --seeds 5 --gt-identity --config configs/attend_identity.yaml
+eval/vlm_video.py --backend mock --seeds 5 --gt-identity --config configs/attend_proto.yaml
 # real VLM (local Qwen via Ollama), real token counts
-eval/vlm_video.py --seeds 5 --count-tokens --config configs/attend_identity.yaml
+eval/vlm_video.py --seeds 10 --count-tokens --config configs/attend_proto.yaml
+# DAVIS-2017 val (data under data/DAVIS — see eval/datasets/davis2017.py)
+eval/vlm_video_davis.py --backend mock --gt-identity --config configs/attend_identity.yaml
+eval/vlm_video_davis.py --count-tokens --config configs/attend_identity.yaml
 ```
 
 ## Files
 
 - `tools/make_dynamic_scene.py` — `--tags` (codes), `--late` (arrivals), `--tag-size`
 - `eval/vlm_video.py` — the harness (arms, questions, legibility oracle, identity statistics)
-- `configs/attend_identity.yaml` — persistent identity switched on
-- `src/system/object_file.cpp` — `persistent_identity` correspondence;
-  `src/system/attention_system.cpp` — `segment_close` / `max_cluster_fraction`
-  and the `attention_system:` config section
-- Tests: `eval/tests/test_vlm_video.py`; Catch2 `[identity]`, `[segment]`,
-  `[config]` cases in `tests/test_system.cpp`; CTest `vlm_video_smoke`
+- `eval/vlm_video_davis.py` — the DAVIS-2017 harness (object crops, mask-based
+  delivery, category questions); categories in `eval/datasets/davis2017.py`
+- `configs/attend_identity.yaml` — persistent identity switched on;
+  `configs/attend_proto.yaml` — plus proto-objects
+- `src/system/object_file.cpp` — `persistent_identity` correspondence and
+  duplicate folding; `src/system/attention_system.cpp` — `segment_close`,
+  `max_cluster_fraction`, proto-objects and the `attention_system:` config section
+- Tests: `eval/tests/test_vlm_video.py`, `eval/tests/test_vlm_video_davis.py`;
+  Catch2 `[identity]`, `[segment]`, `[proto]`, `[config]` cases in
+  `tests/test_system.cpp`; CTest `vlm_video_smoke`
