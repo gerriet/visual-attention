@@ -8,6 +8,8 @@ modern models live Python-side, behind the interchange boundary):
   VLMBackend.answer(payload)          -> a multiple-choice letter
   VLMBackend.estimate_visual_tokens(size) -> provider-independent token proxy
   VLMBackend.count_tokens(payload)    -> real token count, when the backend has one
+  VLMBackend.locate(payload)          -> boxes of what the question asks about
+                                         (the --top-down source), when it can
 
 Backends:
   mock    deterministic; answers correctly iff the target is visible in the
@@ -62,6 +64,22 @@ def _parse_letter(text, n_choices):
     return None
 
 
+def _parse_boxes(text, scale):
+    """Every [x1, y1, x2, y2] in a grounding reply, as (x0, y0, x1, y1)
+    fractions of the image — the model answers in 0..scale coordinates.
+    Degenerate boxes are dropped."""
+    boxes = []
+    for group in re.findall(r"\[([^\[\]]*)\]", text):
+        numbers = re.findall(r"-?\d+(?:\.\d+)?", group)
+        if len(numbers) != 4:
+            continue
+        x0, y0, x1, y1 = (min(1.0, max(0.0, float(v) / scale)) for v in numbers)
+        (x0, x1), (y0, y1) = sorted((x0, x1)), sorted((y0, y1))
+        if x1 > x0 and y1 > y0:
+            boxes.append((x0, y0, x1, y1))
+    return boxes
+
+
 class VLMBackend:
     """Answer a multiple-choice visual question over a set of images."""
 
@@ -85,6 +103,12 @@ class VLMBackend:
     def count_tokens(self, payload):
         """Real input-token count for the request, or None if unavailable."""
         return None
+
+    def locate(self, payload):
+        """Where is what the question asks about? Returns (boxes, real_tokens):
+        boxes as (x0, y0, x1, y1) fractions of payload["images"][0], and the
+        call's real input-token count (or None). The --top-down source."""
+        raise NotImplementedError("the %s backend cannot localize (needed for --top-down)" % self.name)
 
 
 class MockVLM(VLMBackend):
@@ -117,6 +141,11 @@ class MockVLM(VLMBackend):
         # Target known-not-delivered: a deterministic wrong choice.
         wrong = [i for i, c in enumerate(choices) if c != correct] or list(range(len(choices)))
         return chr(65 + wrong[seed % len(wrong)])
+
+    def locate(self, payload):
+        # Perfect grounding from the harness-supplied boxes: exercises the
+        # --top-down plumbing (map -> fixations -> crops) without a model.
+        return list((payload.get("oracle") or {}).get("target_boxes") or []), None
 
 
 class ClaudeVLM(VLMBackend):
@@ -188,8 +217,14 @@ class OllamaVLM(VLMBackend):
 
     name = "ollama"
 
-    def __init__(self, model="qwen3.8:27b", host=None, num_ctx=8192, timeout=900):
+    GROUND_PROMPT = ("Question about this image: %s\n\nLocate the object(s) this question is about. "
+                     "Reply only with JSON: [{\"bbox_2d\": [x1, y1, x2, y2], \"label\": \"<name>\"}]")
+
+    def __init__(self, model="qwen3.8:27b", host=None, num_ctx=8192, timeout=900, grounding_scale=1000):
         self.model = model
+        # Qwen3-family models ground in 0..1000 normalized coordinates
+        # (measured on V*Bench for qwen3.8); Qwen2.5-VL used absolute pixels.
+        self.grounding_scale = grounding_scale
         host = (host or os.environ.get("OLLAMA_HOST") or "localhost:11434").rstrip("/")
         self.host = host if "://" in host else "http://" + host
         self.num_ctx = num_ctx
@@ -224,20 +259,24 @@ class OllamaVLM(VLMBackend):
         cached = payload.get("_ollama_response")
         if cached is not None:
             return cached
+        response = self._generate(_prompt_text(payload), payload["images"], num_predict=16)
+        payload["_ollama_response"] = response
+        return response
+
+    def _generate(self, text, images, num_predict):
         body = {
             "model": self.model,
             "stream": False,
-            "options": {"temperature": 0, "num_predict": 16, "num_ctx": self.num_ctx},
-            "messages": [{"role": "user", "content": _prompt_text(payload),
-                          "images": [_png_base64(image) for image in payload["images"]]}],
+            "options": {"temperature": 0, "num_predict": num_predict, "num_ctx": self.num_ctx},
+            "messages": [{"role": "user", "content": text,
+                          "images": [_png_base64(image) for image in images]}],
         }
         if self._can_think:
-            body["think"] = False  # else a 16-token cap is spent on reasoning
+            body["think"] = False  # else a short token cap is spent on reasoning
         response = self._request("/api/chat", body)
-        if response.get("prompt_eval_count", 0) >= self.num_ctx - 16:
+        if response.get("prompt_eval_count", 0) >= self.num_ctx - num_predict:
             print("WARNING: ollama prompt reached num_ctx=%d and was likely truncated "
                   "(images dropped) — raise num_ctx" % self.num_ctx, file=sys.stderr)
-        payload["_ollama_response"] = response
         return response
 
     def answer(self, payload):
@@ -245,6 +284,12 @@ class OllamaVLM(VLMBackend):
 
     def count_tokens(self, payload):
         return self._chat(payload).get("prompt_eval_count")
+
+    def locate(self, payload):
+        response = self._generate(self.GROUND_PROMPT % payload["question"], payload["images"][:1],
+                                  num_predict=200)
+        return (_parse_boxes(response["message"]["content"], self.grounding_scale),
+                response.get("prompt_eval_count"))
 
 
 _BACKENDS = {"mock": MockVLM, "claude": ClaudeVLM, "ollama": OllamaVLM}

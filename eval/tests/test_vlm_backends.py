@@ -9,7 +9,7 @@ import urllib.error
 from unittest import mock
 
 import vlm_backends
-from vlm_backends import OllamaVLM, _parse_letter
+from vlm_backends import MockVLM, OllamaVLM, _parse_boxes, _parse_letter
 
 try:
     from PIL import Image
@@ -97,6 +97,36 @@ class TestOllamaVLM(unittest.TestCase):
     def test_host_from_environment(self):
         with mock.patch.dict(os.environ, {"OLLAMA_HOST": "10.0.0.5:11434"}):
             self.assertEqual(self.backend(FakeOllama()).host, "http://10.0.0.5:11434")
+
+
+@unittest.skipIf(Image is None, "needs PIL (eval venv)")
+class TestLocate(unittest.TestCase):
+    def test_ollama_grounding_reply_becomes_fractions(self):
+        fake = FakeOllama(reply='```json\n[{"bbox_2d": [277, 81, 366, 198], "label": "glove"}]\n```',
+                          prompt_eval_count=263)
+        with mock.patch.object(vlm_backends.urllib.request, "urlopen", fake):
+            boxes, tokens = OllamaVLM().locate({"images": [Image.new("RGB", (512, 341))],
+                                                "question": "What colour is the glove?"})
+        self.assertEqual(tokens, 263)
+        self.assertEqual(len(boxes), 1)
+        for got, want in zip(boxes[0], (0.277, 0.081, 0.366, 0.198)):
+            self.assertAlmostEqual(got, want)
+        self.assertIn("glove", fake.chats[0]["messages"][0]["content"])
+        self.assertEqual(fake.chats[0]["options"]["num_predict"], 200)
+
+    def test_mock_grounds_perfectly_from_the_oracle(self):
+        boxes, tokens = MockVLM().locate({"oracle": {"target_boxes": [(0.1, 0.2, 0.3, 0.4)]}})
+        self.assertEqual(boxes, [(0.1, 0.2, 0.3, 0.4)])
+        self.assertIsNone(tokens)
+
+
+class TestParseBoxes(unittest.TestCase):
+    def test_every_four_number_group(self):
+        text = '[{"bbox_2d": [100, 200, 300, 400]}, {"bbox_2d": [900, 900, 800, 1100]}]'
+        self.assertEqual(_parse_boxes(text, 1000), [(0.1, 0.2, 0.3, 0.4), (0.8, 0.9, 0.9, 1.0)])
+
+    def test_degenerate_and_malformed_dropped(self):
+        self.assertEqual(_parse_boxes("[1, 2, 3] [5, 5, 5, 9] no boxes", 1000), [])
 
 
 class TestParseLetter(unittest.TestCase):

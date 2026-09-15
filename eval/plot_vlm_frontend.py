@@ -14,6 +14,8 @@ STYLE = {
     "full-res": {"color": "#2a78d6", "marker": "o", "label": "full-res (ceiling)"},
     "uniform": {"color": "#e34948", "marker": "s", "label": "uniform downsample"},
     "fovea": {"color": "#1baf7a", "marker": "^", "label": "attention fovea (ours)"},
+    "fovea-oracle": {"color": "#4a3aa7", "marker": "D", "label": "oracle crops (upper bound)"},
+    "fovea-td": {"color": "#eda100", "marker": "v", "label": "attention + top-down (H5×H6)"},
 }
 TEXT_PRIMARY, TEXT_SECONDARY, GRID = "#0b0b0b", "#52514e", "#e6e5e1"
 
@@ -38,7 +40,7 @@ def main():
     import matplotlib.pyplot as plt
 
     fig, ax = plt.subplots(figsize=(6.2, 4.4), facecolor="#fcfcfb")
-    for arm in ("full-res", "uniform", "fovea"):
+    for arm in [a for a in STYLE if a in summary]:
         s = summary[arm]
         x = max(s["mean_token_fraction"], 0.01)
         y = s["accuracy"]
