@@ -89,7 +89,7 @@ if(Python3_Interpreter_FOUND)
     # Python entry points answer --help too (CLI contract, CLAUDE.md).
     foreach(script tools/fetch_models.py eval/gated_recognition.py eval/plot_gated_recognition.py
             eval/priority_search.py eval/coco_search.py eval/plot_priority_search.py
-            eval/vlm_frontend.py eval/plot_vlm_frontend.py)
+            eval/vlm_frontend.py eval/plot_vlm_frontend.py eval/vlm_video.py eval/vlm_video_davis.py)
         get_filename_component(script_name ${script} NAME_WE)
         add_test(NAME help_${script_name}
             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/${script} --help)
@@ -165,6 +165,18 @@ if(Python3_Interpreter_FOUND)
         # (it would make CTest ignore the exit code). FAIL_REGULAR_EXPRESSION
         # catches an unraised traceback too.
         set_tests_properties(vlm_frontend_smoke PROPERTIES
+            FAIL_REGULAR_EXPRESSION "check failed;Traceback;Error")
+
+        # M19 video front-end, smoke: one small tagged scene through both
+        # stage-2 behaviors and every arm on the mock (legibility oracle).
+        # --check is plumbing, not the hypothesis: the oracle crops read every
+        # code and the budget-matched frames don't.
+        add_test(NAME vlm_video_smoke
+            COMMAND ${EVAL_PYTHON} ${CMAKE_SOURCE_DIR}/eval/vlm_video.py
+                    --binary $<TARGET_FILE:attention> --backend mock --seeds 1 --frames 16 --check
+                    --out ${CMAKE_BINARY_DIR}/vlm_video_smoke
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+        set_tests_properties(vlm_video_smoke PROPERTIES
             FAIL_REGULAR_EXPRESSION "check failed;Traceback;Error")
         add_test(NAME eval_report_smoke
             COMMAND ${EVAL_PYTHON} -m attention_eval.report

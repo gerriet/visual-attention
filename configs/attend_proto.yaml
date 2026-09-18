@@ -1,0 +1,42 @@
+# configs/attend_identity.yaml + proto-object segmentation (roadmap M19,
+# opt-in): each salient cluster becomes the object under it — seeded where it
+# stands out most from the frame's median colour, grown by colour, background
+# clusters (motion ghosts, symmetry responses between objects) dropped,
+# touching objects separated. Suits flat-coloured objects (the M19 synthetic
+# scenes: off-object fixations 0.20 -> 0.01). On textured real objects
+# (DAVIS) the colour fill traces only a homogeneous part and crops cover less
+# of the object — use attend_identity.yaml there.
+#
+#   ./attention --attend <dir|video> --config configs/attend_proto.yaml \
+#       --behavior object-ior --emit-scanpath results/scanpath.json
+
+pipeline:
+  fusion: weighted-sum
+  selection: nms
+
+features:
+  color:
+    weight: 1.0
+  eccentricity:
+    weight: 1.0
+  symmetry:
+    weight: 1.0
+  onset:
+    weight: 1.0
+  intensity:
+    enabled: false
+  orientation:
+    enabled: false
+
+# Second stage (--attend). Every key is optional; absent keys keep the
+# AttentionSystem / ObjectFileStore defaults (the thesis behaviour).
+attention_system:
+  proto_objects: true
+  object_files:
+    motion_prediction: true
+    appearance_matching: true
+    persistent_identity: true
+
+output:
+  output_dir: "results/"
+  display: false

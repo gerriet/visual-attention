@@ -1,0 +1,38 @@
+# configs/attend.yaml + persistent object identity (roadmap M19, opt-in):
+# object files that re-identify after gaps (colour look-alikes anywhere,
+# otherwise inside a gate that widens with the time unseen; a clearly
+# different colour is never the same object) and never age out — the
+# identity-keyed memory object-based IOR and the video token cache need.
+#
+#   ./attention --attend <dir|video> --config configs/attend_identity.yaml \
+#       --behavior object-ior --emit-scanpath results/scanpath.json
+
+pipeline:
+  fusion: weighted-sum
+  selection: nms
+
+features:
+  color:
+    weight: 1.0
+  eccentricity:
+    weight: 1.0
+  symmetry:
+    weight: 1.0
+  onset:
+    weight: 1.0
+  intensity:
+    enabled: false
+  orientation:
+    enabled: false
+
+# Second stage (--attend). Every key is optional; absent keys keep the
+# AttentionSystem / ObjectFileStore defaults (the thesis behaviour).
+attention_system:
+  object_files:
+    motion_prediction: true
+    appearance_matching: true
+    persistent_identity: true
+
+output:
+  output_dir: "results/"
+  display: false

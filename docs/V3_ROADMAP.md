@@ -451,13 +451,19 @@ latency / waste for context. Honesty: publish the regimes where space-IOR ties
 or wins (slow scenes, few objects) and the cost of label switches.
 Deliverable: `docs/VLM_VIDEO.md`.
 
-**Status (2026-09-15): brief agreed; v1 (synthetic) in progress on
-`module/video-token-cache`.** First mock finding: with a perfect tracker,
-identity-keyed crops deliver ~0.97 of the codes vs ~0.5 for location-keyed
-ones at the same budget — the lever is real — but the thesis object files lose
-it to segmentation fragments (a moving disk splits into onset crescents) and
-revival past the fixed radius; opt-in persistent identity and segmentation
-settings are the fix in progress.
+**Status (2026-09-15): v1 done on `module/video-token-cache` (unmerged).**
+The thesis object files lost identity to segmentation — saliency on moving
+disks is hollow onset rings plus symmetry responses between objects — so
+opt-in **proto-object segmentation** (seed by figure-ground colour contrast,
+grow by colour, drop background clusters) and **persistent identity** were
+added. At a code size calibrated to the VLM (8 px: readable from a native
+crop, at chance from the downsampled views), **with a real VLM (local Qwen,
+10 scenes, same token budget): identity-keyed crops 0.95, location-keyed
+crops 0.80, budget-matched frames 0.27 (chance 0.25)** — H7's effect;
+proto-objects carry it (thesis segmentation: 0.45 vs 0.52). DAVIS-2017 (30
+sequences, categories hand-labelled): every arm 0.96–0.98 at 480p — no
+separation; identity on real, textured video remains the open problem. Full
+story: `docs/VLM_VIDEO.md`.
 
 ## Datasets
 

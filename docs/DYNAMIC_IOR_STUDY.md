@@ -184,6 +184,39 @@ but did not, on its own, flip the exploration comparison.
 - **Rigorous statistics**: ≥20 seeds/cell with bootstrap CIs (here: ≤5 seeds).
 - **Real video**: DAVIS-2017 masks for exact "which object attended".
 
+## Persistent identity (M19): object-IOR draws level, and ahead at speed
+
+M19 (the video token cache, `docs/VLM_VIDEO.md`) needs identity-keyed memory,
+which motivated opt-in **persistent identity** in the object-file store
+(`attention_system.object_files.persistent_identity`, shipped as
+`configs/attend_identity.yaml`): an unmatched cluster revives the inactive file
+with the lowest position + colour cost inside a gate that widens with the time
+unseen — or anywhere, if it is a clear colour look-alike; a clearly different
+colour is never the same object; inactive files never age out. The thesis path
+is unchanged by default. Rerunning this study's three regimes, 6 seeds each
+(tracking aids on in both columns):
+
+| Regime | arm | aids: latency / waste | persistent identity: latency / waste |
+|---|---|---|---|
+| standard (4 obj, speed 6, occlusion) | space-IOR | 5.54 / 0.145 | 5.54 / 0.145 |
+| | object-IOR | 4.54 / 0.113 | 4.63 / 0.123 |
+| fast (speed 40, `ior_radius` 20) | space-IOR | 5.58 / 0.088 | 5.58 / 0.088 |
+| | object-IOR | 6.88 / 0.185 | **5.21** / 0.098 |
+| occlusion (speed 20, length 10, `ior_radius` 18) | space-IOR | 5.63 / 0.101 | 5.63 / 0.101 |
+| | object-IOR | 7.29 / 0.164 | **5.63** / 0.115 |
+
+Coverage is 1.00 for both IOR arms throughout; space-IOR is unaffected (it
+doesn't inhibit by identity). Persistent identity takes object-IOR from clearly
+worse to *ahead* of space-IOR on latency at high speed and level under
+occlusion, with waste close to space-IOR's — the first regime map in which the
+thesis's object-based advantage shows. Six seeds without CIs: a direction, not
+yet a result. Identity is still far from stable (≈ 4.5 distinct labels per
+attended object): the remaining loss is in *segmentation*, where a moving disk
+falls apart into onset crescents that each get an object file. The opt-in
+segmentation settings that address it (`segment_close`,
+`max_cluster_fraction`) are documented with the M19 findings in
+`docs/VLM_VIDEO.md`.
+
 ## Artifacts
 
 - `tools/make_dynamic_scene.py` — scene + `gt.json` generator (`dynamic-scene-gt/v1`).

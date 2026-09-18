@@ -45,6 +45,44 @@ PERSON_OBJECTS = {
     "parkour": [1],
 }
 
+# Hand-curated: the category of every annotated object in the 30 val
+# sequences (verified against mask overlays of the frame showing the most ids,
+# 2026-09; M19's video front-end asks which categories a video shows). The
+# small ones — phones, rope, kite, box, gun — are where native-resolution
+# crops should matter.
+OBJECT_CATEGORIES = {
+    "bike-packing": {1: "bicycle", 2: "person"},
+    "blackswan": {1: "swan"},
+    "bmx-trees": {1: "bicycle", 2: "person"},
+    "breakdance": {1: "person"},
+    "camel": {1: "camel"},
+    "car-roundabout": {1: "car"},
+    "car-shadow": {1: "car"},
+    "cows": {1: "cow"},
+    "dance-twirl": {1: "person"},
+    "dog": {1: "dog"},
+    "dogs-jump": {1: "dog", 2: "dog", 3: "person"},
+    "drift-chicane": {1: "car"},
+    "drift-straight": {1: "car"},
+    "goat": {1: "goat"},
+    "gold-fish": {1: "fish", 2: "fish", 3: "fish", 4: "fish", 5: "fish"},
+    "horsejump-high": {1: "horse", 2: "person"},
+    "india": {1: "person", 2: "person", 3: "person"},
+    "judo": {1: "person", 2: "person"},
+    "kite-surf": {1: "kite", 2: "surfboard", 3: "person"},
+    "lab-coat": {1: "phone", 2: "phone", 3: "person", 4: "person", 5: "person"},
+    "libby": {1: "dog"},
+    "loading": {1: "person", 2: "box", 3: "person"},
+    "mbike-trick": {1: "person", 2: "motorbike"},
+    "motocross-jump": {1: "person", 2: "motorbike"},
+    "paragliding-launch": {1: "backpack", 2: "person", 3: "paraglider"},
+    "parkour": {1: "person"},
+    "pigs": {1: "pig", 2: "pig", 3: "pig"},
+    "scooter-black": {1: "person", 2: "scooter"},
+    "shooting": {1: "gun", 2: "person", 3: "rope"},
+    "soapbox": {1: "soapbox", 2: "person", 3: "person"},
+}
+
 
 def available(root=DEFAULT_ROOT):
     root = Path(root)
