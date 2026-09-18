@@ -329,19 +329,19 @@ Small-object categories (5 sequences, 7 questions, with the perfect-tracker arms
 | perfect-tracker crops | 0.86 | 0.88 | 575 |
 | oracle | 0.86 | 1.00 | 558 |
 
-All categories (28 of 30 sequences — two lost to memory pressure — 41 questions):
+All categories (all 30 sequences, 46 questions):
 
-| Arm | accuracy | objects delivered | real tokens / question |
-|---|---|---|---|
-| frames-full (1500 px) | 0.98 | 1.00 | 4923 |
-| frames-uniform | 0.98 | 0.98 | 557 |
-| space-ior | 0.95 | 0.95 | 544 |
-| object-ior | 0.98 | 0.95 | 539 |
-| oracle | 0.98 | 1.00 | 432 |
+| Arm | accuracy | objects delivered | real tokens / question | token fraction |
+|---|---|---|---|---|
+| frames-full (1500 px) | 0.978 | 1.00 | 4889 | 1.00 |
+| frames-uniform | 0.978 | 0.98 | 564 | 0.11 |
+| space-ior | 0.957 | 0.93 | 552 | 0.09 |
+| object-ior | 0.978 | 0.93 | 548 | 0.09 |
+| oracle | 0.978 | 1.00 | 436 | 0.07 |
 
 **The prediction as written is refuted:** at ~8× the pixels per side, every
-budget arm still answers alike, and budget-matched downsampled frames are as
-good as crops at a ninth of the full-frame tokens. The reason is the *task*,
+budget arm still answers alike — downsampled frames and object-file crops both
+reach 0.978, the full-frame reference included, at a tenth of its tokens. The reason is the *task*,
 not the resolution: "which of these can be seen in the video?" only needs
 category gist, which survives downsampling. In the small-object run six of
 seven questions are answered by every arm; the one miss (the box in *loading*)
