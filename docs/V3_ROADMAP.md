@@ -463,7 +463,8 @@ crops 0.80, budget-matched frames 0.27 (chance 0.25)** — H7's effect;
 proto-objects carry it (thesis segmentation: 0.45 vs 0.52). DAVIS-2017 (30
 sequences, categories hand-labelled): every arm 0.96–0.98 at 480p — no
 separation; identity on real, textured video remains the open problem. Full
-story: `docs/VLM_VIDEO.md`.
+story: `docs/VLM_VIDEO.md`; where this stands for a publication (and what a
+reviewer would object to): `docs/PAPER_READINESS.md`.
 
 ## Datasets
 

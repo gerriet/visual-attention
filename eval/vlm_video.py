@@ -422,6 +422,8 @@ def main():
     ap.add_argument("--out", default="results/vlm_video")
     ap.add_argument("--backend", default="ollama", help="ollama (default; local) | claude | mock")
     ap.add_argument("--model", default=None, help="backend model (defaults as in vlm_frontend.py)")
+    ap.add_argument("--num-ctx", type=int, default=None,
+                    help="ollama context size (default 8192): raise it if a frames arm's images exceed it")
     ap.add_argument("--arms", default=",".join(DEFAULT_ARMS),
                     help="comma list of arms (default: %s)" % ",".join(DEFAULT_ARMS))
     ap.add_argument("--gt-identity", action="store_true",
@@ -464,7 +466,10 @@ def main():
     unknown = set(a.strip() for a in args.arms.split(",")) - set(ARMS)
     if unknown:
         sys.exit("unknown arm(s): %s (have: %s)" % (", ".join(sorted(unknown)), ", ".join(ARMS)))
-    backend = create_backend(args.backend, **({"model": args.model} if args.model else {}))
+    options = {"model": args.model} if args.model else {}
+    if args.num_ctx and args.backend == "ollama":
+        options["num_ctx"] = args.num_ctx
+    backend = create_backend(args.backend, **options)
 
     os.makedirs(args.out, exist_ok=True)
     results_path = os.path.join(args.out, "results.json")

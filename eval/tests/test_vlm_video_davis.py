@@ -88,5 +88,22 @@ class TestCropsAndQuestions(unittest.TestCase):
             self.assertEqual(sum(c in ("dog", "phone") for c in q["choices"]), 1)
 
 
+class TestResolution(unittest.TestCase):
+    def test_paths_follow_the_resolution(self):
+        import tempfile
+        from pathlib import Path
+
+        from datasets import davis2017
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for part in ("JPEGImages", "Annotations"):
+                (root / part / "Full-Resolution" / "judo").mkdir(parents=True)
+            self.assertTrue(davis2017.available(root, "Full-Resolution"))
+            self.assertFalse(davis2017.available(root))  # 480p not unpacked here
+            self.assertEqual(davis2017.frames_dir("judo", root, "Full-Resolution").name, "judo")
+            self.assertIn("Full-Resolution", str(davis2017.frames_dir("judo", root, "Full-Resolution")))
+            self.assertIn("480p", str(davis2017.frames_dir("judo", root)))
+
+
 if __name__ == "__main__":
     unittest.main()
