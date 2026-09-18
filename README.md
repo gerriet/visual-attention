@@ -143,8 +143,10 @@ and reported.
 - **Object files as a video token cache (H7).** At a matched token budget on
   synthetic video, with a local open-weights VLM: crops keyed by *object file*
   0.95, by *location* 0.80, budget-matched whole frames 0.27 (chance 0.25).
-  On DAVIS-2017 at 480p every arm ties — the objects are large enough for all
-  of them. [VLM_VIDEO.md](docs/VLM_VIDEO.md)
+  On DAVIS-2017 every arm ties, at 480p *and* at full resolution: the
+  "which of these appears?" question survives downsampling, so the budget
+  never binds. Testing this on real video needs questions about fine detail.
+  [VLM_VIDEO.md](docs/VLM_VIDEO.md)
 
 Where this stands for a publication, and what a reviewer would object to:
 [PAPER_READINESS.md](docs/PAPER_READINESS.md).
