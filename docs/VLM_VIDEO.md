@@ -273,9 +273,98 @@ in *scooter-black* (every arm) and a phone in *lab-coat* (both attention arms;
 too small for their crops). DAVIS at this resolution is a real-video check of
 the machinery, not a test of H7.
 
+## The harder real-video test (run 2026-09-18 — prediction refuted)
+
+DAVIS at 480p cannot test H7: its objects are large enough that every arm —
+including frames downsampled to a fifth of the tokens — sees them. The same
+sequences exist at **full resolution** (up to 4K, same masks, same
+categories), which is the regime the hypothesis is about: at a matched
+budget a whole frame shrinks by ~8× per side, and the small objects (phone,
+rope, kite, gun, box, backpack, surfboard) fall below what the VLM can read,
+while a native-resolution crop of an attended object keeps them legible.
+
+Prepared, so the run is one command when a VLM is available again:
+
+- `eval/datasets/davis2017.py` takes a `resolution` ("480p" |
+  "Full-Resolution"); the download command is in its docstring (~4 GB, unpacks
+  into the same tree).
+- `eval/vlm_video_davis.py` gains `--resolution` and `--only-categories`.
+
+```bash
+# the crux run: small-object questions at full resolution
+eval/vlm_video_davis.py --resolution Full-Resolution --count-tokens \
+    --config configs/attend_identity.yaml \
+    --only-categories phone,rope,kite,gun,box,backpack,surfboard \
+    --crop-side 336 --global-side 512 --full-max-side 2000 --out results/m19_davis_4k
+# model-free first (no VLM needed), same settings with --backend mock --gt-identity
+```
+
+**Prediction, written down before the run.** At a matched budget: crops
+chosen per object file deliver the small objects and answer their questions
+clearly better than budget-matched downsampled frames, and at least as well
+as location-keyed crops; the oracle arm stays near 1.0 and the gap to it is
+the tracker's loss. **What would refute it:** budget-matched frames answering
+as well as the crop arms (as at 480p) — the front-end then buys nothing on
+real video and paper A's claim stays synthetic (`docs/PAPER_READINESS.md`).
+**What to watch:** identity on real video is the known weak point (13–16
+labels per attended object at 480p); if the crop arms lose, check first
+whether it is the tracker (compare against the perfect-tracker arms) or the
+segmentation (crop coverage).
+
+### Outcome: the question, not the resolution, was the limit
+
+Run with local Qwen; the reference arm is capped at 1500 px per frame, because
+four full-resolution frames exceed the model's context — itself the reason a
+front-end is interesting, but it means "frames-full" is already a practical
+ceiling, not native 4K.
+
+Small-object categories (5 sequences, 7 questions, with the perfect-tracker arms):
+
+| Arm | accuracy | objects delivered | real tokens / question |
+|---|---|---|---|
+| frames-full (1500 px) | 1.00 | 1.00 | 4747 |
+| frames-uniform | 0.86 | 0.94 | 713 |
+| space-ior | 0.86 | 0.76 | 710 |
+| object-ior | 0.86 | 0.76 | 710 |
+| perfect-tracker crops | 0.86 | 0.88 | 575 |
+| oracle | 0.86 | 1.00 | 558 |
+
+All categories (28 of 30 sequences — two lost to memory pressure — 41 questions):
+
+| Arm | accuracy | objects delivered | real tokens / question |
+|---|---|---|---|
+| frames-full (1500 px) | 0.98 | 1.00 | 4923 |
+| frames-uniform | 0.98 | 0.98 | 557 |
+| space-ior | 0.95 | 0.95 | 544 |
+| object-ior | 0.98 | 0.95 | 539 |
+| oracle | 0.98 | 1.00 | 432 |
+
+**The prediction as written is refuted:** at ~8× the pixels per side, every
+budget arm still answers alike, and budget-matched downsampled frames are as
+good as crops at a ninth of the full-frame tokens. The reason is the *task*,
+not the resolution: "which of these can be seen in the video?" only needs
+category gist, which survives downsampling. In the small-object run six of
+seven questions are answered by every arm; the one miss (the box in *loading*)
+is missed by the oracle too — Qwen fails to name it from a crop of the true
+object, so that is recognition, not attention.
+
+What the run does show, consistently with 480p: the crop arms deliver *fewer*
+objects than downsampled frames (0.76 vs 0.94 on the small-object set, 0.95 vs
+0.98 overall) while a perfect tracker reaches 0.88 and the oracle 1.00 — so
+attention, not the token budget, is the binding constraint on real video
+(14.3 labels per attended object, 63% of fixations off any annotated object).
+
+**Consequence.** Testing H7 on real video needs questions whose answer
+requires detail that downsampling destroys — reading a label or a number, an
+attribute of a small object, counting small instances. DAVIS ships no such
+annotations; they would have to be authored per sequence and verified against
+crops, as the categories were. Until then the H7 evidence stays synthetic, and
+`docs/PAPER_READINESS.md` reflects that.
+
 ## Next
 
-1. **Sweeps:** more seeds, speed × object count × K, and code sizes around
+1. **The crux run above**, once a VLM is available.
+2. **Sweeps:** more seeds, speed × object count × K, and code sizes around
    the VLM's reading threshold — the effect should grow with busier scenes
    and smaller detail.
 2. **Identity on real video** is the open problem: stronger appearance than

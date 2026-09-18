@@ -58,7 +58,8 @@ ARMS = ("frames-full", "frames-uniform", "space-ior", "space-ior-gtid", "object-
 DEFAULT_ARMS = ("frames-full", "frames-uniform", "space-ior", "object-ior", "oracle")
 BEHAVIORS = {"space-ior": "spatial-ior", "object-ior": "object-ior"}
 MASK_OVERLAP = 0.6  # share of an object's mask a view must show
-SMALL_OBJECT_PX = 64  # median mask short side (native px) below which an object counts as small
+SMALL_OBJECT_FRACTION = 0.13  # median mask short side below this share of the frame's short side = small
+                              # (relative, so "small" means the same at 480p and at 4K)
 
 
 def _pil():
@@ -69,10 +70,10 @@ def _pil():
 class Sequence:
     """One DAVIS sequence: native frames and per-frame object masks, on demand."""
 
-    def __init__(self, name, root):
+    def __init__(self, name, root, resolution="480p"):
         from datasets import davis2017
         self.name = name
-        self.items = list(davis2017.iter_frames(name, root))
+        self.items = list(davis2017.iter_frames(name, root, resolution))
         self.categories = davis2017.OBJECT_CATEGORIES[name]
         self._load_masks = davis2017.load_masks
         self._frames, self._masks = {}, {}
@@ -263,15 +264,16 @@ def view_shows(seq, view, oid, min_px):
 
 
 def small_objects(seq):
-    """Objects whose median mask short side (native px) is below SMALL_OBJECT_PX."""
+    """Objects whose median mask short side is a small share of the frame."""
     import statistics
+    limit = SMALL_OBJECT_FRACTION * min(seq.size)
     sides = {}
     for f in range(0, seq.n_frames, 5):
         for oid, mask in seq.masks(f).items():
             box = mask_box(mask)
             if box:
                 sides.setdefault(oid, []).append(min(box[2] - box[0], box[3] - box[1]))
-    return {oid for oid, s in sides.items() if statistics.median(s) < SMALL_OBJECT_PX}
+    return {oid for oid, s in sides.items() if statistics.median(s) < limit}
 
 
 def build_arms(seq, picks, arms_wanted, backend, params):
@@ -326,7 +328,7 @@ def vocabulary():
 
 
 def run_sequence(backend, name, args):
-    seq = Sequence(name, args.root)
+    seq = Sequence(name, args.root, args.resolution)
     out_dir = os.path.join(args.out, name)
     scale = downscale(seq, os.path.join(out_dir, "proc"), args.proc_max_side)
     tracking = () if args.no_tracking_aids else ("--motion-prediction", "--appearance-matching")
@@ -352,7 +354,11 @@ def run_sequence(backend, name, args):
     arms = build_arms(seq, picks, wanted, backend, params)
 
     small = small_objects(seq)
-    questions = make_questions(seq.categories, vocabulary(), zlib.crc32(name.encode()))
+    asked = seq.categories
+    if args.only_categories:
+        wanted_categories = {c.strip() for c in args.only_categories.split(",")}
+        asked = {oid: c for oid, c in seq.categories.items() if c in wanted_categories}
+    questions = make_questions(asked, vocabulary(), zlib.crc32(name.encode()))
     record = {"sequence": name, "objects": len(seq.objects()), "small_objects": sorted(small), "k": k,
               "scanpath": scan, "arms": {}}
     for arm, views in arms.items():
@@ -445,12 +451,19 @@ def main():
     ap.add_argument("--root", default=os.path.join(os.path.dirname(HERE), "data", "DAVIS"),
                     help="DAVIS-2017 root (480p layout)")
     ap.add_argument("--sequences", default=None, help="comma list (default: every val sequence)")
+    ap.add_argument("--resolution", default="480p", choices=("480p", "Full-Resolution"),
+                    help="DAVIS image set: 480p, or Full-Resolution (up to 4K — the regime where crops should pay)")
+    ap.add_argument("--only-categories", default=None,
+                    help="ask only about these categories (comma list, e.g. phone,rope,kite,gun,box); "
+                         "sequences with none of them are skipped")
     ap.add_argument("--limit", type=int, default=0, help="max sequences (0 = all)")
     ap.add_argument("--binary", default="build/attention")
     ap.add_argument("--config", default="configs/attend.yaml", help="pipeline config for --attend")
     ap.add_argument("--out", default="results/vlm_video_davis")
     ap.add_argument("--backend", default="ollama", help="ollama (default; local) | claude | mock")
     ap.add_argument("--model", default=None, help="backend model (defaults as in vlm_frontend.py)")
+    ap.add_argument("--num-ctx", type=int, default=None,
+                    help="ollama context size (default 8192): raise it if a frames arm's images exceed it")
     ap.add_argument("--arms", default=",".join(DEFAULT_ARMS),
                     help="comma list of arms (default: %s)" % ",".join(DEFAULT_ARMS))
     ap.add_argument("--gt-identity", action="store_true",
@@ -475,17 +488,21 @@ def main():
 
     if not os.path.exists(args.binary):
         sys.exit("binary not found: %s (build first: cmake --build build)" % args.binary)
-    if not davis2017.available(args.root):
-        sys.exit("DAVIS-2017 not found under %s — see eval/datasets/davis2017.py" % args.root)
+    if not davis2017.available(args.root, args.resolution):
+        sys.exit("DAVIS-2017 (%s) not found under %s — see eval/datasets/davis2017.py"
+                 % (args.resolution, args.root))
     if args.gt_identity:
         args.arms += ",space-ior-gtid,object-ior-gtid"
     unknown = set(a.strip() for a in args.arms.split(",")) - set(ARMS)
     if unknown:
         sys.exit("unknown arm(s): %s (have: %s)" % (", ".join(sorted(unknown)), ", ".join(ARMS)))
-    names = args.sequences.split(",") if args.sequences else davis2017.sequences(args.root, "val")
+    names = args.sequences.split(",") if args.sequences else davis2017.sequences(args.root, "val", args.resolution)
     if args.limit:
         names = names[:args.limit]
-    backend = create_backend(args.backend, **({"model": args.model} if args.model else {}))
+    options = {"model": args.model} if args.model else {}
+    if args.num_ctx and args.backend == "ollama":
+        options["num_ctx"] = args.num_ctx
+    backend = create_backend(args.backend, **options)
 
     os.makedirs(args.out, exist_ok=True)
     results_path = os.path.join(args.out, "results.json")
@@ -496,11 +513,16 @@ def main():
     for name in names:
         if name in done:
             continue
-        records.append(run_sequence(backend, name, args))
+        record = run_sequence(backend, name, args)
+        if not record["arms"][next(iter(record["arms"]))]["questions"]:
+            continue  # --only-categories: nothing to ask about here
+        records.append(record)
         with open(results_path, "w") as fh:  # after every sequence, for --resume
             json.dump(records, fh, indent=2)
         print("  %s done" % name, file=sys.stderr)
 
+    if not records:
+        sys.exit("no sequences to score (--only-categories %s matched nothing)" % args.only_categories)
     summary = summarize(records)
     print(format_table(summary))
     with open(os.path.join(args.out, "summary.json"), "w") as fh:

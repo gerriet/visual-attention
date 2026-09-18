@@ -33,6 +33,7 @@ import json
 import os
 import re
 import sys
+import urllib.error
 import urllib.request
 
 # One visual token per ~28x28 px patch — a Qwen2-VL-style proxy (14px ViT
@@ -250,8 +251,14 @@ class OllamaVLM(VLMBackend):
         data = json.dumps(body).encode() if body is not None else None
         request = urllib.request.Request(self.host + path, data=data,
                                          headers={"Content-Type": "application/json"})
-        with urllib.request.urlopen(request, timeout=self.timeout) as response:
-            return json.load(response)
+        try:
+            with urllib.request.urlopen(request, timeout=self.timeout) as response:
+                return json.load(response)
+        except urllib.error.HTTPError as e:
+            # Ollama explains itself in the body (a prompt longer than num_ctx
+            # comes back as 400) — a bare HTTPError hides that.
+            raise RuntimeError("ollama %s: HTTP %d %s — %s"
+                               % (path, e.code, e.reason, e.read().decode(errors="replace")[:500])) from e
 
     def _chat(self, payload):
         """One /api/chat round trip per payload, memoized on it: answer() and
