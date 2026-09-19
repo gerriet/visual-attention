@@ -340,6 +340,7 @@ def run_item(backend, image, fixations, item, params):
             real = real + grounding["real_tokens"] if real is not None and grounding["real_tokens"] else real
         rows[name] = {
             "correct": int(chosen is not None and chosen == item["answer"]),
+            "letter": letter,  # with item.answer_letter: audits position bias after the fact
             "tokens": tokens,
             "token_fraction": tokens / full_tokens if full_tokens else 0.0,
             "real_tokens": real,
@@ -352,6 +353,8 @@ def run_item(backend, image, fixations, item, params):
     rows["item"] = {
         "question_id": item.get("question_id"),
         "category": item.get("category"),
+        "answer_letter": item.get("answer_letter"),
+        "n_choices": len(item["choices"]),  # chance differs per item (V*Bench has 2-way questions)
         "n_fixations": len(fixations),
         "target_rank": target_fixation_rank(fixations, boxes, params["fovea_side"], image.size),
     }
@@ -419,6 +422,10 @@ def summarize(results):
         if grounded:
             row["grounded_rate"] = _mean([int(x) for x in grounded])
         summary[arm] = row
+    sizes = [r["item"]["n_choices"] for r in results if r["item"].get("n_choices")]
+    if sizes:
+        # Guessing accuracy for this item mix (V*Bench mixes 2- and 4-way questions).
+        summary["chance"] = _mean([1.0 / n for n in sizes])
     boxed = [r for r in results if r["fovea"].get("crop_hit") is not None]
     if boxed:
         summary["targets"] = _rank_summary([r["item"]["target_rank"] for r in boxed])
@@ -453,6 +460,8 @@ def format_table(summary):
         extra += "  %9.3f" % s["delivered_rate"] if have_boxes else ""
         lines.append("%-12s %10.3f  [%5.3f,%5.3f] %16.3f%s" % (
             arm, s["accuracy"], s["accuracy_ci"][0], s["accuracy_ci"][1], s["mean_token_fraction"], extra))
+    if "chance" in summary:
+        lines.append("chance (guessing, this item mix): %.2f" % summary["chance"])
     hits = ["%s %.2f" % (a, summary[a]["crop_hit_rate"]) for a in arms if "crop_hit_rate" in summary[a]]
     if hits:
         lines.append("crop-hit (a crop covers the target): " + ", ".join(hits))
@@ -552,6 +561,13 @@ def main():
         if args.resume and os.path.exists(results_path):
             with open(results_path) as fh:
                 results = json.load(fh)
+            # Rows from before the answer letter was recorded predate the
+            # HR-Bench option re-ordering (correct option always "A"): rescore.
+            stale = [r for r in results if "answer_letter" not in r["item"]]
+            if stale:
+                print("resuming: dropping %d rows scored before option order was recorded" % len(stale),
+                      file=sys.stderr)
+                results = [r for r in results if "answer_letter" in r["item"]]
             done = {r["item"]["question_id"] for r in results}
             print("resuming: %d items already scored in %s" % (len(done), results_path), file=sys.stderr)
         for n, item in enumerate(items):

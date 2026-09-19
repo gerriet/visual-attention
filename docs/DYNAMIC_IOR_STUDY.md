@@ -205,6 +205,12 @@ is unchanged by default. Rerunning this study's three regimes, 6 seeds each
 | occlusion (speed 20, length 10, `ior_radius` 18) | space-IOR | 5.63 / 0.101 | 5.63 / 0.101 |
 | | object-IOR | 7.29 / 0.164 | **5.63** / 0.115 |
 
+(The "aids" column differs from the earlier sections — there space-IOR led in
+every regime, here object-IOR already leads in the standard one. The seed sets
+differ (≤ 5 seeds then, 6 here) and neither has intervals; differences of this
+size are within what a handful of seeds can produce, which is the reason the
+confirmatory run is needed.)
+
 Coverage is 1.00 for both IOR arms throughout; space-IOR is unaffected (it
 doesn't inhibit by identity). Persistent identity takes object-IOR from clearly
 worse to *ahead* of space-IOR on latency at high speed and level under

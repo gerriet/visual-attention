@@ -2,8 +2,8 @@
 
 *Drafted 2026-07-10; sharpened the same day against `docs/RESEARCH_POSITIONING.md`
 (priority-map framing, scanpath-variability scoring, and the VLM front-end —
-milestones M17/M18 and hypotheses H5/H6). v2 (`docs/V2_ROADMAP.md`, M0–M9) built the instrument: the
-thesis model reimplemented (loose behavioral equivalence), a fully pluggable
+milestones M17/M18 and hypotheses H5/H6; M19 and H7 were added 2026-09-15).
+v2 (`docs/V2_ROADMAP.md`, M0–M9) built the instrument: the thesis model reimplemented (loose behavioral equivalence), a fully pluggable
 pipeline (features / fusion / selection / behaviors / processors as
 registries), six alternative saliency operators, a Python evaluation layer,
 and a live demonstrator. v3 uses the instrument: replicate the thesis
@@ -128,6 +128,9 @@ where the thesis used lab imagery. Deliverable:
 v2 plot, verdict **replicated / partially / diverged** with explanation.
 Divergences are findings, not failures (document, don't chase pixel parity).
 
+**Status (2026-09-19): not started.** No dossier, no `experiments/replication/`.
+Needs no VLM, no API key and no dataset — the thesis text and the binary.
+
 ### M10b — Selection backends: robust multi-blob tracking without the field's tuning
 
 The Amari field works but is hard to parametrize (13 coupled, input-scale-
@@ -155,6 +158,14 @@ Build order (all opt-in; thesis field stays default):
   (genuinely new since the thesis, per RESEARCH_POSITIONING.md). A cheap
   "sample the priority map every N frames" readout is a biologically-topical
   alternative temporal story worth an experiment, not a core dependency.
+
+**Status (2026-07-12): B and D done; the payoff experiment is open.**
+`kalman-mot` (B) and `normalization` (D) ship as opt-in selection strategies
+(`configs/kalman.yaml`, `configs/normalization.yaml`, Catch2 + CTest coverage).
+E, F, A and C are not built. The A/B this milestone exists for — same saliency
+stream, vary only the backend → tracking accuracy, parameter sensitivity,
+runtime — has not been run, and neither backend has been entered as an arm in
+M12 or M19; `docs/SELECTION_BACKENDS.md` therefore carries no verdicts yet.
 
 Deliverable: the backends behind config keys + `docs/SELECTION_BACKENDS.md`
 verdicts. This **pairs with M12**: the payoff experiment is same saliency
@@ -184,6 +195,13 @@ tune" into a quantified result and giving H1 rigorous baselines.
 Deliverable: `docs/SCANPATH_VS_HUMAN.md` — metric tables + montages; the
 thesis model placed on the floor↔ceiling axis, scored as a sample of a
 distribution. Done when the comparison runs end-to-end from one command.
+
+**Status (2026-07-21): instrument built on `module/scanpath-human`
+(unmerged); no real-data numbers yet.** MultiMatch (4 spatial dimensions) and
+ScanMatch, the generic WTA+IOR readout and the stochastic sampler, the MIT1003
+per-observer sequence adapter and the study harness exist there with tests and
+a synthetic demo. Open: download MIT1003, run the study, rebase (the branch is
+behind main; README conflicts) and merge. Needs no VLM and no API key.
 
 ### M12 — The dynamic-IOR proving ground (H1 — the centerpiece)
 
@@ -231,6 +249,15 @@ object-IOR from clearly-worse to *nearly tied* with space-IOR — but not past i
 on exploration metrics. Remaining (the likely object-IOR win): identity-centric
 metrics + *persistent* object memory vs necessarily-decaying spatial memory;
 seeds+CIs; DAVIS. See `docs/DYNAMIC_IOR_STUDY.md`.
+
+**Update (2026-09-15, with M19):** opt-in *persistent identity* in the
+object-file store takes object-IOR from clearly worse to level with space-IOR,
+and ahead on latency at high speed — in a six-seed pilot without intervals: a
+direction, not yet a result. **Still open from this milestone's own list:** ≥ 20
+seeds per cell with intervals (and a seed loop in `eval/dynamic_ior.py` — the
+tables so far were averaged by hand), the speed × count × occlusion sweep, the
+Abb. 6.14 scenario, DAVIS scoring of H1, and a strengthened spatial baseline
+(motion-compensated spatial IOR). Plan: `docs/HYPOTHESIS_CLOSURE_PLAN.md`.
 
 ### M13 — Recognition processors (attention-gated perception, H2)
 
@@ -407,8 +434,12 @@ HR-Bench 8K):** oracle crops beat full resolution on single-target questions at
 a third of the tokens (1.00 vs 0.85), so the front-end works when attention
 lands; bottom-up crops rarely land (10% of targets covered); grounding lifts
 coverage to 65% and accuracy 0.45 → 0.70 but doesn't yet beat the same-budget
-uniform arm; relational questions favour the whole view. Full story:
-`docs/VLM_FRONT_END.md`.
+uniform arm. (The HR-Bench pilot rows were first scored with the correct
+option always "A", which inflated the blind uniform arm; fixed and rerun
+2026-09-19 — and the two-way
+relative-position questions sit at chance at this n, so "relations favour the
+whole view" is not yet shown.) Open: the full V\*Bench run and a budget sweep.
+Full story: `docs/VLM_FRONT_END.md`.
 
 ### M19 — Object files as a video token cache (H7 = H1 × H6)
 
@@ -451,7 +482,7 @@ latency / waste for context. Honesty: publish the regimes where space-IOR ties
 or wins (slow scenes, few objects) and the cost of label switches.
 Deliverable: `docs/VLM_VIDEO.md`.
 
-**Status (2026-09-15): v1 done on `module/video-token-cache` (unmerged).**
+**Status (2026-09-18): v1 done and merged into main.**
 The thesis object files lost identity to segmentation — saliency on moving
 disks is hollow onset rings plus symmetry responses between objects — so
 opt-in **proto-object segmentation** (seed by figure-ground colour contrast,
@@ -462,7 +493,12 @@ crop, at chance from the downsampled views), **with a real VLM (local Qwen,
 crops 0.80, budget-matched frames 0.27 (chance 0.25)** — H7's effect;
 proto-objects carry it (thesis segmentation: 0.45 vs 0.52). DAVIS-2017 (30
 sequences, categories hand-labelled): every arm 0.96–0.98 at 480p — no
-separation; identity on real, textured video remains the open problem. Full
+separation. The pre-registered harder test (the same sequences at full
+resolution, run 2026-09-18) **refuted the prediction**: every budget arm still
+answers alike (0.957–0.978), because "which of these can be seen?" survives
+downsampling — the task, not the resolution, is the limit, so the H7 evidence
+stays synthetic until a real-video task needs fine detail. Identity on real,
+textured video remains the open problem. Full
 story: `docs/VLM_VIDEO.md`; where this stands for a publication (and what a
 reviewer would object to): `docs/PAPER_READINESS.md`.
 
@@ -485,10 +521,13 @@ Corpora stay pointed-to, never redistributed (v2 convention).
 
 ## Conventions for the phase
 
-- `experiments/<area>/<name>/` = config + runner + README; results land
-  outside git (`results/`), reports and key plots land in `docs/`.
+- Study runners live in `eval/` (one script per study, each with a mock-backed
+  CTest smoke) and stimulus generators in `tools/`; results land outside git
+  (`results/`), reports and key plots land in `docs/`. (The originally planned
+  `experiments/<area>/<name>/` layout was never adopted.)
 - Every quantitative claim: ≥20 seeds where stochastic, bootstrap CIs, and
-  train/test splits for anything tuned.
+  train/test splits for anything tuned. *As of 2026-09 only the H5 synthetic
+  study meets this bar; closing the gap is `docs/HYPOTHESIS_CLOSURE_PLAN.md`.*
 - Every experiment reproducible from one command; smoke-test versions wired
   into CTest where they're fast enough.
 - The thesis model remains the default everywhere; everything new is opt-in

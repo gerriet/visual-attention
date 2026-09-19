@@ -128,7 +128,9 @@ and reported.
 - **Object-based inhibition of return in dynamic scenes (H1).** It does *not*
   beat space-based IOR on exploration metrics — it is only as good as its
   tracker, and every identity switch costs a re-fixation. With persistent,
-  identity-keyed object memory it moves ahead on latency at high speed.
+  identity-keyed object memory it draws level, and in a six-seed pilot it is
+  ahead on latency at high speed — a direction, not yet a result (the
+  confirmatory run at ≥ 20 seeds with intervals is open).
   [DYNAMIC_IOR_STUDY.md](docs/DYNAMIC_IOR_STUDY.md)
 - **Recognition gated by attention (H2).** Detectors restricted to attended
   ROIs recover 51% of all full-frame detections at 5.8% of the pixels.

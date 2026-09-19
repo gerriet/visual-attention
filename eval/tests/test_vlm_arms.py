@@ -72,9 +72,21 @@ class TestHRBenchExtraction(unittest.TestCase):
             items = list(hrbench.iter_items("4k", root=root))
             self.assertEqual([it["question_id"] for it in items], [0, 4])
             self.assertEqual(items[0]["answer"], "red")
-            self.assertEqual(items[0]["choices"], ["red", "green", "blue", "gray"])
+            self.assertEqual(sorted(items[0]["choices"]), ["blue", "gray", "green", "red"])
+            # The letter follows the answer through the re-ordering.
+            first = items[0]
+            self.assertEqual(first["choices"][ord(first["answer_letter"]) - 65], "red")
             self.assertTrue(items[0]["image"].exists())
             self.assertEqual(items[0]["image"].suffix, ".jpg")
+
+    def test_correct_letter_is_spread_and_stable(self):
+        # Cycle 0 stores the correct option as "A" for every question; served
+        # as stored, always answering "A" would score 1.0.
+        options = ["right", "wrong-1", "wrong-2", "wrong-3"]
+        letters = [hrbench.shuffled_choices(options, qid).index("right") for qid in range(200)]
+        for position in range(4):
+            self.assertGreater(letters.count(position), 30)
+        self.assertEqual(hrbench.shuffled_choices(options, 7), hrbench.shuffled_choices(options, 7))
 
 
 if __name__ == "__main__":

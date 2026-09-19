@@ -63,3 +63,16 @@ never a cherry-picked single scene), and record where each regime actually lives
   and naive object-IOR does not win by default"* — more useful than the thesis's
   unqualified claim, and the framework can now say exactly where each regime lives.
   Full data and reproduction: [../DYNAMIC_IOR_STUDY.md](../DYNAMIC_IOR_STUDY.md).
+
+## Update (2026-09)
+
+The identity-centric follow-up ran as part of M19: opt-in *persistent identity*
+in the object-file store. In a six-seed pilot per regime it takes object-IOR
+from clearly worse to level with space-IOR, and ahead on latency at high speed
+(`docs/DYNAMIC_IOR_STUDY.md`, "Persistent identity"). Six seeds without
+intervals: a direction, not yet a result — the statement above ("nearly tied —
+not a win") stands until the confirmatory run (≥ 20 fresh seeds per regime,
+paired intervals; `docs/HYPOTHESIS_CLOSURE_PLAN.md`). Note for that run: since
+this ADR the object arm has gained several mechanisms and the spatial arm one
+knob, so the fair comparison adds a strengthened spatial baseline
+(motion-compensated spatial IOR).

@@ -1,10 +1,11 @@
 # Object files as a video token cache (M19, H7)
 
-*Status (2026-09-15): harness built; model-free findings (the mock is a
+*Status (2026-09-18): harness built; model-free findings (the mock is a
 legibility oracle) and real-VLM results (local Qwen) on synthetic scenes and
 DAVIS-2017 below. With a real VLM the H7 effect holds on the synthetic scenes
 (identity-keyed crops 0.95 vs location-keyed 0.80 vs budget-matched frames
-0.27, chance 0.25); DAVIS at 480p does not separate the arms.*
+0.27, chance 0.25); DAVIS does not separate the arms — at 480p, nor at full
+resolution, where the pre-registered prediction was refuted (2026-09-18).*
 
 **H7 — Object files as a video token cache (H1 × H6).** *At a matched
 visual-token budget per video, an object-file front-end (object-based IOR +
@@ -30,7 +31,8 @@ where an earlier crop was (misses).
 
 - **Scenes:** `tools/make_dynamic_scene.py --tags --late` — coloured disks
   that move and bounce at 1280×960, some arriving mid-video, each carrying a
-  small code ("K7", ~14 px tall) legible only at native resolution. The flags
+  small code ("K7"; 20 px by default, 8 px in the reported runs — see
+  "Calibrated to the VLM") legible only at native resolution. The flags
   are additive; M12's scenes are unchanged without them.
 - **Attention:** the system runs `--attend` on a 320-px copy — exactly M12's
   scene geometry (radius 16, speed 6 px/frame) — under the `spatial-ior` and
@@ -363,16 +365,23 @@ crops, as the categories were. Until then the H7 evidence stays synthetic, and
 
 ## Next
 
-1. **The crux run above**, once a VLM is available.
-2. **Sweeps:** more seeds, speed × object count × K, and code sizes around
-   the VLM's reading threshold — the effect should grow with busier scenes
-   and smaller detail.
-2. **Identity on real video** is the open problem: stronger appearance than
+1. **A confirmatory synthetic run** on fresh seeds with a frozen config (the
+   mechanisms above were developed on seeds 0–9, and the headline is reported
+   on the same seeds), scored per scene with paired intervals, and with the
+   missing baselines: crops keyed by colour alone, a location memory that
+   decays, random crops — and scenes of same-coloured disks, where identity is
+   carried by continuity only. Plan: `docs/HYPOTHESIS_CLOSURE_PLAN.md`.
+2. **Sweeps:** speed × object count × K, and code sizes around the VLM's
+   reading threshold — the effect should grow with busier scenes and smaller
+   detail.
+3. **A real-video task that needs detail.** DAVIS is done (480p and full
+   resolution, above): its category question survives downsampling. Next is
+   video QA where the answer is a small region — reading text or a number,
+   an attribute of a small object, counting small instances.
+4. **Identity on real video** is the open problem: stronger appearance than
    mean colour (histograms / per-feature signatures), a segmentation that
    copes with texture, and fewer background fixations.
-3. **Harder real video:** DAVIS full resolution, or video QA where small
-   objects matter.
-4. **Object files as working memory:** labels and trajectories handed to the
+5. **Object files as working memory:** labels and trajectories handed to the
    VLM as text next to the crops (closes M13 Tier 3); re-send on change.
 
 ## Running it
