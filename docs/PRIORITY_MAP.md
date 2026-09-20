@@ -85,6 +85,14 @@ mean fixations-to-target, cap+1 when never found):
 *(Human fixations-to-target excludes the enforced central start fixation and
 is capped at the model's budget, so all three rows are on one scale.)*
 
+*Stage-1 profile (added 2026-09-20).* The rows above were measured with the old
+five-feature default. `eval/coco_search.py --config <profile>` scores any
+profile; with the dissertation's feature set and the neural field the same 150
+trials give **bottom-up 7.97 / 0.47 and prior 6.35 / 0.59** (paired against
+the old default, bottom-up found@10 +0.18 [+0.09, +0.27]) — the prior still
+helps, from a much better floor. Details: `docs/FEATURE_ASSESSMENT.md`,
+"Ablation".
+
 ## Reading the results
 
 **Each term earns its weight — or honestly fails to.** The ablation separates

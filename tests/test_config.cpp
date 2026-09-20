@@ -86,6 +86,20 @@ TEST_CASE("thesis profile enables the dissertation feature set with neural-field
   attention::pipeline::AttentionPipeline pipeline(config.pipeline);
 }
 
+TEST_CASE("modern profile: the best measured stage 1 (docs/adr/0005)", "[config]")
+{
+  auto config = ConfigLoader::load((source_dir() / "configs" / "modern.yaml").string());
+  // What the 2026-09 ablation chose; this case changes whenever a measurement
+  // changes the profile — it documents the choice, it does not protect it.
+  // Today that is the dissertation's feature set (validated on two benchmarks).
+  CHECK(enabled_count(config.pipeline.features) == 3);
+  CHECK(find_spec(config.pipeline.features, "color-munsell")->enabled);
+  CHECK(find_spec(config.pipeline.features, "eccentricity")->enabled);
+  CHECK(find_spec(config.pipeline.features, "symmetry")->enabled);
+  CHECK_FALSE(find_spec(config.pipeline.features, "color")->enabled);
+  CHECK(config.pipeline.effective_selection() == "neural-field");
+}
+
 TEST_CASE("thesis-extended profile enables the reimplementation's original five features", "[config]")
 {
   auto config = ConfigLoader::load((source_dir() / "configs" / "thesis-extended.yaml").string());

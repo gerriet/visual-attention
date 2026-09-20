@@ -269,11 +269,82 @@ bootstrap over items:
   fixations, and in the legibility-oracle accuracy the `fovea` arm (0.12)
   remains below the same-budget uniform downsample (0.18). Bottom-up attention
   alone does not rescue H6 on stills; it stops being *useless*.
-- Not yet separated: the two profiles differ in features **and** in selection
-  (neural field vs NMS) **and** in exclusivity. The ablation (swap one at a
-  time) is cheap and is the first item of the next step.
+- Which difference between the two profiles does it — features, selection or
+  exclusivity — is answered by the ablation below: mostly the *selection*.
 - Everything in Part 3 still applies — above all tiling: this was measured at
   ≤ 1024 px processing size with a 256-px colour segmentation.
+
+### Ablation (2026-09-20): what carries the effect — and the choice of the modern base
+
+One change at a time against the thesis profile (`configs/ablation/`), all 191
+V\*Bench items, model-free; `eval/coverage_table.py` gives coverage by the top
+K fixation windows, the chance level, and paired bootstrap differences over
+items (top 10):
+
+| Profile | top-3 | top-5 | top-10 | minus chance | minus thesis |
+|---|---|---|---|---|---|
+| chance (random fixations) | 0.07 | 0.11 | 0.22 | | |
+| colour contrast (MTM) alone, neural field | 0.13 | 0.24 | 0.42 | +0.20 [+0.14, +0.27] | +0.03 [−0.05, +0.11] |
+| thesis + Itti intensity & orientation | 0.13 | 0.24 | 0.41 | +0.19 [+0.13, +0.26] | +0.02 [−0.05, +0.09] |
+| thesis − symmetry | 0.14 | 0.20 | 0.40 | +0.19 [+0.12, +0.26] | +0.02 [−0.06, +0.09] |
+| thesis − exclusivity | 0.12 | 0.21 | 0.39 | +0.18 [+0.11, +0.24] | +0.01 [−0.07, +0.08] |
+| **thesis** | 0.13 | 0.24 | 0.39 | +0.17 [+0.11, +0.24] | — |
+| thesis − eccentricity | 0.10 | 0.20 | 0.37 | +0.15 [+0.08, +0.22] | −0.02 [−0.08, +0.04] |
+| thesis, **Itti colour for MTM colour** | 0.11 | 0.16 | 0.29 | +0.08 [+0.02, +0.14] | **−0.09 [−0.16, −0.03]** |
+| colour contrast alone, NMS (plateau-aware) | 0.13 | 0.23 | 0.33 | +0.11 [+0.05, +0.18] | −0.06 [−0.15, +0.02] |
+| thesis, **NMS for the neural field** | 0.13 | 0.15 | 0.22 | −0.00 [−0.06, +0.06] | **−0.17 [−0.25, −0.10]** |
+| thesis-extended (the old default) | 0.09 | 0.13 | 0.23 | +0.01 [−0.05, +0.07] | −0.16 [−0.25, −0.08] |
+| old default with MTM colour, NMS | 0.09 | 0.16 | 0.22 | −0.00 [−0.06, +0.06] | −0.17 [−0.25, −0.09] |
+
+Reading:
+
+1. **The selection stage is decisive, and that was not expected.** The same
+   three feature maps are at chance read out by NMS and at twice chance read
+   out by the neural field. Part of it was a defect: on a piecewise-constant
+   map every pixel of a salient segment is a "local maximum", so NMS tiled the
+   largest segment with peaks; NMS is now plateau-aware (one interior peak per
+   plateau), which lifts colour-contrast-alone from chance to +0.11. With
+   several features fused it stays at chance even so — pixel-wise maxima follow
+   the smooth maps (symmetry ridges, Itti channels), while the field integrates
+   over area and reads out cluster centres. *The thesis's argument for a
+   field-based, region-level selection stage shows up as a measurable
+   difference on a 2024 benchmark.*
+2. **Colour contrast in MTM space carries the information.** Replacing it with
+   the Itti–Koch colour feature is the only feature change with a measurable
+   cost. Alone, with the field, it is as good as the full profile.
+3. **Exclusivity, symmetry, eccentricity and the Itti channels: no measurable
+   effect here** (all intervals include zero).
+
+**Validation on a second benchmark** — COCO-Search18 target-present search,
+bottom-up arm, 150 validation trials, paired over trials
+(`eval/coco_search.py --config <profile>`):
+
+| Profile | mean fixations-to-target | found@10 | with category prior |
+|---|---|---|---|
+| human | 2.58 | 0.92 | |
+| thesis-extended (old default) | 9.07 | 0.29 | 7.86 / 0.47 |
+| two-feature profile (MTM colour + eccentricity, field) | 8.34 | 0.38 | 6.66 / 0.56 |
+| **thesis** | **7.97** | **0.47** | **6.35 / 0.59** |
+
+thesis − old default: found@10 **+0.18 [+0.09, +0.27]**; thesis − two-feature:
+found@10 +0.09 [+0.01, +0.17]. The ordering found on V\*Bench holds on a
+different task and dataset; the simplification that V\*Bench could not tell
+apart (dropping symmetry and exclusivity) costs targets here. (This also
+revises M17's bottom-up baseline: 9.03 / 0.27 was measured with the old
+default.)
+
+**Decision (ADR-0005, "start the modern default from the best base that can be
+measured"):** `configs/modern.yaml` starts as the dissertation's feature set
+with the neural field — the best base on both benchmarks — and is free to leave
+it. The modern second-stage profiles (`configs/attend*.yaml`) moved to the same
+stage 1; on the H7 dev scenes that lifts object-file crops from 0.92 to 0.98
+and identity to exactly one label per object (mock, 10 scenes, to be confirmed
+on fresh seeds).
+
+Not done: the compiled-in base feature set (what runs with no `--config`, and
+what every YAML is layered on) is still the old five features with NMS.
+Changing it touches every profile that disables features explicitly; it needs
+the configs to stop inheriting a hidden base first.
 
 ### What the first (pre-port) measurement does and does not show
 

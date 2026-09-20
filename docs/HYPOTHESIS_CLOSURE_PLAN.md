@@ -158,15 +158,31 @@ ablation when the real run happens (standing reminder).
 
 No stereo-video work is planned; mark H3 and M15 *deferred* in the roadmap.
 
-## Order
+## Order (revised 2026-09-20 after the ADR-0005 decisions)
 
-1. H1 instrument + confirmatory run (no dependencies; CPU only).
-2. H6 model-free coverage@K with the random baseline — decides how much to
-   invest in features.
-3. H7 model-free (baselines, same-colour scenes); then the Qwen rows for H6/H7
-   and the HR-Bench rerun as one unattended batch.
-4. M11 as soon as MIT1003 is on disk.
-5. H2/H5 controls.
-6. M10 replication dossier — writing-heavy; runs in parallel with everything.
-7. `docs/STATUS.md`: one table (hypothesis · verdict · n · date of
-   confirmatory run · doc) that the README links instead of restating numbers.
+Replication track — finite; close it and freeze it:
+
+1. **H1 confirmatory run** on `configs/thesis/attend.yaml` (instrument fixes
+   first: seed loop, paired intervals, a revisit metric that does not saturate,
+   the motion-compensated spatial-IOR arm). CPU only.
+2. **M11** as soon as MIT1003 is on disk (H4).
+3. **M10 replication dossier** — the colour and eccentricity variation curves
+   (Abb. 5.13, 5.20) are now replicable; writing-heavy, runs alongside.
+4. Tag `replication-v1`, freeze the thesis goldens.
+
+Modern track — optimise first, then confirm once:
+
+1. **Stage-1 optimisation, measured model-free** against chance
+   (`eval/coverage_table.py`) and validated on COCO-Search18. Done so far: the
+   ablation and the choice of base (`configs/modern.yaml`), plateau-aware NMS,
+   `--tiles`. Next: tiling result → an open-vocabulary detector as the top-down
+   source → text / face features (docs/FEATURE_ASSESSMENT.md, Part 3).
+2. **H6**: full V\*Bench with the best crop source, three budgets, `fovea-random`
+   as the floor; HR-Bench at full size.
+3. **H7 confirmatory** — *after* step 1, on the optimised system, so it is
+   confirmed once: baselines (colour-keyed dedup, decaying location memory,
+   random crops), same-coloured scenes, 30 fresh seeds, then Qwen.
+4. H2 / H5 controls.
+
+Both: `docs/STATUS.md` — one table (hypothesis · track · verdict · n · date of
+confirmatory run · doc) that the README links instead of restating numbers.

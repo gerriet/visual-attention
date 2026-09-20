@@ -87,9 +87,11 @@ cmake --build build -j
 # Single image → saliency map + scanpath overlay (in results/)
 ./build/attention data/samples/images/butterfly.jpg --no-display
 
-# Classic (thesis) vs. modern feature profile on the same image
+# The dissertation profile, the best modern profile (today it starts equal to
+# the thesis one — see configs/modern.yaml), and the old five-feature default
 ./build/attention --config configs/thesis/thesis.yaml data/test_images/inputc.png --no-display
 ./build/attention --config configs/modern.yaml data/test_images/inputc.png --no-display
+./build/attention --config configs/thesis-extended.yaml data/test_images/inputc.png --no-display
 
 # Live overlay on a webcam/video with per-object ROI processors (ESC to quit)
 ./build/attention --live 0 --config configs/live.yaml
