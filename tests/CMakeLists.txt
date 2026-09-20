@@ -13,7 +13,7 @@ if(NOT Catch2_FOUND)
     FetchContent_MakeAvailable(Catch2)
 endif()
 
-add_executable(characterization_tests test_characterization.cpp test_config.cpp test_selection.cpp test_stereo_onset.cpp test_system.cpp test_processors.cpp test_alt_features.cpp test_kalman_mot.cpp test_normalization.cpp test_recognition.cpp test_priority.cpp)
+add_executable(characterization_tests test_characterization.cpp test_config.cpp test_selection.cpp test_stereo_onset.cpp test_system.cpp test_processors.cpp test_alt_features.cpp test_kalman_mot.cpp test_normalization.cpp test_recognition.cpp test_priority.cpp test_thesis_features.cpp)
 target_link_libraries(characterization_tests PRIVATE attention_core Catch2::Catch2WithMain)
 target_compile_definitions(characterization_tests PRIVATE
     ATTENTION_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
@@ -89,7 +89,8 @@ if(Python3_Interpreter_FOUND)
     # Python entry points answer --help too (CLI contract, CLAUDE.md).
     foreach(script tools/fetch_models.py eval/gated_recognition.py eval/plot_gated_recognition.py
             eval/priority_search.py eval/coco_search.py eval/plot_priority_search.py
-            eval/vlm_frontend.py eval/plot_vlm_frontend.py eval/vlm_video.py eval/vlm_video_davis.py)
+            eval/vlm_frontend.py eval/plot_vlm_frontend.py eval/vlm_video.py eval/vlm_video_davis.py
+            eval/coverage_table.py eval/dynamic_ior.py)
         get_filename_component(script_name ${script} NAME_WE)
         add_test(NAME help_${script_name}
             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/${script} --help)
@@ -193,7 +194,7 @@ if(Python3_Interpreter_FOUND)
                     --images ${CMAKE_SOURCE_DIR}/data/test_images/input.png
                              ${CMAKE_SOURCE_DIR}/data/test_images/inputc.png
                     --out ${CMAKE_BINARY_DIR}/benchmark_smoke
-                    --model cpp:$<TARGET_FILE:attention>:${CMAKE_SOURCE_DIR}/configs/thesis.yaml=thesis
+                    --model cpp:$<TARGET_FILE:attention>:${CMAKE_SOURCE_DIR}/configs/thesis/thesis.yaml=thesis
                     --model spectral-residual --model center-bias --reference thesis
                     --report ${CMAKE_BINARY_DIR}/benchmark_smoke/report.md
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/eval)
@@ -207,7 +208,7 @@ if(Python3_Interpreter_FOUND)
         COMMAND attention --stereo
                 ${CMAKE_SOURCE_DIR}/data/test_images/stereo/left.png
                 ${CMAKE_SOURCE_DIR}/data/test_images/stereo/right.png
-                --config ${CMAKE_SOURCE_DIR}/configs/stereo.yaml
+                --config ${CMAKE_SOURCE_DIR}/configs/thesis/stereo.yaml
                 --emit-json ${CMAKE_BINARY_DIR}/behavioral/stereo.json
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
     set_tests_properties(emit_json_stereo PROPERTIES FIXTURES_SETUP stereo_json)
@@ -235,9 +236,26 @@ if(Python3_Interpreter_FOUND)
                 --pos-tol 20)
     set_tests_properties(scanpath_attend PROPERTIES FIXTURES_REQUIRED attend_scanpath)
 
+    # The same over the thesis-track second-stage profile (the one H1 runs on:
+    # colour contrast in MTM, exclusivity — docs/adr/0005)
+    add_test(NAME emit_scanpath_thesis_attend
+        COMMAND attention --attend ${CMAKE_SOURCE_DIR}/data/test_images/motion_seq
+                --config ${CMAKE_SOURCE_DIR}/configs/thesis/attend.yaml
+                --output ${CMAKE_BINARY_DIR}/thesis_attend
+                --emit-scanpath ${CMAKE_BINARY_DIR}/thesis_attend/scanpath.json
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+    set_tests_properties(emit_scanpath_thesis_attend PROPERTIES FIXTURES_SETUP thesis_attend_scanpath)
+
+    add_test(NAME scanpath_thesis_attend
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/eval/compare_scanpath_json.py
+                ${CMAKE_SOURCE_DIR}/tests/golden/thesis_attend/scanpath.json
+                ${CMAKE_BINARY_DIR}/thesis_attend/scanpath.json
+                --pos-tol 20)
+    set_tests_properties(scanpath_thesis_attend PROPERTIES FIXTURES_REQUIRED thesis_attend_scanpath)
+
     # Thesis profile (neural-field selection) behavioral golden
     add_test(NAME emit_json_thesis_inputc
-        COMMAND attention --config ${CMAKE_SOURCE_DIR}/configs/thesis.yaml
+        COMMAND attention --config ${CMAKE_SOURCE_DIR}/configs/thesis/thesis.yaml
                 ${CMAKE_SOURCE_DIR}/data/test_images/inputc.png
                 --no-display --emit-json ${CMAKE_BINARY_DIR}/behavioral/thesis_inputc.json
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR})

@@ -1,3 +1,5 @@
+# Thesis track (docs/adr/0005): only components that implement the dissertation.
+#
 # Stereo profile: depth-aware attention on a rectified stereo pair (roadmap M5).
 #
 # Adds the disparity/depth feature (thesis §5.4) to the classic static set and
@@ -6,7 +8,7 @@
 # structures at different depths compete.
 #
 # Run with a stereo pair:
-#   ./attention --stereo left.png right.png --config configs/stereo.yaml
+#   ./attention --stereo left.png right.png --config configs/thesis/stereo.yaml
 # (Without --config, --stereo just augments the default 2D set with a stereo
 #  channel and keeps the ordinary selection.)
 
@@ -35,12 +37,19 @@ features:
       min_disparity: -16
       max_disparity: 0
       window_size: 15
-  color:
+      exclusivity: 1.1      # §5.5.3: "1.1 for all features in all experiments"
+  color-munsell:
     weight: 1.0
+    params:
+      exclusivity: 1.1
   eccentricity:
     weight: 1.0
+    params:
+      exclusivity: 1.1
   symmetry:
     weight: 1.0
+  color:
+    enabled: false
   intensity:
     enabled: false
   orientation:

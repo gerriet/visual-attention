@@ -558,7 +558,8 @@ void print_usage(const char* program_name, std::ostream& out = std::cerr)
   out << "  " << program_name << " data/test_images/input.png" << std::endl;
   out << "  " << program_name << " data/test_images/input.png --no-display" << std::endl;
   out << "  " << program_name << " data/test_images/input.png --debug=detailed --debug-print" << std::endl;
-  out << "  " << program_name << " --config configs/thesis.yaml data/test_images/inputc.png --no-display" << std::endl;
+  out << "  " << program_name << " --config configs/thesis/thesis.yaml data/test_images/inputc.png --no-display"
+      << std::endl;
   out << "  " << program_name << " --batch data/test_images/ --output results/" << std::endl;
   out << "  " << program_name << " --live 0 --config configs/live.yaml" << std::endl;
   out << "  " << program_name << " --live video.mp4 --processors roi-probe,region-descriptor" << std::endl;
@@ -868,7 +869,7 @@ int main(int argc, char** argv)
         else if (arg.rfind("--", 0) != 0)
         {
           // Positional image overrides input.image, so profile configs
-          // (configs/thesis.yaml, configs/modern.yaml) work on any image
+          // (configs/thesis/thesis.yaml, configs/modern.yaml) work on any image
           config.input_image = arg;
         }
       }

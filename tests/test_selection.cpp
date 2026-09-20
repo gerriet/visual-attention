@@ -68,6 +68,33 @@ TEST_CASE("NMS selection enforces minimum distance", "[selection]")
   }
 }
 
+TEST_CASE("NMS selection: a flat segment is one peak, not a grid of them", "[selection]")
+{
+  // Segment-based features (eccentricity, colour contrast) give
+  // piecewise-constant maps. Every pixel of a plateau equals its dilation, so
+  // a pixel-wise reading tiles the largest segment with peaks min_distance
+  // apart and never reaches the others — which put the default readout at
+  // chance on V*Bench (docs/FEATURE_ASSESSMENT.md, "Ablation").
+  cv::Mat map = cv::Mat::zeros(240, 320, CV_32F);
+  cv::rectangle(map, cv::Rect(20, 20, 200, 120), cv::Scalar(0.9f), cv::FILLED); // large, most salient
+  cv::rectangle(map, cv::Rect(250, 170, 40, 40), cv::Scalar(0.7f), cv::FILLED);
+  cv::rectangle(map, cv::Rect(40, 180, 50, 30), cv::Scalar(0.5f), cv::FILLED);
+
+  selection::SelectionParams params;
+  params.threshold = 0.3f;
+  params.min_distance = 30;
+  params.max_count = 10;
+  core::RunState state;
+  auto peaks = selection::create_selection_strategy("nms", params, YAML::Node())->select(map, state);
+
+  REQUIRE(peaks.size() == 3);
+  CHECK(cv::Rect(20, 20, 200, 120).contains(peaks[0].location));
+  CHECK(cv::Rect(250, 170, 40, 40).contains(peaks[1].location));
+  CHECK(cv::Rect(40, 180, 50, 30).contains(peaks[2].location));
+  // The peak sits inside the segment, away from its border
+  CHECK(cv::Rect(60, 50, 120, 60).contains(peaks[0].location));
+}
+
 TEST_CASE("neural-field selection settles on blobs in salience order", "[selection][neural-field]")
 {
   selection::SelectionParams params;

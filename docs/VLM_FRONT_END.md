@@ -1,9 +1,14 @@
 # Attention as a VLM token-budget allocator (M18, H6)
 
+*Track: **modern** (docs/adr/0005) — a usefulness claim; the thesis profile is one arm, not the subject.*
+
 *Status: instrument built and verified end-to-end on a mock backend, 2026-07.
 Since 2026-09 the default backend is a local open-weights VLM (Ollama,
 `qwen3.8:27b`), so the real V\*Bench measurement needs no credentials (see
-"Running it for real"); the headline numbers land when the full run completes.*
+"Running it for real"). Numbers so far are pilot scale (20 items per V\*Bench
+category, 10 per HR-Bench category); the full V\*Bench run and a budget sweep
+are open. The HR-Bench pilot rows were rerun on 2026-09-19 after a scoring
+defect (correct option always "A") was fixed — see the note under the table.*
 
 **H6 — Attention as a VLM token budget.** *Feeding a vision-language model only
 the attended ROIs (fovea) plus a low-res global view preserves task accuracy at
@@ -30,13 +35,14 @@ for this first cut (the full C++ virtual fovea is M15's job). Per image+question
    top-K fixations, plus one low-res **global view** of the whole image.
 3. Hand the VLM *only* those images + the question.
 
-Three arms answer the same multiple-choice question, so the trade is honest:
+Every arm answers the same multiple-choice question, so the trade is honest:
 
 | Arm | What the VLM sees | Role |
 |---|---|---|
 | `full-res` | the whole image, capped to a practical VLM size | accuracy ceiling |
 | `uniform` | the whole image uniformly downsampled **to the fovea arm's token budget** | same-budget baseline (small objects vanish) |
 | `fovea` (ours) | low-res global view + K native-res attention crops | the front-end |
+| `fovea-random` | the same global view + K crops at uniformly random positions (seeded per question) | the floor: what the front-end is worth with no attention at all |
 | `fovea-oracle` (`--oracle`) | the same, crops centred on the annotated targets | upper bound: perfect attention |
 | `fovea-td` (`--top-down`) | the same, crops from a priority map with a question-conditioned top-down channel | H5×H6 |
 
@@ -70,7 +76,11 @@ legibly (the mock's criterion below), whether a fovea *crop* — not the global
 view — covered them (`crop_hit`), and the rank of the first fixation whose
 window covers them (`target_rank`, so coverage by the top K can be read off for
 any K). That separates the two ways the fovea arm can fail — attention missed
-the target, or the VLM misread a crop it was given.
+the target, or the VLM misread a crop it was given. Next to the coverage the
+harness prints its **chance level** — the expected coverage of uniformly
+random fixations (200 draws per item): for small targets the base rate of a
+336-px window is not negligible, and a crop source is informative only to the
+extent that it beats it.
 
 The VLM is pluggable (`eval/vlm_backends.py`): a `VLMBackend` interface with an
 `ollama` default (a local VLM over Ollama's HTTP API, `qwen3.8:27b`, stdlib
@@ -156,7 +166,11 @@ higher-resolution regime: 4K and 8K images (200 questions each, 4 options;
 far past what a VLM ingests natively — where a uniform downsample should truly
 blind the model. Adapter: `eval/datasets/hrbench.py`. The parquet files carry
 each question four times (option rotations for CircularEval); only the first
-rotation is scored (plain accuracy, chance 0.25). There are no target boxes,
+rotation is scored (plain accuracy, chance 0.25). In that rotation the correct
+option is "A" for every question, so the adapter re-orders the options per
+question (seeded by the question id — the same order in every arm and run);
+without that, a model that answers "A" whenever it cannot see the target scores
+1.0. There are no target boxes,
 so no oracle arm or target diagnostics. The first use extracts the images
 (needs `pyarrow`); the 8K extraction peaks at ~5.8 GB of RAM, so unload the VLM
 first (`ollama stop qwen3.8:27b`).
@@ -185,8 +199,23 @@ token fraction of full-res (Ollama's own count).
 |---|---|---|---|---|---|
 | V\*Bench direct attributes (20) | 0.85 | 0.80 @ 0.36 | 0.45 @ 0.37 | **1.00** @ 0.34 | 0.70 @ 0.53 |
 | V\*Bench relative position (20) | 0.90 | 0.80 @ 0.37 | 0.60 @ 0.38 | 0.70 @ 0.37 | 0.65 @ 0.54 |
-| HR-Bench 8K single (10) | 1.00 | 0.70 @ 0.22 | 0.50 @ 0.23 | — | 0.70 @ 0.32 |
-| HR-Bench 8K cross (10) | 0.70 | 0.80 @ 0.23 | 0.50 @ 0.24 | — | 0.40 @ 0.34 |
+| HR-Bench 8K single (10) | 0.90 | 0.60 @ 0.22 | 0.70 @ 0.23 | — | 0.70 @ 0.32 |
+| HR-Bench 8K cross (10) | 0.80 | 0.50 @ 0.23 | 0.40 @ 0.24 | — | 0.40 @ 0.34 |
+
+**Caveats on this table (added 2026-09-19).** (1) *The two HR-Bench rows were
+rerun on 2026-09-19 with the option order fixed.* The first version was scored
+with the options as stored, where the correct answer is always "A", and read
+1.00 / 0.70 / 0.50 / 0.70 (single) and 0.70 / 0.80 / 0.50 / 0.40 (cross). The
+bias was real and favoured the blind arm: with options re-ordered the uniform
+arm falls 0.70 → 0.60 and 0.80 → 0.50 (on the cross items it still answers "A"
+six times in ten — it guesses "A" when it cannot see), and the apparent
+"uniform beats full-res on cross" disappears. At n = 10 per row the intervals
+are about ±0.3; the ordering full-res > budget arms is the only thing these
+rows show. (2) *Chance differs per
+row:* V\*Bench relative-position questions are two-way, so chance there is 0.5
+and 0.60–0.70 at n = 20 is not distinguishable from guessing; direct-attribute
+questions are mostly four-way. The harness now prints the chance level of the
+item mix. (3) "1.00 vs 0.85" for the oracle arm is 3 discordant items of 20.
 
 What they say:
 
@@ -200,12 +229,15 @@ What they say:
   not yet beat the same-budget uniform arm, and its grounding call raises its
   cost (the arm is not budget-matched; a fair comparison gives uniform its
   budget).
-- **Relations favour the whole view.** Two-object (relative position) and
-  cross-instance questions lose their spatial layout in crops; the global view
-  alone can't carry them.
+- **Relations may favour the whole view** — two-object (relative position)
+  questions lose their spatial layout in crops — but at two-way chance and
+  n = 20 the pilot cannot show it. On HR-Bench "cross" the crop arms (0.40) do
+  trail uniform (0.50) and full-res (0.80), which points the same way, at
+  n = 10.
 - **Qwen reads small detail from downsampled images better than the 24-px
   legibility floor assumes**, which keeps the uniform arm strong at these
-  budgets.
+  budgets (V\*Bench rows; the synthetic video probe in `docs/VLM_VIDEO.md`
+  found the same).
 
 ## Honest limitations (to report with the real numbers)
 
@@ -222,6 +254,17 @@ What they say:
   the target *less* often than a same-budget uniform downsample (12% vs 17% at
   ~20% of full-res tokens). On V\*Bench, bottom-up crops alone are not
   expected to beat uniform; the top-down channel is the necessary next step.
+  *Random baseline (2026-09-19):* uniformly random fixations cover the targets
+  just as often — 2% / 7% / 22% for the top 1 / 3 / 10 — so these figures are
+  the base rate of a 336-px window, not a saliency signal; the bottom-up
+  `fovea` arm has so far been equivalent to random crops. Why (first-stage
+  defects, resolution collapse) and what to try: `docs/FEATURE_ASSESSMENT.md`.
+  *After the feature port (2026-09-20):* the default profile is still at
+  chance, but the thesis profile — Munsell colour contrast, ported
+  eccentricity, exclusivity — covers 13% / 24% / 39% of targets with the top
+  3 / 5 / 10 fixations against a chance level of 7% / 11% / 22% (top-10 minus
+  chance: +0.17 [+0.11, +0.24], paired over the 191 items). Its legibility-
+  oracle accuracy (0.12) is still below the same-budget uniform arm (0.18).
 - **The controller isn't free.** The token *saving* is measured on the VLM side;
   the attention pipeline that picks the crops costs its own compute
   (`docs/PERFORMANCE.md`). The argument scales as the VLM gets more expensive per

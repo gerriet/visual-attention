@@ -1,35 +1,377 @@
 #include "attention/features/eccentricity_feature.h"
+#include <algorithm>
+#include <array>
 #include <chrono>
-#include <iostream>
-#include <map>
-#include <set>
+#include <cmath>
+#include <queue>
+#include <stdexcept>
+#include <utility>
 
 namespace attention
 {
 namespace features
 {
 
-EccentricityFeature::EccentricityFeature() : config_() {}
+namespace
+{
 
-EccentricityFeature::EccentricityFeature(const Config& config) : config_(config) {}
+using Segment = EccentricityFeature::Segment;
+
+constexpr int kOffsetX[8] = {-1, 1, 0, 0, -1, -1, 1, 1};
+constexpr int kOffsetY[8] = {0, 0, -1, 1, -1, 1, -1, 1};
+// The original caps the growth threshold: a Sobel response this strong is an
+// edge however uniform the rest of the image is.
+constexpr int kMaxGrowthThreshold = 250;
+
+void add_pixel(Segment& segment, int x, int y, int gray)
+{
+  ++segment.pixels;
+  segment.sum_gray += gray;
+  segment.sum_gray_sq += static_cast<double>(gray) * gray;
+  segment.sum_x += x;
+  segment.sum_y += y;
+  segment.sum_xx += static_cast<double>(x) * x;
+  segment.sum_yy += static_cast<double>(y) * y;
+  segment.sum_xy += static_cast<double>(x) * y;
+}
+
+void absorb(Segment& into, Segment& from)
+{
+  into.pixels += from.pixels;
+  into.sum_gray += from.sum_gray;
+  into.sum_gray_sq += from.sum_gray_sq;
+  into.sum_x += from.sum_x;
+  into.sum_y += from.sum_y;
+  into.sum_xx += from.sum_xx;
+  into.sum_yy += from.sum_yy;
+  into.sum_xy += from.sum_xy;
+  from = Segment{};
+}
+
+// Segments merge during the dilation passes; the label image keeps the labels
+// it was painted with and is resolved through this forest.
+class LabelForest
+{
+ public:
+  int add()
+  {
+    parent_.push_back(static_cast<int>(parent_.size()));
+    return parent_.back();
+  }
+  int find(int label)
+  {
+    while (parent_[label] != label)
+    {
+      parent_[label] = parent_[parent_[label]];
+      label = parent_[label];
+    }
+    return label;
+  }
+  void join(int child, int root) { parent_[child] = root; }
+
+ private:
+  std::vector<int> parent_;
+};
+
+} // namespace
+
+EccentricityFeature::EccentricityFeature(const Config& config) : config_(config)
+{
+  if (config_.connectivity != 4 && config_.connectivity != 8)
+  {
+    throw std::invalid_argument("EccentricityFeature: connectivity must be 4 or 8");
+  }
+  if (config_.edge_threshold <= 0.0f || config_.edge_threshold >= 1.0f)
+  {
+    throw std::invalid_argument("EccentricityFeature: edge_threshold is a share of pixels, in (0, 1)");
+  }
+  if (config_.saliency_offset < 0.0f || config_.saliency_offset >= 1.0f)
+  {
+    throw std::invalid_argument("EccentricityFeature: saliency_offset must be in [0, 1)");
+  }
+}
+
+float EccentricityFeature::eccentricity(double mu20, double mu02, double mu11)
+{
+  const double sum = mu20 + mu02;
+  if (sum <= 0.0)
+  {
+    return 0.0f; // a single pixel (or an empty segment) has no shape
+  }
+  const double diff = mu20 - mu02;
+  return static_cast<float>((diff * diff + 4.0 * mu11 * mu11) / (sum * sum));
+}
+
+EccentricityFeature::Result EccentricityFeature::evaluate(const cv::Mat& gray_8u) const
+{
+  if (gray_8u.type() != CV_8UC1 || gray_8u.empty())
+  {
+    throw std::runtime_error("EccentricityFeature::evaluate: needs a non-empty 8-bit grey image");
+  }
+  const int w = gray_8u.cols;
+  const int h = gray_8u.rows;
+
+  cv::Mat gray = gray_8u;
+  if (config_.equalize)
+  {
+    cv::equalizeHist(gray_8u, gray);
+  }
+
+  Result result;
+
+  // --- 1. Homogeneity: max(|gx|, |gy|), zero on the one-pixel image border
+  cv::Mat grad_x, grad_y;
+  cv::Sobel(gray, grad_x, CV_32F, 1, 0, 3);
+  cv::Sobel(gray, grad_y, CV_32F, 0, 1, 3);
+  const cv::Mat abs_x = cv::abs(grad_x);
+  const cv::Mat abs_y = cv::abs(grad_y);
+  cv::max(abs_x, abs_y, result.sobel);
+  result.sobel.row(0).setTo(0.0f);
+  result.sobel.row(h - 1).setTo(0.0f);
+  result.sobel.col(0).setTo(0.0f);
+  result.sobel.col(w - 1).setTo(0.0f);
+
+  // Growth threshold from the histogram: the smallest value below which the
+  // configured share of all pixels lies.
+  std::array<int, 256> histogram{};
+  for (int y = 0; y < h; ++y)
+  {
+    const float* row = result.sobel.ptr<float>(y);
+    for (int x = 0; x < w; ++x)
+    {
+      ++histogram[std::min(255, static_cast<int>(row[x]))];
+    }
+  }
+  const long target = static_cast<long>(config_.edge_threshold * w * h);
+  int threshold = 0;
+  for (long sum = 0; sum < target && threshold < kMaxGrowthThreshold; ++threshold)
+  {
+    sum += histogram[threshold];
+  }
+  result.growth_threshold = threshold;
+  auto is_area = [&](int x, int y) { return result.sobel.at<float>(y, x) < threshold; };
+
+  // --- 2. Region growing. Label 0 = boundary / unassigned.
+  result.labels = cv::Mat::zeros(h, w, CV_32S);
+  std::vector<Segment>& segments = result.segments;
+  LabelForest forest;
+  segments.emplace_back(); // label 0
+  forest.add();
+
+  cv::Mat visited = cv::Mat::zeros(h, w, CV_8U);
+  std::queue<std::pair<int, int>> frontier;
+  for (int sy = 0; sy < h; ++sy)
+  {
+    for (int sx = 0; sx < w; ++sx)
+    {
+      if (visited.at<uchar>(sy, sx) || !is_area(sx, sy))
+      {
+        continue;
+      }
+      const int label = forest.add();
+      segments.emplace_back();
+      visited.at<uchar>(sy, sx) = 1;
+      frontier.emplace(sx, sy);
+      while (!frontier.empty())
+      {
+        const auto [cx, cy] = frontier.front();
+        frontier.pop();
+        if (!is_area(cx, cy))
+        {
+          continue; // reached, but a boundary pixel: growth stops here
+        }
+        result.labels.at<int>(cy, cx) = label;
+        add_pixel(segments[label], cx, cy, gray.at<uchar>(cy, cx));
+        for (int i = 0; i < config_.connectivity; ++i)
+        {
+          const int nx = cx + kOffsetX[i];
+          const int ny = cy + kOffsetY[i];
+          if (nx >= 0 && nx < w && ny >= 0 && ny < h && !visited.at<uchar>(ny, nx))
+          {
+            visited.at<uchar>(ny, nx) = 1;
+            frontier.emplace(nx, ny);
+          }
+        }
+      }
+    }
+  }
+  // A boundary pixel reached during a growth stays `visited` but unlabelled;
+  // that is intended — it is what the dilation below works on.
+  result.initial_segments = static_cast<int>(segments.size()) - 1;
+
+  // --- 3. Merging + dilation
+  auto mergeable = [&](const Segment& a, const Segment& b)
+  {
+    if (a.pixels == 0 || b.pixels == 0)
+    {
+      return false;
+    }
+    if (std::abs(a.mean_gray() - b.mean_gray()) > config_.merge_mean_difference)
+    {
+      return false;
+    }
+    // +1: two flat segments (variance 0) are alike, not 0/0 — see the header
+    const double high = std::max(a.variance(), b.variance()) + 1.0;
+    const double low = std::min(a.variance(), b.variance()) + 1.0;
+    return high / low < config_.variance_threshold;
+  };
+
+  for (int pass = 0; pass < config_.merge_iterations; ++pass)
+  {
+    // Dilation is applied after the pass (every pixel sees the same state);
+    // merges take effect at once, as in the original.
+    std::vector<std::pair<cv::Point, int>> dilated;
+    for (int y = 1; y < h - 1; ++y)
+    {
+      for (int x = 1; x < w - 1; ++x)
+      {
+        if (result.labels.at<int>(y, x) != 0)
+        {
+          continue;
+        }
+        // Distinct neighbouring segments and how many neighbours each holds
+        std::array<std::pair<int, int>, 8> around{};
+        int distinct = 0;
+        for (int i = 0; i < config_.connectivity; ++i)
+        {
+          const int raw = result.labels.at<int>(y + kOffsetY[i], x + kOffsetX[i]);
+          if (raw == 0)
+          {
+            continue;
+          }
+          const int label = forest.find(raw);
+          auto end = around.begin() + distinct;
+          auto hit = std::find_if(around.begin(), end, [label](const auto& e) { return e.first == label; });
+          if (hit == end)
+          {
+            around[distinct++] = {label, 1};
+          }
+          else
+          {
+            ++hit->second;
+          }
+        }
+
+        if (distinct == 2)
+        {
+          int into = around[0].first;
+          int from = around[1].first;
+          if (mergeable(segments[into], segments[from]))
+          {
+            if (segments[into].pixels < segments[from].pixels)
+            {
+              std::swap(into, from);
+            }
+            absorb(segments[into], segments[from]);
+            forest.join(from, into);
+            result.labels.at<int>(y, x) = into;
+            add_pixel(segments[into], x, y, gray.at<uchar>(y, x));
+          }
+          // Two unlike segments: the pixel stays a boundary between them.
+        }
+        else if (distinct > 0)
+        {
+          const auto dominant = std::max_element(around.begin(), around.begin() + distinct,
+                                                 [](const auto& a, const auto& b) { return a.second < b.second; });
+          dilated.emplace_back(cv::Point(x, y), dominant->first);
+        }
+      }
+    }
+    for (const auto& [point, label] : dilated)
+    {
+      const int root = forest.find(label); // it may have been merged later in the pass
+      result.labels.at<int>(point) = root;
+      add_pixel(segments[root], point.x, point.y, gray.at<uchar>(point));
+    }
+  }
+
+  // Resolve merged labels
+  for (int y = 0; y < h; ++y)
+  {
+    int* row = result.labels.ptr<int>(y);
+    for (int x = 0; x < w; ++x)
+    {
+      row[x] = forest.find(row[x]);
+    }
+  }
+
+  // --- 4./5. Size filter, moments, orientation classes, saliency
+  const int min_pixels = static_cast<int>(config_.min_area / 100.0f * w * h);
+  const int max_pixels = static_cast<int>(config_.max_area / 100.0f * w * h);
+  std::array<int, kOrientationClasses + 1> per_class{};
+  for (std::size_t label = 1; label < segments.size(); ++label)
+  {
+    Segment& segment = segments[label];
+    if (segment.pixels == 0)
+    {
+      continue; // merged away
+    }
+    if (segment.pixels < min_pixels || segment.pixels > max_pixels)
+    {
+      segment = Segment{}; // too small to matter for attention, or background-sized
+      continue;
+    }
+    const double n = segment.pixels;
+    const double mu20 = segment.sum_xx - segment.sum_x * segment.sum_x / n;
+    const double mu02 = segment.sum_yy - segment.sum_y * segment.sum_y / n;
+    const double mu11 = segment.sum_xy - segment.sum_x * segment.sum_y / n;
+    segment.eccentricity = eccentricity(mu20, mu02, mu11);
+    if (segment.eccentricity >= config_.min_oriented)
+    {
+      double angle = 0.5 * std::atan2(2.0 * mu11, mu20 - mu02); // eq. 5.5
+      if (angle < 0.0)
+      {
+        angle += CV_PI;
+      }
+      segment.angle = static_cast<float>(angle);
+      segment.orientation_class =
+          std::min(kOrientationClasses - 1, static_cast<int>(kOrientationClasses * angle / CV_PI));
+    }
+    ++per_class[segment.orientation_class];
+  }
+
+  for (Segment& segment : segments)
+  {
+    if (segment.pixels == 0)
+    {
+      continue;
+    }
+    const float above = std::max(0.0f, segment.eccentricity - config_.saliency_offset);
+    segment.saliency =
+        above / (1.0f - config_.saliency_offset) / config_.exclusivity.divisor(per_class[segment.orientation_class]);
+  }
+
+  result.saliency = cv::Mat::zeros(h, w, CV_32F);
+  for (int y = 0; y < h; ++y)
+  {
+    int* label = result.labels.ptr<int>(y);
+    float* out = result.saliency.ptr<float>(y);
+    for (int x = 0; x < w; ++x)
+    {
+      if (segments[label[x]].pixels == 0)
+      {
+        label[x] = 0; // dropped by the size filter
+      }
+      out[x] = segments[label[x]].saliency;
+    }
+  }
+  return result;
+}
 
 core::FeatureMap EccentricityFeature::extract(const core::Frame& frame) const
 {
-  DebugContext dummy_debug;
-  return extract(frame, dummy_debug);
+  DebugContext no_debug;
+  return extract(frame, no_debug);
 }
 
 core::FeatureMap EccentricityFeature::extract(const core::Frame& frame, DebugContext& debug) const
 {
-  // Timing (only if debugging)
-  auto t_start = std::chrono::high_resolution_clock::now();
+  const auto start = std::chrono::high_resolution_clock::now();
 
-  // Validation
   if (frame.empty())
   {
     throw std::runtime_error("EccentricityFeature: Cannot extract from empty frame");
   }
-
   if (!frame.pyramids_computed || frame.gray_pyramid.empty())
   {
     throw std::runtime_error("EccentricityFeature: Grayscale pyramid not computed");
@@ -42,314 +384,52 @@ core::FeatureMap EccentricityFeature::extract(const core::Frame& frame, DebugCon
   {
     requested_scale = (frame.width() > 640 || frame.height() > 640) ? 2 : 0;
   }
+  const int scale_index = std::min(requested_scale, static_cast<int>(frame.gray_pyramid.size()) - 1);
 
-  int scale_index = std::min(requested_scale, static_cast<int>(frame.gray_pyramid.size()) - 1);
-  if (scale_index < 0)
+  // The pyramid holds float grey values in [0, 1]; the algorithm's thresholds
+  // (Sobel histogram, max_mu = 20) are defined on 0..255.
+  cv::Mat gray_8u;
+  frame.gray_pyramid[scale_index].convertTo(gray_8u, CV_8U, 255.0);
+
+  const Result result = evaluate(gray_8u);
+
+  cv::Mat saliency;
+  if (result.saliency.size() != frame.size())
   {
-    throw std::runtime_error("EccentricityFeature: Invalid pyramid configuration");
-  }
-
-  const cv::Mat& gray = frame.gray_pyramid[scale_index];
-
-  // Step 1: Compute edges using Sobel gradient magnitude
-  auto t_edge_start = std::chrono::high_resolution_clock::now();
-  cv::Mat grad_x, grad_y;
-  cv::Sobel(gray, grad_x, CV_32F, 1, 0, 3);
-  cv::Sobel(gray, grad_y, CV_32F, 0, 1, 3);
-
-  cv::Mat edges;
-  cv::magnitude(grad_x, grad_y, edges);
-  cv::normalize(edges, edges, 0.0f, 1.0f, cv::NORM_MINMAX);
-  auto t_edge_end = std::chrono::high_resolution_clock::now();
-
-  // Step 2: Segment the image using watershed
-  auto t_segment_start = std::chrono::high_resolution_clock::now();
-  cv::Mat labels = segment_image(gray, edges);
-  auto t_segment_end = std::chrono::high_resolution_clock::now();
-
-  // Step 3: Compute eccentricity for each segment
-  auto t_ecc_start = std::chrono::high_resolution_clock::now();
-  int image_area = gray.rows * gray.cols;
-  std::map<int, cv::Moments> valid_segments = filter_segments(labels, image_area);
-
-  // Pre-compute eccentricity for all valid segments (O(N+M) optimization)
-  std::map<int, float> label_to_ecc;
-  for (const auto& pair : valid_segments)
-  {
-    label_to_ecc[pair.first] = compute_eccentricity(pair.second);
-  }
-
-  // Create eccentricity map - single pass over pixels
-  cv::Mat eccentricity_map = cv::Mat::zeros(gray.size(), CV_32F);
-  for (int y = 0; y < labels.rows; ++y)
-  {
-    for (int x = 0; x < labels.cols; ++x)
-    {
-      int label = labels.at<int>(y, x);
-      auto it = label_to_ecc.find(label);
-      if (it != label_to_ecc.end())
-      {
-        eccentricity_map.at<float>(y, x) = it->second;
-      }
-    }
-  }
-  auto t_ecc_end = std::chrono::high_resolution_clock::now();
-
-  // Step 4: Resize to original frame size and normalize
-  auto t_resize_start = std::chrono::high_resolution_clock::now();
-  cv::Mat result;
-  if (scale_index > 0)
-  {
-    cv::resize(eccentricity_map, result, frame.size(), 0, 0, cv::INTER_LINEAR);
+    cv::resize(result.saliency, saliency, frame.size(), 0, 0, cv::INTER_LINEAR);
   }
   else
   {
-    result = eccentricity_map.clone();
+    saliency = result.saliency;
   }
 
-  cv::normalize(result, result, 0.0f, 1.0f, cv::NORM_MINMAX);
-  auto t_resize_end = std::chrono::high_resolution_clock::now();
-
-  // Capture debug data if requested (keeps algorithm code clean above)
   if (debug.enabled)
   {
-    double total_ms = std::chrono::duration<double, std::milli>(t_resize_end - t_start).count();
-    double edge_ms = std::chrono::duration<double, std::milli>(t_edge_end - t_edge_start).count();
-    double segment_ms = std::chrono::duration<double, std::milli>(t_segment_end - t_segment_start).count();
-    double ecc_ms = std::chrono::duration<double, std::milli>(t_ecc_end - t_ecc_start).count();
-    double resize_ms = std::chrono::duration<double, std::milli>(t_resize_end - t_resize_start).count();
-
-    capture_debug_data(debug, frame, gray, edges, labels, eccentricity_map, result, total_ms, edge_ms, segment_ms,
-                       ecc_ms, resize_ms, static_cast<int>(valid_segments.size()));
-  }
-
-  return core::FeatureMap("eccentricity", result, 1.0f);
-}
-
-cv::Mat EccentricityFeature::segment_image(const cv::Mat& gray, const cv::Mat& edges) const
-{
-  // Create binary edge map based on threshold
-  cv::Mat edge_binary;
-  cv::threshold(edges, edge_binary, config_.edge_threshold, 1.0, cv::THRESH_BINARY);
-  edge_binary.convertTo(edge_binary, CV_8U, 255);
-
-  // Use distance transform and watershed for segmentation
-  cv::Mat dist;
-  cv::distanceTransform(~edge_binary, dist, cv::DIST_L2, 3);
-
-  // Find local maxima as seeds
-  cv::Mat dist_8u;
-  cv::normalize(dist, dist_8u, 0, 255, cv::NORM_MINMAX, CV_8U);
-
-  // Threshold distance transform to get markers
-  cv::Mat markers_8u;
-  cv::threshold(dist_8u, markers_8u, 0.3 * 255, 255, cv::THRESH_BINARY);
-
-  // Find connected components as initial markers
-  cv::Mat markers;
-  int num_labels = cv::connectedComponents(markers_8u, markers, 8, CV_32S);
-
-  // Apply watershed - requires CV_8UC3 input
-  cv::Mat gray_8u, gray_bgr;
-  if (gray.type() != CV_8U)
-  {
-    gray.convertTo(gray_8u, CV_8U);
-  }
-  else
-  {
-    gray_8u = gray;
-  }
-  cv::cvtColor(gray_8u, gray_bgr, cv::COLOR_GRAY2BGR);
-  cv::watershed(gray_bgr, markers);
-
-  // Collect valid labels first, then reassign boundaries
-  std::set<int> valid_labels;
-  for (int y = 0; y < markers.rows; ++y)
-  {
-    for (int x = 0; x < markers.cols; ++x)
+    const auto end = std::chrono::high_resolution_clock::now();
+    const int kept = static_cast<int>(
+        std::count_if(result.segments.begin(), result.segments.end(), [](const Segment& s) { return s.pixels > 0; }));
+    debug.add_annotation("initial_segments", std::to_string(result.initial_segments));
+    debug.add_annotation("num_segments", std::to_string(kept));
+    debug.add_annotation("growth_threshold", std::to_string(result.growth_threshold));
+    debug.add_annotation("compute_scale", std::to_string(scale_index));
+    debug.add_timing("total_time", std::chrono::duration<double, std::milli>(end - start).count());
+    if (debug.is_level(DebugContext::Level::Basic))
     {
-      int label = markers.at<int>(y, x);
-      if (label > 0)
-      {
-        valid_labels.insert(label);
-      }
+      cv::Mat sobel_viz;
+      cv::normalize(result.sobel, sobel_viz, 0.0f, 1.0f, cv::NORM_MINMAX);
+      debug.add_image("edges", sobel_viz);
+      debug.add_image("eccentricity_map_before_resize", result.saliency);
+    }
+    if (debug.is_level(DebugContext::Level::Detailed))
+    {
+      cv::Mat labels_viz;
+      cv::normalize(result.labels, labels_viz, 0, 255, cv::NORM_MINMAX, CV_8U);
+      cv::applyColorMap(labels_viz, labels_viz, cv::COLORMAP_JET);
+      debug.add_image("segment_labels", labels_viz);
     }
   }
 
-  // If no valid labels, return empty markers (fallback)
-  if (valid_labels.empty())
-  {
-    return cv::Mat::zeros(markers.size(), CV_32S);
-  }
-
-  // Use first valid label as fallback
-  int fallback_label = *valid_labels.begin();
-
-  // Watershed sets boundaries to -1, we need to reassign those to nearest segment
-  for (int y = 0; y < markers.rows; ++y)
-  {
-    for (int x = 0; x < markers.cols; ++x)
-    {
-      if (markers.at<int>(y, x) == -1)
-      {
-        // Find nearest non-boundary pixel (simple 3x3 search)
-        bool found = false;
-        for (int dy = -1; dy <= 1 && !found; ++dy)
-        {
-          for (int dx = -1; dx <= 1 && !found; ++dx)
-          {
-            int nx = x + dx;
-            int ny = y + dy;
-            if (nx >= 0 && nx < markers.cols && ny >= 0 && ny < markers.rows)
-            {
-              int neighbor_label = markers.at<int>(ny, nx);
-              if (neighbor_label > 0)
-              {
-                markers.at<int>(y, x) = neighbor_label;
-                found = true;
-              }
-            }
-          }
-        }
-        if (!found)
-        {
-          markers.at<int>(y, x) = fallback_label; // Use valid label as fallback
-        }
-      }
-    }
-  }
-
-  return markers;
-}
-
-float EccentricityFeature::compute_eccentricity(const cv::Moments& m) const
-{
-  // Guard against zero or near-zero area
-  if (m.m00 < 1e-10)
-  {
-    return 0.0f;
-  }
-
-  // Compute central moments
-  double mu20 = m.mu20 / m.m00;
-  double mu02 = m.mu02 / m.m00;
-  double mu11 = m.mu11 / m.m00;
-
-  // Compute eigenvalues of the covariance matrix
-  // The covariance matrix is:
-  // [ mu20  mu11 ]
-  // [ mu11  mu02 ]
-  //
-  // Eigenvalues: lambda = (mu20 + mu02 +/- sqrt((mu20-mu02)^2 + 4*mu11^2)) / 2
-
-  double diff = mu20 - mu02;
-  double disc = std::sqrt(diff * diff + 4 * mu11 * mu11);
-
-  double lambda1 = (mu20 + mu02 + disc) / 2.0;
-  double lambda2 = (mu20 + mu02 - disc) / 2.0;
-
-  // Eccentricity from eigenvalues: ecc = sqrt(1 - lambda_min/lambda_max)
-  if (lambda1 <= 0)
-  {
-    return 0.0f; // Degenerate case
-  }
-
-  double ecc_squared = 1.0 - std::abs(lambda2) / std::abs(lambda1);
-  if (ecc_squared < 0)
-  {
-    ecc_squared = 0;
-  }
-
-  return static_cast<float>(std::sqrt(ecc_squared));
-}
-
-std::map<int, cv::Moments> EccentricityFeature::filter_segments(const cv::Mat& labels, int image_area) const
-{
-  std::map<int, cv::Moments> valid_segments;
-
-  // Find unique labels and compute moments
-  std::map<int, int> label_counts;
-
-  // Count pixels per label
-  for (int y = 0; y < labels.rows; ++y)
-  {
-    for (int x = 0; x < labels.cols; ++x)
-    {
-      int label = labels.at<int>(y, x);
-      if (label > 0)
-      {
-        label_counts[label]++;
-      }
-    }
-  }
-
-  // Compute area thresholds
-  int min_pixels = static_cast<int>(config_.min_area * image_area / 100.0);
-  int max_pixels = static_cast<int>(config_.max_area * image_area / 100.0);
-
-  // For each label, check area constraints and compute moments
-  for (const auto& pair : label_counts)
-  {
-    int label = pair.first;
-    int count = pair.second;
-
-    if (count >= min_pixels && count <= max_pixels)
-    {
-      // Create binary mask for this segment
-      cv::Mat mask = (labels == label);
-
-      // Compute moments
-      cv::Moments moments = cv::moments(mask, true);
-
-      if (moments.m00 > 0)
-      {
-        valid_segments[label] = moments;
-      }
-    }
-  }
-
-  return valid_segments;
-}
-
-void EccentricityFeature::capture_debug_data(DebugContext& debug, const core::Frame& frame, const cv::Mat& gray,
-                                             const cv::Mat& edges, const cv::Mat& labels,
-                                             const cv::Mat& eccentricity_map, const cv::Mat& result, double total_ms,
-                                             double edge_computation_ms, double segmentation_ms,
-                                             double eccentricity_computation_ms, double resize_ms,
-                                             int num_segments) const
-{
-  // Annotations
-  debug.add_annotation("num_segments", std::to_string(num_segments));
-  debug.add_annotation("compute_scale", std::to_string(config_.compute_at_scale));
-  debug.add_annotation("edge_threshold", std::to_string(config_.edge_threshold));
-  debug.add_annotation("output_size", std::to_string(result.cols) + "x" + std::to_string(result.rows));
-
-  // Timings
-  debug.add_timing("edge_computation", edge_computation_ms);
-  debug.add_timing("segmentation", segmentation_ms);
-  debug.add_timing("eccentricity_computation", eccentricity_computation_ms);
-  debug.add_timing("resize_and_normalize", resize_ms);
-  debug.add_timing("total_time", total_ms);
-
-  // Basic level: Key intermediate results
-  if (debug.is_level(DebugContext::Level::Basic))
-  {
-    debug.add_image("edges", edges);
-    debug.add_image("eccentricity_map_before_resize", eccentricity_map);
-  }
-
-  // Detailed level: Add segmentation labels visualization
-  if (debug.is_level(DebugContext::Level::Detailed))
-  {
-    // Visualize segments by converting labels to colors
-    cv::Mat labels_viz;
-    cv::normalize(labels, labels_viz, 0, 255, cv::NORM_MINMAX, CV_8U);
-    cv::applyColorMap(labels_viz, labels_viz, cv::COLORMAP_JET);
-    debug.add_image("segment_labels", labels_viz);
-
-    // Also save the raw grayscale used for computation
-    debug.add_image("input_grayscale", gray);
-  }
+  return core::FeatureMap("eccentricity", saliency, 1.0f);
 }
 
 } // namespace features

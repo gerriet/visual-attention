@@ -1,0 +1,49 @@
+# Thesis track (docs/adr/0005): only components that implement the dissertation.
+# This is the profile the replication-track studies run on — H1 (object- vs
+# space-based inhibition of return, eval/dynamic_ior.py) and the M10 dossier.
+# The modern-track second-stage profile is configs/attend.yaml.
+#
+# AttentionSystem profile (roadmap M6): the dissertation's feature set feeding
+# the symbolic second stage. Use with --attend on a temporal sequence:
+#
+#   ./attention --attend <dir|video> --config configs/thesis/attend.yaml \
+#       --output results/attend --emit-scanpath results/scanpath.json
+#
+# --attend runs the full system: features → fusion → saliency (this config),
+# then object files + the Exploration behavior maintain the scanpath. The
+# second-stage / behavior parameters (dwell, correspondence radius, action
+# mode) are AttentionSystem::Config defaults; the pipeline part is below.
+#
+# Without --config, --attend uses the default feature set plus onset (motion
+# helps object correspondence).
+
+pipeline:
+  fusion: weighted-sum
+  # A cheap selection: under --attend the system segments the fused saliency
+  # itself, so the pipeline's own peak selection is unused. nms avoids the
+  # neural field's cross-frame IOR fighting the object-file tracking.
+  selection: nms
+
+features:
+  color-munsell:
+    weight: 1.0
+    params:
+      exclusivity: 1.1
+  eccentricity:
+    weight: 1.0
+    params:
+      exclusivity: 1.1
+  symmetry:
+    weight: 1.0
+  onset:
+    weight: 1.0
+  color:
+    enabled: false
+  intensity:
+    enabled: false
+  orientation:
+    enabled: false
+
+output:
+  output_dir: "results/"
+  display: false

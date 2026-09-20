@@ -1,0 +1,16 @@
+{
+  "schema": "attention-scanpath/v1",
+  "generator": {
+    "name": "attention-framework",
+    "behavior": "exploration"
+  },
+  "frames": 3,
+  "scanpath": [
+    {"frame": 0, "label": 3, "x": 99, "y": 99, "saliency": 0.525784, "bbox": [21, 21, 163, 158]},
+    {"frame": 1, "label": 3, "x": 89, "y": 107, "saliency": 0.461951, "bbox": [87, 89, 6, 30]},
+    {"frame": 2, "label": 3, "x": 142, "y": 100, "saliency": 0.557573, "bbox": [113, 65, 59, 71]}
+  ],
+  "objects": [
+    {"label": 3, "x": 142, "y": 100, "size": 2488, "saliency": 0.557573, "avg_saliency": 0.52572, "created_frame": 0, "last_selected_frame": 2}
+  ]
+}

@@ -2,6 +2,7 @@
 
 #include "attention/core/feature_map.h"
 #include "attention/core/frame.h"
+#include "attention/features/exclusivity.h"
 #include "attention/features/feature_extractor.h"
 #include <opencv2/opencv.hpp>
 #include <vector>
@@ -61,6 +62,14 @@ class StereoFeature : public FeatureExtractor
     double gabor_bandwidth = 1.0;
     int confidence_blur = 3;    // spatial Gaussian on each disparity slice (odd; 0 = none)
     int max_working_size = 256; // downscale so the longer side is ≤ this before correlating
+    // Exclusivity (§5.5.3): every pixel of disparity level i is divided by
+    // c^(np_i / np), np_i = pixels won by that level — crowded depth planes (a
+    // wall, a shelf front) lose saliency. The thesis does not define np; it is
+    // reconstructed here as the pixel count of a level under a uniform spread
+    // (matched pixels / disparity levels), so the exponent reads "how many
+    // times fuller than average". Only the Exponential mode applies. Off by
+    // default; configs/thesis/stereo.yaml: 1.1.
+    Exclusivity exclusivity;
   };
 
   StereoFeature() : StereoFeature(Config{}) {}

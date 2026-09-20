@@ -143,7 +143,9 @@ def main():
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--scene", required=True, help="scene dir (frames + gt.json)")
     ap.add_argument("--binary", default="build/attention")
-    ap.add_argument("--config", default="configs/attend.yaml")
+    ap.add_argument("--config", default="configs/thesis/attend.yaml",
+                    help="pipeline config; H1 is a claim of the thesis, so the thesis-track "
+                         "second-stage profile is the default (docs/adr/0005)")
     ap.add_argument("--out", default="results/dynamic_ior")
     ap.add_argument("--match-radius", type=float, default=28.0,
                     help="max distance (px) from focus to an object centroid to count as attended")

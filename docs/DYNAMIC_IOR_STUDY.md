@@ -1,5 +1,7 @@
 # Dynamic-IOR study (M12) — is object-based inhibition of return useful?
 
+*Track: **replication** (docs/adr/0005) — H1 is the thesis's own claim; from 2026-09-20 the study runs on `configs/thesis/attend.yaml` by default. The numbers below predate that profile (they were measured with the Itti-style colour feature and the defective eccentricity) and are superseded by the confirmatory run planned in `docs/HYPOTHESIS_CLOSURE_PLAN.md`.*
+
 *First cut, 2026-07-12. Tests hypothesis **H1**: in multi-object dynamic scenes,
 object-based inhibition of return (IOR) beats space-based and no IOR. This is
 the thesis's raison d'être for its symbolic second stage.*
@@ -204,6 +206,12 @@ is unchanged by default. Rerunning this study's three regimes, 6 seeds each
 | | object-IOR | 6.88 / 0.185 | **5.21** / 0.098 |
 | occlusion (speed 20, length 10, `ior_radius` 18) | space-IOR | 5.63 / 0.101 | 5.63 / 0.101 |
 | | object-IOR | 7.29 / 0.164 | **5.63** / 0.115 |
+
+(The "aids" column differs from the earlier sections — there space-IOR led in
+every regime, here object-IOR already leads in the standard one. The seed sets
+differ (≤ 5 seeds then, 6 here) and neither has intervals; differences of this
+size are within what a handful of seeds can produce, which is the reason the
+confirmatory run is needed.)
 
 Coverage is 1.00 for both IOR arms throughout; space-IOR is unaffected (it
 doesn't inhibit by identity). Persistent identity takes object-IOR from clearly

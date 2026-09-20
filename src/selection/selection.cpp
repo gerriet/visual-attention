@@ -81,25 +81,41 @@ class NmsSelection : public SelectionStrategy
     cv::Mat peak_mask;
     cv::bitwise_and(local_max, thresholded, peak_mask);
 
-    // Extract peak locations and values from detection map
-    std::vector<core::Peak> candidate_peaks;
+    // One candidate per *plateau*. On a piecewise-constant map (segment-based
+    // features: eccentricity, colour contrast) every pixel of a salient segment
+    // equals its dilation, so every pixel is a "local maximum" with the same
+    // value; taken one by one, the min-distance rule below then tiles the
+    // largest segment with peaks and spends the whole fixation budget inside
+    // it. A plateau is one maximum: it contributes its most interior pixel
+    // (distance-transform maximum — unlike the centroid, always inside a
+    // non-convex region). An isolated peak is a plateau of one pixel.
+    cv::Mat plateau_labels;
+    const int plateaus = cv::connectedComponents(peak_mask, plateau_labels, 8, CV_32S);
+    cv::Mat interior;
+    cv::distanceTransform(peak_mask, interior, cv::DIST_L2, 3);
+    std::vector<cv::Point> best(plateaus, cv::Point(-1, -1));
+    std::vector<float> best_depth(plateaus, -1.0f);
     for (int y = 0; y < peak_mask.rows; ++y)
     {
+      const int* label = plateau_labels.ptr<int>(y);
+      const float* depth = interior.ptr<float>(y);
       for (int x = 0; x < peak_mask.cols; ++x)
       {
-        if (peak_mask.at<uchar>(y, x) > 0)
+        if (label[x] > 0 && depth[x] > best_depth[label[x]])
         {
-          // Scale coordinates back to original resolution
-          int orig_x = static_cast<int>(x / scale_factor + 0.5f);
-          int orig_y = static_cast<int>(y / scale_factor + 0.5f);
-
-          orig_x = std::min(orig_x, map.cols - 1);
-          orig_y = std::min(orig_y, map.rows - 1);
-
-          float value = map.at<float>(orig_y, orig_x);
-          candidate_peaks.push_back(core::Peak(cv::Point(orig_x, orig_y), value));
+          best_depth[label[x]] = depth[x];
+          best[label[x]] = cv::Point(x, y);
         }
       }
+    }
+
+    std::vector<core::Peak> candidate_peaks;
+    for (int label = 1; label < plateaus; ++label)
+    {
+      // Scale coordinates back to original resolution
+      const int orig_x = std::min(static_cast<int>(best[label].x / scale_factor + 0.5f), map.cols - 1);
+      const int orig_y = std::min(static_cast<int>(best[label].y / scale_factor + 0.5f), map.rows - 1);
+      candidate_peaks.push_back(core::Peak(cv::Point(orig_x, orig_y), map.at<float>(orig_y, orig_x)));
     }
 
     // Sort by value (descending)

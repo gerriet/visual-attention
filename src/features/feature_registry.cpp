@@ -7,6 +7,7 @@
 #include "attention/features/image_signature_feature.h"
 #include "attention/features/intensity_feature.h"
 #include "attention/features/minimum_barrier_feature.h"
+#include "attention/features/munsell_color_feature.h"
 #include "attention/features/onset_feature.h"
 #include "attention/features/orientation_feature.h"
 #include "attention/features/phase_spectrum_feature.h"
@@ -61,6 +62,26 @@ std::vector<std::string> FeatureRegistry::available() const
 
 using config::read_param;
 
+namespace
+{
+
+// `exclusivity: 1.1` (+ optional `exclusivity_mode: exponential | power`) —
+// shared by the features that categorize their segments (thesis §5.5.3).
+void read_exclusivity(const YAML::Node& params, Exclusivity& exclusivity)
+{
+  std::string mode;
+  read_param(params, "exclusivity_mode", mode);
+  if (!mode.empty())
+  {
+    exclusivity.mode = Exclusivity::parse_mode(mode);
+    // "off" differs per mode (c = 1 vs p = 0)
+    exclusivity.strength = exclusivity.mode == Exclusivity::Mode::Power ? 0.0f : 1.0f;
+  }
+  read_param(params, "exclusivity", exclusivity.strength);
+}
+
+} // namespace
+
 void register_builtin_features()
 {
   static bool registered = false;
@@ -79,6 +100,25 @@ void register_builtin_features()
                  read_param(params, "pyramid_levels", config.pyramid_levels);
                  read_param(params, "normalize_channels", config.normalize_channels);
                  return std::make_unique<ColorFeature>(config);
+               });
+
+  // The dissertation's colour feature (MTM/Munsell segmentation contrast,
+  // §5.3.2). `color` above is the reimplementation's Itti-Koch-style feature;
+  // configs/thesis/thesis.yaml selects this one instead.
+  registry.add("color-munsell",
+               [](const YAML::Node& params)
+               {
+                 MunsellColorFeature::Config config;
+                 read_param(params, "max_working_size", config.max_working_size);
+                 read_param(params, "threshold", config.threshold);
+                 read_param(params, "threshold_sigma", config.threshold_sigma);
+                 read_param(params, "attribute_threshold", config.attribute_threshold);
+                 read_param(params, "min_segment", config.min_segment);
+                 read_param(params, "max_segment", config.max_segment);
+                 read_param(params, "max_contrast", config.max_contrast);
+                 read_param(params, "sigmoid_beta", config.sigmoid_beta);
+                 read_exclusivity(params, config.exclusivity);
+                 return std::make_unique<MunsellColorFeature>(config);
                });
 
   registry.add("intensity",
@@ -111,7 +151,14 @@ void register_builtin_features()
                  read_param(params, "min_area", config.min_area);
                  read_param(params, "max_area", config.max_area);
                  read_param(params, "variance_threshold", config.variance_threshold);
+                 read_param(params, "merge_mean_difference", config.merge_mean_difference);
+                 read_param(params, "merge_iterations", config.merge_iterations);
+                 read_param(params, "connectivity", config.connectivity);
+                 read_param(params, "equalize", config.equalize);
+                 read_param(params, "saliency_offset", config.saliency_offset);
+                 read_param(params, "min_oriented", config.min_oriented);
                  read_param(params, "compute_at_scale", config.compute_at_scale);
+                 read_exclusivity(params, config.exclusivity);
                  return std::make_unique<EccentricityFeature>(config);
                });
 
@@ -167,6 +214,7 @@ void register_builtin_features()
                  read_param(params, "gabor_bandwidth", config.gabor_bandwidth);
                  read_param(params, "confidence_blur", config.confidence_blur);
                  read_param(params, "max_working_size", config.max_working_size);
+                 read_exclusivity(params, config.exclusivity);
                  return std::make_unique<StereoFeature>(config);
                });
 

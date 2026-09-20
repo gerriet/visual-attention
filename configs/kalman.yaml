@@ -1,6 +1,6 @@
 # Kalman-MOT selection profile: the thesis feature set, but selection done by
 # blob-detection + Kalman multi-object tracking instead of the neural field
-# (docs/SELECTION_BACKENDS.md, option B). A drop-in A/B against configs/thesis.yaml
+# (docs/SELECTION_BACKENDS.md, option B). A drop-in A/B against configs/thesis/thesis.yaml
 # on the same features and inputs — especially streams (--attend / --live / a
 # frame directory), where tracking and object-based IOR matter.
 #

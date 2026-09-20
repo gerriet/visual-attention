@@ -15,7 +15,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 BINARY = REPO / "build" / "attention"
-CONFIG = REPO / "configs" / "thesis.yaml"
+CONFIG = REPO / "configs" / "thesis" / "thesis.yaml"
 IMAGES = [REPO / "data" / "test_images" / n for n in ("input.png", "inputc.png", "art.jpg")]
 OUT_DIR = REPO / "docs"
 WORK = REPO / "build" / "benchmark"

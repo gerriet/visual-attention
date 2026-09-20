@@ -275,9 +275,12 @@ core::FeatureMap StereoFeature::extract(const core::Frame& frame, DebugContext& 
   // reliable correspondence (winning confidence ~0) stay dark.
   const float disp_span = static_cast<float>(std::max(1, std::max(std::abs(min_d), std::abs(max_d))));
   cv::Mat depth = cv::Mat::zeros(H, W, CV_32F);
+  cv::Mat winner(H, W, CV_32S, cv::Scalar(-1)); // winning disparity level per pixel
+  std::vector<int> level_pixels(num_d, 0);
   for (int y = 0; y < H; ++y)
   {
     float* out = depth.ptr<float>(y);
+    int* won = winner.ptr<int>(y);
     for (int x = 0; x < W; ++x)
     {
       float best = 0.0f;
@@ -295,6 +298,41 @@ core::FeatureMap StereoFeature::extract(const core::Frame& frame, DebugContext& 
       {
         const int disparity = min_d + best_d;
         out[x] = std::abs(disparity) / disp_span;
+        won[x] = best_d;
+        ++level_pixels[best_d];
+      }
+    }
+  }
+
+  // Exclusivity (§5.5.3): depth has no discrete segments, so the pixel count
+  // of each disparity level stands in for the segment count — a level holding
+  // many pixels is a common depth and gives less saliency.
+  if (config_.exclusivity.enabled() && config_.exclusivity.mode == Exclusivity::Mode::Exponential)
+  {
+    long matched = 0;
+    for (int pixels : level_pixels)
+    {
+      matched += pixels;
+    }
+    const float uniform = static_cast<float>(matched) / static_cast<float>(num_d); // "np", see the header
+    if (uniform > 0.0f)
+    {
+      std::vector<float> divisor(num_d, 1.0f);
+      for (int d = 0; d < num_d; ++d)
+      {
+        divisor[d] = std::pow(config_.exclusivity.strength, level_pixels[d] / uniform);
+      }
+      for (int y = 0; y < H; ++y)
+      {
+        float* out = depth.ptr<float>(y);
+        const int* won = winner.ptr<int>(y);
+        for (int x = 0; x < W; ++x)
+        {
+          if (won[x] >= 0)
+          {
+            out[x] /= divisor[won[x]];
+          }
+        }
       }
     }
   }

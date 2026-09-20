@@ -26,6 +26,19 @@ feature maps → an object-based attentive stage) as a clean, config-driven,
 tested C++ system, with a Python layer that scores it against human fixations
 and modern saliency models.
 
+How faithful, component by component: stereo, the neural fields and — since
+2026-09 — colour contrast (Munsell/MTM segmentation), eccentricity and the
+exclusivity weighting are ports of the original sources and the thesis's
+equations; onset and the symbolic second stage are reconstructions from the
+thesis text, because their sources did not survive; symmetry has the thesis's
+core with additions. `configs/thesis/` holds the dissertation profiles (the
+replication track — finite, to be frozen when done); everything else is the
+modern track, free to move away from the thesis
+([ADR-0005](docs/adr/0005-two-tracks-replication-and-modern.md)).
+`configs/default.yaml` adds Itti–Koch-style colour, intensity and orientation
+features that the thesis did not have. Details and what is still open:
+[docs/FEATURE_ASSESSMENT.md](docs/FEATURE_ASSESSMENT.md).
+
 The thesis model is the **protected default**: every later addition — a
 priority map with top-down and selection-history channels, persistent
 identity-keyed object memory, proto-object segmentation, alternative feature
@@ -74,9 +87,11 @@ cmake --build build -j
 # Single image → saliency map + scanpath overlay (in results/)
 ./build/attention data/samples/images/butterfly.jpg --no-display
 
-# Classic (thesis) vs. modern feature profile on the same image
-./build/attention --config configs/thesis.yaml data/test_images/inputc.png --no-display
+# The dissertation profile, the best modern profile (today it starts equal to
+# the thesis one — see configs/modern.yaml), and the old five-feature default
+./build/attention --config configs/thesis/thesis.yaml data/test_images/inputc.png --no-display
 ./build/attention --config configs/modern.yaml data/test_images/inputc.png --no-display
+./build/attention --config configs/thesis-extended.yaml data/test_images/inputc.png --no-display
 
 # Live overlay on a webcam/video with per-object ROI processors (ESC to quit)
 ./build/attention --live 0 --config configs/live.yaml
@@ -128,7 +143,9 @@ and reported.
 - **Object-based inhibition of return in dynamic scenes (H1).** It does *not*
   beat space-based IOR on exploration metrics — it is only as good as its
   tracker, and every identity switch costs a re-fixation. With persistent,
-  identity-keyed object memory it moves ahead on latency at high speed.
+  identity-keyed object memory it draws level, and in a six-seed pilot it is
+  ahead on latency at high speed — a direction, not yet a result (the
+  confirmatory run at ≥ 20 seeds with intervals is open).
   [DYNAMIC_IOR_STUDY.md](docs/DYNAMIC_IOR_STUDY.md)
 - **Recognition gated by attention (H2).** Detectors restricted to attended
   ROIs recover 51% of all full-frame detections at 5.8% of the pixels.
@@ -159,6 +176,7 @@ The load-bearing choices are recorded as short ADRs:
 - [Registry- and config-driven strategies](docs/adr/0002-registry-config-driven-strategies.md)
 - [File-based interchange instead of FFI](docs/adr/0003-file-interchange-not-ffi.md)
 - [IOR as a controlled ablation, and an honest negative result](docs/adr/0004-ior-ablation-honest-negative-result.md)
+- [Two tracks: a finite replication, an open-ended modern system](docs/adr/0005-two-tracks-replication-and-modern.md)
 
 ## Context — where this sits
 
@@ -209,6 +227,7 @@ to check that everything still works.
 - [ALTERNATIVE_FEATURES.md](docs/ALTERNATIVE_FEATURES.md) · [SELECTION_BACKENDS.md](docs/SELECTION_BACKENDS.md) — pluggable operators / trackers
 - [DYNAMIC_IOR_STUDY.md](docs/DYNAMIC_IOR_STUDY.md) · [GATED_RECOGNITION.md](docs/GATED_RECOGNITION.md) · [PRIORITY_MAP.md](docs/PRIORITY_MAP.md) · [VLM_FRONT_END.md](docs/VLM_FRONT_END.md) · [VLM_VIDEO.md](docs/VLM_VIDEO.md) — the H1, H2, H5, H6 and H7 studies
 - [PAPER_READINESS.md](docs/PAPER_READINESS.md) — what could be published, and what is missing
+- [CRITICAL_REVIEW_2026-09.md](docs/CRITICAL_REVIEW_2026-09.md) · [HYPOTHESIS_CLOSURE_PLAN.md](docs/HYPOTHESIS_CLOSURE_PLAN.md) · [FEATURE_ASSESSMENT.md](docs/FEATURE_ASSESSMENT.md) — the 2026-09 review: what is solid, what is not, and the plan to close the open hypotheses
 - [PERFORMANCE.md](docs/PERFORMANCE.md) — timing and optimization notes
 - Roadmaps: [V3_ROADMAP.md](docs/V3_ROADMAP.md) (current) · [V2_ROADMAP.md](docs/V2_ROADMAP.md) (history)
 

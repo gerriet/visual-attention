@@ -5,6 +5,17 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# Default to an optimized build: a plain `cmake -S . -B build` otherwise leaves
+# CMAKE_BUILD_TYPE empty (no -O flags at all), and every study and timing then
+# runs several times slower than it needs to. Multi-config generators (Xcode,
+# Visual Studio) choose at build time and are left alone.
+get_property(ATTENTION_MULTI_CONFIG GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
+if(NOT ATTENTION_MULTI_CONFIG AND NOT CMAKE_BUILD_TYPE)
+    message(STATUS "No build type given - defaulting to Release")
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS Debug Release RelWithDebInfo MinSizeRel)
+endif()
+
 # Find dependencies. OpenCV 4 is pinned (the code predates the 5.0 API); once
 # Homebrew's default `opencv` moved to 5.x, `brew install opencv@4` became the
 # supported route, and that formula is keg-only — hence the explicit prefix.
@@ -28,6 +39,7 @@ add_library(attention_core STATIC
     src/pipeline/attention_pipeline.cpp
     src/pipeline/frame_source.cpp
     src/features/color_feature.cpp
+    src/features/munsell_color_feature.cpp
     src/features/intensity_feature.cpp
     src/features/orientation_feature.cpp
     src/features/eccentricity_feature.cpp

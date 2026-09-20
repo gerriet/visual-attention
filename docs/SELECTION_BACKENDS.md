@@ -151,7 +151,15 @@ This turns "the field was hard to tune" into a quantified result and gives H1
 
 > **Decision (Gerriet, 2026-07-10): agreed — prototype B first**, as a
 > `kalman-mot` `SelectionStrategy`, to A/B against the neural field on identical
-> saliency streams (e.g. `vtest.avi`). To be built after the M9 commit lands.
+> saliency streams (e.g. `vtest.avi`).
+>
+> **Status (2026-07-12): B and D are built** — `kalman-mot`
+> (`src/selection/kalman_mot_selection.cpp`, `configs/kalman.yaml`) and
+> `normalization` (`src/selection/normalization_selection.cpp`,
+> `configs/normalization.yaml`), both opt-in with Catch2 + CTest coverage. E, F,
+> A and C are not built. **The A/B study above has not been run**, so this
+> document has no per-backend verdicts yet, and neither backend has been used
+> as an arm in the dynamic-IOR (M12) or video (M19) studies.
 
 Build **B (blob + Kalman MOT)** first — biggest robustness/efficiency win,
 simplest to reason about, and its Kalman occlusion handling is exactly what the

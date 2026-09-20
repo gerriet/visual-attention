@@ -14,7 +14,10 @@ Layout expected under data/hr_bench/ (gitignored):
 Each split is one parquet file with the image inline as base64: 800 rows =
 200 questions x 4 option rotations (`cycle_category`, HR-Bench's CircularEval).
 Only cycle 0 is scored here — plain accuracy, chance 0.25 — so each question
-counts once. The first use extracts the cycle-0 images to
+counts once. In cycle 0 the correct option is *always* "A", so the options are
+re-ordered per question (seeded by the question id: the same order in every arm
+and every run); served as stored, a model that says "A" whenever it cannot see
+the target would score 1.0. The first use extracts the cycle-0 images to
 data/hr_bench/extracted_<split>/ (needs pyarrow: eval/.venv/bin/pip install
 pyarrow), streaming one row at a time so the 2.8 GB 8K file never sits in
 memory whole. There are no target boxes, so the front-end's target
@@ -24,6 +27,7 @@ diagnostics stay off. Data is pointed to, never redistributed.
 import base64
 import json
 import os
+import random
 from pathlib import Path
 
 DEFAULT_ROOT = Path(__file__).resolve().parents[2] / "data" / "hr_bench"
@@ -68,6 +72,15 @@ def extract(split, root=DEFAULT_ROOT):
     return len(records)
 
 
+def shuffled_choices(choices, question_id):
+    """The options in an order fixed by the question id alone. Cycle 0 stores
+    the correct option first for every question; this spreads it evenly over
+    the letters without making the order depend on the run or the arm."""
+    order = list(choices)
+    random.Random("hrbench-%s" % question_id).shuffle(order)
+    return order
+
+
 def iter_items(split, category=None, root=DEFAULT_ROOT):
     """Yield dicts: {image (Path), question, choices, answer (str), answer_letter,
     category ('single' | 'cross'), question_id, target_boxes (None)}."""
@@ -82,14 +95,18 @@ def iter_items(split, category=None, root=DEFAULT_ROOT):
             record = json.loads(line)
             if category and record["category"] != category:
                 continue
-            choices = [record[k] for k in "ABCD" if record.get(k) is not None]
+            stored = [record[k] for k in "ABCD" if record.get(k) is not None]
             letter = record["answer"].strip()
             index = ord(letter) - 65
+            answer = stored[index] if 0 <= index < len(stored) else letter
+            choices = shuffled_choices(stored, record["index"])
+            if answer in choices:
+                letter = chr(65 + choices.index(answer))
             yield {
                 "image": out / record["image"],
                 "question": record["question"],
                 "choices": choices,
-                "answer": choices[index] if 0 <= index < len(choices) else letter,
+                "answer": answer,
                 "answer_letter": letter,
                 "category": record["category"],
                 "question_id": record["index"],
