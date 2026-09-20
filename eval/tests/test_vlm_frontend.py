@@ -7,8 +7,9 @@ import unittest
 from pathlib import Path
 
 from datasets import vstar
+import vlm_frontend
 from vlm_frontend import (make_view, random_coverage, random_fixations, target_fixation_rank,
-                          target_visible)
+                          target_visible, tile_boxes, tiled_fixations)
 
 
 def view(source_box, scale=1.0):
@@ -68,6 +69,44 @@ class TestRandomBaseline(unittest.TestCase):
 
     def test_no_boxes_is_unknown(self):
         self.assertIsNone(random_coverage(self.SIZE, None, 336, seed=1))
+
+
+class TestTiling(unittest.TestCase):
+    def test_tiles_cover_the_image_and_overlap(self):
+        boxes = tile_boxes((2000, 1500), 2)
+        self.assertEqual(len(boxes), 4)
+        self.assertEqual((boxes[0][0], boxes[0][1]), (0, 0))
+        self.assertEqual((boxes[-1][2], boxes[-1][3]), (2000, 1500))
+        self.assertGreater(boxes[0][2], boxes[1][0])  # horizontal neighbours overlap
+        self.assertGreater(boxes[0][3], boxes[2][1])  # vertical neighbours overlap
+
+    def test_fixations_merge_by_rank_in_native_coordinates(self):
+        class Img:  # the only parts of PIL.Image the merge touches
+            size = (2000, 1500)
+
+            def __init__(self, box=None):
+                self.box = box
+
+            def crop(self, box):
+                return Img(box)
+
+        def fake_emit(binary, image, proc_max_side, config=None, top_down=None):
+            if image.box is None:  # the whole image: one fixation
+                return [(1000.0, 750.0, 1.0)]
+            strong = 0.9 if image.box[0] == 0 and image.box[1] == 0 else 0.5
+            # local (10, 10) in every tile, plus a duplicate of the global one
+            return [(10.0, 10.0, strong), (1000.0 - image.box[0], 750.0 - image.box[1], 0.4)]
+
+        original = vlm_frontend.emit_fixations
+        vlm_frontend.emit_fixations = fake_emit
+        try:
+            merged = tiled_fixations("bin", Img(), 1024, tiles=2)
+        finally:
+            vlm_frontend.emit_fixations = original
+        self.assertEqual(merged[0][:2], (1000.0, 750.0))   # the gist comes first
+        self.assertEqual(merged[1][:2], (10.0, 10.0))      # then the strongest tile
+        self.assertEqual(len(merged), 5)                   # 1 global + 4 tile tops; duplicates dropped
+        self.assertIn((867.0, 653.0), [m[:2] for m in merged])  # tile offsets applied
 
 
 class TestVStarBoxes(unittest.TestCase):

@@ -128,6 +128,53 @@ def emit_fixations(binary, native, proc_max_side, config=None, top_down=None):
     return [(f["x"] * inv, f["y"] * inv, f["value"]) for f in fixations]
 
 
+def tile_boxes(size, tiles, overlap=0.25):
+    """An N x N grid of equal windows covering (w, h), neighbours overlapping by
+    `overlap` of a window so an object on a seam is whole in at least one."""
+    w, h = size
+    tw = w / (tiles - (tiles - 1) * overlap)
+    th = h / (tiles - (tiles - 1) * overlap)
+    boxes = []
+    for row in range(tiles):
+        for col in range(tiles):
+            x0, y0 = col * tw * (1 - overlap), row * th * (1 - overlap)
+            boxes.append((round(x0), round(y0), min(w, round(x0 + tw)), min(h, round(y0 + th))))
+    return boxes
+
+
+def tiled_fixations(binary, native, proc_max_side, config=None, tiles=2, min_distance=96):
+    """Attention at native scale: the pipeline runs once on the whole image (the
+    gist) and once per tile of an N x N grid, so a small target is not shrunk
+    away before stage 1 sees it — every stage of the pipeline works on a bounded
+    image, and a 36-px object in a 2000-px photo is 1-4 px at that size.
+
+    Saliency values are normalized per run and not comparable across tiles, so
+    the lists are merged by *rank*: round-robin over the runs (whole image
+    first, then tiles by the strength of their top fixation), skipping a
+    fixation closer than `min_distance` native px to one already taken — the
+    overlap would otherwise report an object twice."""
+    runs = [emit_fixations(binary, native, proc_max_side, config)]
+    for box in tile_boxes(native.size, tiles):
+        local = emit_fixations(binary, native.crop(box), proc_max_side, config)
+        runs.append([(x + box[0], y + box[1], v) for x, y, v in local])
+    head, tail = runs[0], sorted(runs[1:], key=lambda run: -run[0][2] if run else 0.0)
+    merged = []
+    for rank in range(max(len(run) for run in runs)):
+        for run in [head] + tail:
+            if rank < len(run):
+                x, y, v = run[rank]
+                if all(math.hypot(x - mx, y - my) >= min_distance for mx, my, _ in merged):
+                    merged.append((x, y, v))
+    return merged
+
+
+def bottom_up_fixations(args, image):
+    """The fovea arm's attention source, as configured on the command line."""
+    if args.tiles > 1:
+        return tiled_fixations(args.binary, image, args.proc_max_side, args.config, args.tiles)
+    return emit_fixations(args.binary, image, args.proc_max_side, args.config)
+
+
 def relevance_map(size, boxes):
     """Grayscale top-down relevance raster: each box filled, padded by a quarter
     of its size and softly blurred. A plateau, not a peak — so *within* the
@@ -558,6 +605,9 @@ def main():
     ap.add_argument("--ground-side", type=int, default=None,
                     help="long side (px) of the view the VLM grounds on for fovea-td (default: --global-side)")
     ap.add_argument("--config", default=None, help="pipeline config for --emit-json")
+    ap.add_argument("--tiles", type=int, default=1,
+                    help="N > 1: also run attention on an N x N grid of overlapping native-resolution "
+                         "tiles and merge the fixations by rank (small targets survive; N*N+1 pipeline runs)")
     ap.add_argument("--count-tokens", action="store_true", help="also record the backend's real count_tokens()")
     ap.add_argument("--resume", action="store_true",
                     help="continue a killed dataset run: keep the rows in --out/results.json and skip "
@@ -590,7 +640,7 @@ def main():
         img, item = synthetic_item(params)
         os.makedirs(args.out, exist_ok=True)
         img.save(os.path.join(args.out, "demo.png"))
-        fixations = emit_fixations(args.binary, img, args.proc_max_side, args.config)
+        fixations = bottom_up_fixations(args, img)
         results.append(run_item(backend, img, fixations, item, params))
     elif args.vstar or args.hrbench:
         from datasets import hrbench, vstar
@@ -632,7 +682,7 @@ def main():
                 continue
             with Image.open(item["image"]) as im:
                 image = im.convert("RGB")
-            fixations = emit_fixations(args.binary, image, args.proc_max_side, args.config)
+            fixations = bottom_up_fixations(args, image)
             results.append(run_item(backend, image, fixations, item, params))
             # Written after every item, so a run killed midway (a long local-VLM
             # run under memory pressure) keeps its rows for --resume.
