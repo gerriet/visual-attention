@@ -53,8 +53,8 @@ consumes that format, so adding a model never touches the harness.
 ```mermaid
 flowchart TD
     FS[FrameSource<br/>image / dir / video / stereo] --> FR[Frame<br/>pyramids + parameter-keyed Gabor banks]
-    FR --> FE[FeatureExtractor registry<br/>color · intensity · orientation · symmetry ·<br/>eccentricity · stereo · onset · 6 alt. operators]
-    FE -->|parallel| FU[FusionStrategy<br/>weighted-sum · normalization]
+    FR --> FE[FeatureExtractor registry<br/>color-munsell · eccentricity · symmetry · stereo · onset (thesis) ·<br/>color · intensity · orientation (Itti-Koch) · 6 alt. operators]
+    FE -->|parallel| FU[FusionStrategy<br/>weighted-sum]
     FU --> SEL[SelectionStrategy<br/>WTA/NMS · 2D neural field · 3D field · Kalman-MOT]
     SEL --> P[Peaks / activation clusters]
     P --> OS[ObjectFileStore<br/>correspondence + tracking]

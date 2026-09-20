@@ -33,13 +33,14 @@ for this first cut (the full C++ virtual fovea is M15's job). Per image+question
    top-K fixations, plus one low-res **global view** of the whole image.
 3. Hand the VLM *only* those images + the question.
 
-Three arms answer the same multiple-choice question, so the trade is honest:
+Every arm answers the same multiple-choice question, so the trade is honest:
 
 | Arm | What the VLM sees | Role |
 |---|---|---|
 | `full-res` | the whole image, capped to a practical VLM size | accuracy ceiling |
 | `uniform` | the whole image uniformly downsampled **to the fovea arm's token budget** | same-budget baseline (small objects vanish) |
 | `fovea` (ours) | low-res global view + K native-res attention crops | the front-end |
+| `fovea-random` | the same global view + K crops at uniformly random positions (seeded per question) | the floor: what the front-end is worth with no attention at all |
 | `fovea-oracle` (`--oracle`) | the same, crops centred on the annotated targets | upper bound: perfect attention |
 | `fovea-td` (`--top-down`) | the same, crops from a priority map with a question-conditioned top-down channel | H5×H6 |
 
@@ -73,7 +74,11 @@ legibly (the mock's criterion below), whether a fovea *crop* — not the global
 view — covered them (`crop_hit`), and the rank of the first fixation whose
 window covers them (`target_rank`, so coverage by the top K can be read off for
 any K). That separates the two ways the fovea arm can fail — attention missed
-the target, or the VLM misread a crop it was given.
+the target, or the VLM misread a crop it was given. Next to the coverage the
+harness prints its **chance level** — the expected coverage of uniformly
+random fixations (200 draws per item): for small targets the base rate of a
+336-px window is not negligible, and a crop source is informative only to the
+extent that it beats it.
 
 The VLM is pluggable (`eval/vlm_backends.py`): a `VLMBackend` interface with an
 `ollama` default (a local VLM over Ollama's HTTP API, `qwen3.8:27b`, stdlib

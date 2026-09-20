@@ -8,6 +8,59 @@ model, and what should be added? Based on a read-through of `src/features/`,
 with small synthetic probes. Items marked **[verified]** were re-checked by
 hand after the audit.*
 
+## Status (2026-09-20): what has been fixed since this assessment
+
+Acted on, on `module/thesis-features` (ported from the surviving original
+sources `feature/color.C` and `feature/eccentricity.C` plus thesis ch. 5):
+
+| Finding | Now |
+|---|---|
+| Colour is Itti–Koch, not the thesis's | **`color-munsell` added** — MTM transform, centroid-linkage region growing with the variance-adaptive threshold, border-weighted contrast, sigmoid (eq. 5.7–5.12). `color` (Itti–Koch) is kept unchanged; `configs/thesis.yaml` selects `color-munsell`. |
+| Eccentricity: other segmentation, other formula, and the all-black-image bug | **Replaced by a port**: Sobel-histogram threshold, region growing, merging + dilation, Jähne's ε, 12 + 1 orientation classes. A 2:1 ellipse scores 0.36, a disk 0, a bar > 0.85 (thesis Abb. 5.10). |
+| No exclusivity weighting (§5.5.3) | **Added, inside the features** as the thesis describes (it is not a fusion step): divide by c^n for the n segments sharing an orientation / hue class; per disparity level for stereo. Thesis form c^n (1.1) by default, the source's n^p selectable. Off unless configured; on in `thesis.yaml`. |
+| Goldens lock defects in; no behavioural tests | **`tests/test_thesis_features.cpp`**: 13 cases checking each feature against the property it is named after (shape ordering, segmentation follows the image, flat map when nothing is there, colour contrast grows with colour distance, odd-one-out pops out under exclusivity). Goldens regenerated after review — only `feature_eccentricity` and the fused saliency changed. |
+| Bottom-up = random, measured with a scratch script | **Permanent**: `eval/vlm_frontend.py` now always runs a `fovea-random` arm and reports the chance level of target coverage next to the pipeline's. |
+
+Both ported features now emit an **absolute** saliency in [0, 1] instead of a
+min-max-stretched map — the thesis's integration presupposes comparable ranges,
+and an image with nothing elongated / no colour contrast must give a flat map.
+
+Where thesis text and surviving source disagree, the source fixes the *units*
+and the thesis the *parameters*; each choice is documented in the header:
+
+| Item | Thesis text | Original source | Used |
+|---|---|---|---|
+| MTM lightness | L = 0.23·V(Y) | L = V(Y), 0–100 tristimulus scale | source (it fixes what "threshold 8" means) |
+| MTM S2 | cos φ | sin φ | source (and the MTM paper) |
+| Colour threshold | cc_add + cc_mult·σ² | + cc_mult·σ (3×3 window) | source |
+| Colour sigmoid β | 3 | 4 | thesis |
+| Eccentricity growth share | 0.65 | 0.75 | thesis |
+| Eccentricity variance ratio k | 2 | 1.12 | thesis |
+| Eccentricity saliency offset | none | 0.2 | thesis |
+| Exclusivity | ÷ c^n, c = 1.1 | ÷ n^p, p = 0 (off) | thesis; source form selectable |
+| Stereo exclusivity | ÷ c^(np_i/np), *np* undefined | not in the surviving file | reconstructed: np = matched pixels / disparity levels |
+
+One deliberate deviation: eccentricity takes the variance ratio on
+(variance + 1), so two perfectly flat segments (synthetic stimuli; 0/0 in the
+original) count as alike.
+
+**Checked:** the H7 mock study (10 scenes) is unchanged by the new eccentricity
+(object-ior 0.92 / space-ior 0.62, before 0.90 / 0.63) — the stage-2 findings
+did not depend on the defective feature.
+
+**Still open from this assessment:**
+- The Itti–Koch `color` keeps its defects (polarity lost by `abs()` before
+  center–surround; per-level min-max). It was asked to be *kept*, not repaired;
+  it is what `default.yaml` and the `attend*.yaml` study configs still run.
+- `configs/attend*.yaml` (H1, H7) still use `color`, not `color-munsell` — see
+  ADR-0005, open point 1.
+- Symmetry: additions beyond the thesis (thresholds, consistency weight,
+  enlarged radii), single-phase Gabor bank, hot-path `std::cerr`, blind borders.
+- Fusion still min-max-stretches maps that are not absolute (the Itti-style
+  ones); no N(·).
+- `--batch` ignores `--config` and always runs the default feature set.
+- Everything in Part 3 (tiling, better crop sources).
+
 ## Summary
 
 - **The second stage and the dynamic features are the faithful part.** Stereo

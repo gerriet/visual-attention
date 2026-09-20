@@ -8,13 +8,19 @@ accuracy at a fraction of the visual tokens — the "gaze tells you where to
 compute" recipe, with the model-free attention pipeline as the interpretable
 controller (the project's edge; the non-goal is becoming another VLM).
 
-Three arms per question, all answered by the same VLM backend:
+Four arms per question, all answered by the same VLM backend:
 
   full-res    the whole image (capped to a practical VLM size) — the ceiling
   uniform     the whole image uniformly downsampled to the fovea arm's token
               budget — the honest same-budget baseline (small objects vanish)
   fovea       one low-res global view + K native-res crops around the top-K
               attention fixations (ours, bottom-up)
+  fovea-random  the same global view + K crops at uniformly random positions
+              (seeded per question) — the floor every crop source has to beat:
+              a crop arm that does not beat it has an attention source that
+              carries no information about the target. Where targets are
+              annotated, the expected coverage of random fixations is reported
+              next to the pipeline's ("random fixations cover the target").
 
 Two opt-in arms keep the fovea arm's global view and crop count and change only
 *where* the crops sit:
@@ -65,7 +71,13 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from study_common import bootstrap_ci  # noqa: E402
 from vlm_backends import create_backend  # noqa: E402
 
-ARMS = ("full-res", "uniform", "fovea", "fovea-oracle", "fovea-td")
+ARMS = ("full-res", "uniform", "fovea", "fovea-random", "fovea-oracle", "fovea-td")
+
+# Random-fixation baseline: crops per question come from one seeded draw; the
+# model-free coverage figure averages this many draws of RANDOM_FIXATIONS each.
+RANDOM_DRAWS = 200
+RANDOM_FIXATIONS = 10
+COVERAGE_KS = (1, 3, 5, 10)
 
 # Appended to the pipeline config for the fovea-td arm (M17 dense top-down).
 PRIORITY_YAML = """
@@ -151,6 +163,31 @@ def target_visible(views, target_boxes, min_target_px, overlap=0.6):
     if not target_boxes:
         return None
     return all(_box_visible(views, box, min_target_px, overlap) for box in target_boxes)
+
+
+def random_fixations(size, n, seed):
+    """`n` uniformly placed fixations (x, y, value) — the no-attention baseline.
+    Seeded by the caller (the question id), so a rerun and every arm of one run
+    see the same positions."""
+    import random
+    rng = random.Random("random-fixations-%s" % (seed,))
+    w, h = size
+    return [(rng.uniform(0, w), rng.uniform(0, h), 0.0) for _ in range(n)]
+
+
+def random_coverage(size, target_boxes, fovea_side, seed, draws=RANDOM_DRAWS):
+    """Expected share of random scanpaths whose top K fixation windows cover the
+    targets, {K: rate} for COVERAGE_KS — the chance level of `target_rank`.
+    None without target boxes."""
+    if not target_boxes:
+        return None
+    hits = dict.fromkeys(COVERAGE_KS, 0)
+    for draw in range(draws):
+        rank = target_fixation_rank(random_fixations(size, RANDOM_FIXATIONS, "%s-%d" % (seed, draw)),
+                                    target_boxes, fovea_side, size)
+        for k in COVERAGE_KS:
+            hits[k] += int(rank is not None and rank <= k)
+    return {str(k): hits[k] / draws for k in COVERAGE_KS}
 
 
 def target_fixation_rank(fixations, target_boxes, fovea_side, size, overlap=0.6):
@@ -255,7 +292,7 @@ def oracle_views(image, global_view, target_boxes, fovea, params):
     return views
 
 
-def build_arms(image, fixations, params, oracle_boxes=None, td_fixations=None):
+def build_arms(image, fixations, params, oracle_boxes=None, td_fixations=None, seed=None):
     """Return {arm_name: list_of_views} for one image. The opt-in arms reuse the
     fovea arm's global view and crop count, so they differ from it only in
     where the crops sit."""
@@ -280,6 +317,10 @@ def build_arms(image, fixations, params, oracle_boxes=None, td_fixations=None):
     uniform = [make_view(uni_img, (0, 0, w, h), r)]
 
     arms = {"full-res": full, "uniform": uniform, "fovea": fovea}
+    # Same global view and crop count as the fovea arm, crops placed at random:
+    # what the front-end is worth with no attention at all.
+    arms["fovea-random"] = fovea_views(image, global_view,
+                                       random_fixations(image.size, RANDOM_FIXATIONS, seed), params)
     if oracle_boxes:
         arms["fovea-oracle"] = oracle_views(image, global_view, oracle_boxes, fovea, params)
     if td_fixations is not None:
@@ -317,7 +358,7 @@ def run_item(backend, image, fixations, item, params):
                                           top_down=(grounding["boxes"], params["top_down_weight"]))
     arms = build_arms(image, fixations, params,
                       oracle_boxes=boxes if params.get("oracle") else None,
-                      td_fixations=td_fixations)
+                      td_fixations=td_fixations, seed=item.get("question_id"))
     full_tokens = visual_tokens(backend, arms["full-res"])
     rows = {}
     for name, views in arms.items():
@@ -357,6 +398,7 @@ def run_item(backend, image, fixations, item, params):
         "n_choices": len(item["choices"]),  # chance differs per item (V*Bench has 2-way questions)
         "n_fixations": len(fixations),
         "target_rank": target_fixation_rank(fixations, boxes, params["fovea_side"], image.size),
+        "random_coverage": random_coverage(image.size, boxes, params["fovea_side"], item.get("question_id")),
     }
     if grounding is not None:
         rows["fovea-td"]["grounded"] = bool(grounding["boxes"])
@@ -429,6 +471,11 @@ def summarize(results):
     boxed = [r for r in results if r["fovea"].get("crop_hit") is not None]
     if boxed:
         summary["targets"] = _rank_summary([r["item"]["target_rank"] for r in boxed])
+        chance = [r["item"]["random_coverage"] for r in boxed if r["item"].get("random_coverage")]
+        if chance:
+            summary["targets_random"] = {
+                "n": len(chance), "draws": RANDOM_DRAWS,
+                "covered_by_top": {str(k): _mean([c[str(k)] for c in chance]) for k in COVERAGE_KS}}
         if "target_rank_td" in boxed[0]["item"]:
             summary["targets_td"] = _rank_summary([r["item"]["target_rank_td"] for r in boxed])
     return summary
@@ -473,6 +520,11 @@ def format_table(summary):
             lines.append("%s fixations cover the target: #1 %.2f, top-3 %.2f, top-5 %.2f, top-10 %.2f, "
                          "never %.2f (n=%d)" % (label, top["1"], top["3"], top["5"], top["10"],
                                                 t["never_covered"], t["n"]))
+    if "targets_random" in summary:
+        top = summary["targets_random"]["covered_by_top"]
+        lines.append("random fixations cover the target:    #1 %.2f, top-3 %.2f, top-5 %.2f, top-10 %.2f "
+                     "(chance level of the rows above; %d draws)"
+                     % (top["1"], top["3"], top["5"], top["10"], summary["targets_random"]["draws"]))
     return "\n".join(lines)
 
 
@@ -561,13 +613,16 @@ def main():
         if args.resume and os.path.exists(results_path):
             with open(results_path) as fh:
                 results = json.load(fh)
-            # Rows from before the answer letter was recorded predate the
-            # HR-Bench option re-ordering (correct option always "A"): rescore.
-            stale = [r for r in results if "answer_letter" not in r["item"]]
+            # Rows from an older harness cannot be mixed in: before the answer
+            # letter was recorded the HR-Bench options were served as stored
+            # (correct option always "A"), and rows without the random-crop arm
+            # would leave that arm with a different item set. Rescore them.
+            def current(row):
+                return "answer_letter" in row["item"] and "fovea-random" in row
+            stale = len(results) - sum(1 for r in results if current(r))
             if stale:
-                print("resuming: dropping %d rows scored before option order was recorded" % len(stale),
-                      file=sys.stderr)
-                results = [r for r in results if "answer_letter" in r["item"]]
+                print("resuming: dropping %d rows scored by an older harness" % stale, file=sys.stderr)
+                results = [r for r in results if current(r)]
             done = {r["item"]["question_id"] for r in results}
             print("resuming: %d items already scored in %s" % (len(done), results_path), file=sys.stderr)
         for n, item in enumerate(items):
@@ -609,6 +664,8 @@ def main():
         fovea, uniform = summary["fovea"]["accuracy"], summary["uniform"]["accuracy"]
         if not (fovea > uniform):
             sys.exit("check failed: fovea accuracy %.3f did not beat uniform %.3f" % (fovea, uniform))
+        if not (fovea > summary["fovea-random"]["accuracy"]):
+            sys.exit("check failed: attention crops did not beat random crops")
         if summary["fovea"]["mean_token_fraction"] >= 0.9:
             sys.exit("check failed: fovea used %.3f of full-res tokens (no saving)"
                      % summary["fovea"]["mean_token_fraction"])

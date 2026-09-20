@@ -6,6 +6,23 @@ own bar. This plan opens nothing new. Each hypothesis gets one confirmatory
 run and leaves with a verdict — **supported**, **refuted**, **supported under
 a named condition**, or **parked** with the reason written down.*
 
+## Which track each hypothesis belongs to
+
+The project has two goals (ADR-0005, proposed): a **replication** of the
+dissertation — finite, done when the dossier is written — and a **modern
+system** on its core ideas — open-ended, judged by usefulness. Each hypothesis
+belongs to one, and that decides which profile it runs and what its verdict
+means:
+
+| Track | Question | Hypotheses | Runs on |
+|---|---|---|---|
+| Replication | "Was the thesis right?" | H1 (the thesis's central claim), H4 (are its scanpaths plausible?), M10 (its findings, figure by figure) | the thesis profile — since 2026-09-20 with the thesis's own colour, eccentricity and exclusivity |
+| Modern | "Is this useful today?" | H2, H5, H6, H7 | whatever works best; the thesis profile is one arm |
+| Parked | | H3 | — |
+
+Closing the replication track ends it: tag, freeze, stop. Closing a
+modern-track hypothesis only ends *that question*; the system keeps moving.
+
 ## Rules for every confirmatory run
 
 1. **Frozen config, fresh seeds.** Mechanisms and knobs are tuned on *dev
@@ -44,7 +61,13 @@ local model.
 
 ## The runs
 
-### H1 — object-based vs space-based IOR *(the centerpiece; do first)*
+### H1 — object-based vs space-based IOR *(replication track; the centerpiece; do first)*
+
+*Precondition (new):* decide the second-stage profile. `configs/attend*.yaml`
+still run the Itti-style `color`; a replication-track H1 should run the thesis
+features (`color-munsell`, exclusivity). Checked 2026-09-20: the H7 mock result
+is unchanged by the eccentricity port, so stage 2 is not sensitive to it — but
+the confirmatory run should be on the profile the paper will describe.
 
 - **Instrument fixes:** `eval/dynamic_ior.py --seeds N --seed0 S` with the
   regime presets (standard / fast / occlusion) and paired intervals; a revisit
@@ -69,7 +92,7 @@ local model.
   per 100 frames" or "refuted: a spatial baseline with motion compensation
   matches it".
 
-### H7 — object files as a video token cache
+### H7 — object files as a video token cache *(modern track)*
 
 - **Model-free first** (mock, 30 test seeds, frozen `attend_proto.yaml`):
   arms frames-uniform · random crops · **colour-keyed dedup** (one crop per
@@ -89,15 +112,16 @@ local model.
   EgoTextVQA, SoccerNet-GSR) — does uniform downsampling at budget destroy the
   evidence region? — and only then VLM time.
 
-### H6 — attention as a VLM token budget (stills)
+### H6 — attention as a VLM token budget (stills) *(modern track)*
 
 - ~~Rerun the HR-Bench pilot with the option order fixed~~ — done 2026-09-19
   (uniform fell 0.80 → 0.50 on "cross": the bias was real). The full 200-item
   splits remain; the 8K run needs the machine to itself (a 27B model plus 8K
   images was stopped once for low memory — `--resume` picks up).
 - **Model-free coverage@K on all 191 V\*Bench items**, per crop source, against
-  a **random-fixation baseline** — make it a permanent arm of
-  `eval/vlm_frontend.py`. First measurement (2026-09-19): the current pipeline
+  a **random-fixation baseline** — a permanent arm of `eval/vlm_frontend.py`
+  since 2026-09-20 (`fovea-random`, plus the chance level of target coverage in
+  every summary). First measurement (2026-09-19): the current pipeline
   equals random (top-3 0.068 vs 0.069), so the bottom-up `fovea` arm has been
   random crops. Sources to test, in order: tiled native-resolution saliency with
   the stage-1 defects fixed → open-vocabulary detector → text/face features
@@ -109,7 +133,7 @@ local model.
   supported for question-conditioned sources at budgets ≤ b" — or plain
   refuted. Either is publishable next to the oracle ceiling.
 
-### H4 — scanpaths vs humans (M11)
+### H4 — scanpaths vs humans (M11) *(replication track)*
 
 Download MIT1003 → rebase `module/scanpath-human` → run
 `eval/scanpath_vs_human.py --mit1003` → table on the floor↔ceiling axis, the

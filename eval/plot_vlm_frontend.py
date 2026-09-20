@@ -14,6 +14,7 @@ STYLE = {
     "full-res": {"color": "#2a78d6", "marker": "o", "label": "full-res (ceiling)"},
     "uniform": {"color": "#e34948", "marker": "s", "label": "uniform downsample"},
     "fovea": {"color": "#1baf7a", "marker": "^", "label": "attention fovea (ours)"},
+    "fovea-random": {"color": "#8a8985", "marker": "x", "label": "random crops (floor)"},
     "fovea-oracle": {"color": "#4a3aa7", "marker": "D", "label": "oracle crops (upper bound)"},
     "fovea-td": {"color": "#eda100", "marker": "v", "label": "attention + top-down (H5×H6)"},
 }

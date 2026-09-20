@@ -7,7 +7,8 @@ import unittest
 from pathlib import Path
 
 from datasets import vstar
-from vlm_frontend import make_view, target_fixation_rank, target_visible
+from vlm_frontend import (make_view, random_coverage, random_fixations, target_fixation_rank,
+                          target_visible)
 
 
 def view(source_box, scale=1.0):
@@ -44,6 +45,29 @@ class TestTargetFixationRank(unittest.TestCase):
     def test_never_covered(self):
         fixations = [(1800, 1300, 1.0)]
         self.assertIsNone(target_fixation_rank(fixations, [(100, 100, 130, 130)], 224, self.SIZE))
+
+
+class TestRandomBaseline(unittest.TestCase):
+    SIZE = (2000, 1500)
+
+    def test_fixations_are_seeded_by_the_question(self):
+        a = random_fixations(self.SIZE, 10, seed=17)
+        self.assertEqual(a, random_fixations(self.SIZE, 10, seed=17))
+        self.assertNotEqual(a, random_fixations(self.SIZE, 10, seed=18))
+        self.assertTrue(all(0 <= x <= 2000 and 0 <= y <= 1500 for x, y, _ in a))
+
+    def test_coverage_is_the_base_rate_of_a_window(self):
+        # A 36-px target in a 2000x1500 image: a 336-px window covers it for
+        # roughly 300^2 of 3e6 centre positions -> ~3% per fixation.
+        small = [(1000, 700, 1036, 736)]
+        rates = random_coverage(self.SIZE, small, 336, seed=1)
+        self.assertLess(rates["1"], 0.08)
+        self.assertLess(rates["1"], rates["3"])
+        self.assertLess(rates["3"], rates["10"])
+        self.assertLess(rates["10"], 0.45)
+
+    def test_no_boxes_is_unknown(self):
+        self.assertIsNone(random_coverage(self.SIZE, None, 336, seed=1))
 
 
 class TestVStarBoxes(unittest.TestCase):
