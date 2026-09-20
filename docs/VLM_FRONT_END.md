@@ -257,6 +257,12 @@ What they say:
   the base rate of a 336-px window, not a saliency signal; the bottom-up
   `fovea` arm has so far been equivalent to random crops. Why (first-stage
   defects, resolution collapse) and what to try: `docs/FEATURE_ASSESSMENT.md`.
+  *After the feature port (2026-09-20):* the default profile is still at
+  chance, but the thesis profile — Munsell colour contrast, ported
+  eccentricity, exclusivity — covers 13% / 24% / 39% of targets with the top
+  3 / 5 / 10 fixations against a chance level of 7% / 11% / 22% (top-10 minus
+  chance: +0.17 [+0.11, +0.24], paired over the 191 items). Its legibility-
+  oracle accuracy (0.12) is still below the same-budget uniform arm (0.18).
 - **The controller isn't free.** The token *saving* is measured on the VLM side;
   the attention pipeline that picks the crops costs its own compute
   (`docs/PERFORMANCE.md`). The argument scales as the VLM gets more expensive per

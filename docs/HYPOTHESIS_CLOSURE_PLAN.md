@@ -123,7 +123,11 @@ the confirmatory run should be on the profile the paper will describe.
   since 2026-09-20 (`fovea-random`, plus the chance level of target coverage in
   every summary). First measurement (2026-09-19): the current pipeline
   equals random (top-3 0.068 vs 0.069), so the bottom-up `fovea` arm has been
-  random crops. Sources to test, in order: tiled native-resolution saliency with
+  random crops. Second measurement, after the feature port: `default.yaml`
+  still at chance, **`thesis.yaml` at about twice chance** (top-10 0.39 vs 0.22,
+  +0.17 [+0.11, +0.24]) — so bottom-up is weak, not worthless. Sources to test,
+  in order: the one-at-a-time ablation between the two profiles (colour feature
+  / exclusivity / selection) → tiled native-resolution saliency with
   the stage-1 defects fixed → open-vocabulary detector → text/face features
   (`docs/FEATURE_ASSESSMENT.md`). This is where new saliency features are
   evaluated, without VLM cost.

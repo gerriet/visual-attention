@@ -244,6 +244,39 @@ window landing on a small target, not a (weak) saliency signal: on this
 benchmark the current stage 1 carries no information about where the
 question's target is.
 
+### After the feature port (2026-09-20): the thesis profile beats chance, the default does not
+
+Same 191 items, same criterion, now from the permanent harness
+(`eval/vlm_frontend.py --vstar --backend mock --limit 0 --config …`; the mock
+makes it model-free). Difference to the per-item chance level, paired
+bootstrap over items:
+
+| Profile | K = 1 | K = 3 | K = 5 | K = 10 | top-10 minus chance |
+|---|---|---|---|---|---|
+| random fixations (chance) | 0.02 | 0.07 | 0.11 | 0.22 | — |
+| `default.yaml` (Itti colour, intensity, orientation + ported eccentricity, symmetry; NMS) | 0.04 | 0.09 | 0.13 | 0.23 | +0.010 [−0.048, +0.070] |
+| `thesis.yaml` (**colour contrast in MTM**, ported eccentricity, exclusivity, symmetry; neural field) | 0.05 | **0.13** | **0.24** | **0.39** | **+0.172 [+0.106, +0.241]** |
+
+(thesis profile, top-3: +0.061 [+0.015, +0.111]; top-5: +0.122 [+0.066, +0.185].)
+
+- **The dissertation's own stage 1 carries real information about where
+  question targets are** — about twice the chance coverage at K = 5–10 — and the
+  Itti-style default carries none. V\*Bench targets are small, distinctly
+  coloured things (a cup, a sign, a piece of clothing); a segment-level colour
+  contrast with odd-one-out weighting is a reasonable detector for exactly
+  that, where a multi-scale center–surround average washes them out.
+- It is still far from enough: 61% of targets are never covered by ten
+  fixations, and in the legibility-oracle accuracy the `fovea` arm (0.12)
+  remains below the same-budget uniform downsample (0.18). Bottom-up attention
+  alone does not rescue H6 on stills; it stops being *useless*.
+- Not yet separated: the two profiles differ in features **and** in selection
+  (neural field vs NMS) **and** in exclusivity. The ablation (swap one at a
+  time) is cheap and is the first item of the next step.
+- Everything in Part 3 still applies — above all tiling: this was measured at
+  ≤ 1024 px processing size with a 256-px colour segmentation.
+
+### What the first (pre-port) measurement does and does not show
+
 What this does and does not show. It does not show that bottom-up saliency
 *cannot* help — given Part 1 (a broken colour map, meaningless eccentricity
 segments, no peak-promoting fusion) and the resolution collapse, this stage 1
