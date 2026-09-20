@@ -259,6 +259,18 @@ tables so far were averaged by hand), the speed × count × occlusion sweep, the
 Abb. 6.14 scenario, DAVIS scoring of H1, and a strengthened spatial baseline
 (motion-compensated spatial IOR). Plan: `docs/HYPOTHESIS_CLOSURE_PLAN.md`.
 
+**Confirmatory run (2026-09-20): H1 supported for the quantity it names.**
+Thesis profile, 30 fresh scenes per regime, predictions written down first,
+one command (`eval/dynamic_ior.py --regime all --seeds 30 --seed0 1000`).
+Object-based IOR reaches new objects sooner than space-based IOR in every
+regime (−1.2 / −2.2 / −0.8 frames; also against the motion-compensated tag) and
+degrades gracefully with speed when identity is held (latency 1.79 → 1.85,
+space-based 2.94 → 4.00); at high speed the thesis's own correspondence is not
+enough. Coverage is 1.0 for all IOR arms. On sustained coverage (staleness) it
+does not win — a third of its fixations go to object files that are not
+objects: the open problem has moved from tracking to segmentation. Still open:
+the speed × count sweep, the Abb. 6.14 scenario, DAVIS.
+
 ### M13 — Recognition processors (attention-gated perception, H2)
 
 - Tier 1 (zero new dependencies): `hog-person` and `haar-face` processors

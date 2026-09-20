@@ -140,12 +140,13 @@ eval/vlm_video.py --seeds 5 --count-tokens --config configs/attend_proto.yaml \
 Each study is a controlled ablation with its own document; negatives are kept
 and reported.
 
-- **Object-based inhibition of return in dynamic scenes (H1).** It does *not*
-  beat space-based IOR on exploration metrics — it is only as good as its
-  tracker, and every identity switch costs a re-fixation. With persistent,
-  identity-keyed object memory it draws level, and in a six-seed pilot it is
-  ahead on latency at high speed — a direction, not yet a result (the
-  confirmatory run at ≥ 20 seeds with intervals is open).
+- **Object-based inhibition of return in dynamic scenes (H1).** Confirmatory
+  run, 30 fresh scenes per regime, predictions written down beforehand:
+  object-based IOR reaches new objects sooner than space-based IOR in every
+  regime (latency −1.2 / −2.2 / −0.8 frames, also against a motion-compensated
+  location tag) — at high speed only when identity is held, which is where it
+  is "only as good as its tracker". On sustained coverage it does not win: a
+  third of its fixations go to object files that are not objects.
   [DYNAMIC_IOR_STUDY.md](docs/DYNAMIC_IOR_STUDY.md)
 - **Recognition gated by attention (H2).** Detectors restricted to attended
   ROIs recover 51% of all full-frame detections at 5.8% of the pixels.

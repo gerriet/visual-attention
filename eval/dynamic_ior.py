@@ -187,9 +187,14 @@ def score(gt, scanpath, match_radius):
     }
 
 
-def run_arm(binary, scene_dir, config, behavior, out_dir, ior_radius=None, tracking=()):
+def run_arm(binary, scene_dir, config, behavior, out_dir, ior_radius=None, tracking=(), resume=False):
     os.makedirs(out_dir, exist_ok=True)
     scan_path = os.path.join(out_dir, "scanpath_%s.json" % behavior)
+    if resume and os.path.exists(scan_path):
+        try:  # a run killed mid-write leaves a truncated file: redo that arm
+            return load_json(scan_path)["scanpath"]
+        except (ValueError, KeyError):
+            pass
     cmd = [binary, "--attend", scene_dir, "--behavior", behavior,
            "--emit-scanpath", scan_path, "--output", os.path.join(out_dir, behavior)]
     if config:
@@ -225,7 +230,7 @@ def identity_config(config):
     return handle.name
 
 
-def run_regime(binary, config, regime, seeds, seed0, out_dir, match_radius, arms):
+def run_regime(binary, config, regime, seeds, seed0, out_dir, match_radius, arms, resume=False):
     """{arm: [per-scene metric dict]} over `seeds` generated scenes."""
     preset = REGIMES[regime]
     id_config = identity_config(config)
@@ -239,7 +244,7 @@ def run_regime(binary, config, regime, seeds, seed0, out_dir, match_radius, arms
             for arm in arms:
                 behavior, tracking, persistent = STUDY_ARMS[arm]
                 scanpath = run_arm(binary, scene, id_config if persistent else config, behavior,
-                                   os.path.join(scene, "arms", arm), preset["ior_radius"], tracking)
+                                   os.path.join(scene, "arms", arm), preset["ior_radius"], tracking, resume)
                 rows[arm].append(score(gt, scanpath, match_radius))
     finally:
         os.unlink(id_config)
@@ -302,6 +307,9 @@ def main():
     ap.add_argument("--seed0", type=int, default=0,
                     help="first scene seed; 0-9 are development seeds, confirmatory runs use 1000+")
     ap.add_argument("--arms", default=",".join(STUDY_ARMS), help="study arms, comma-separated")
+    ap.add_argument("--resume", action="store_true",
+                    help="reuse the scanpaths already under --out (the pipeline is deterministic; "
+                         "scenes are regenerated from their seed)")
     ap.add_argument("--reference", default=REFERENCE_ARM, choices=sorted(STUDY_ARMS),
                     help="the arm the paired differences are taken against")
     ap.add_argument("--binary", default="build/attention")
@@ -330,7 +338,7 @@ def main():
         report = {}
         for regime in (sorted(REGIMES) if args.regime == "all" else [args.regime]):
             rows = run_regime(args.binary, args.config, regime, args.seeds, args.seed0, args.out,
-                              args.match_radius, arms)
+                              args.match_radius, arms, args.resume)
             report[regime] = summarize_regime(rows, args.reference)
             report[regime]["scenes"] = rows  # per-scene metrics: any other paired comparison, later
             print(format_regime(regime, report[regime], args.reference))

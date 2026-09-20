@@ -1,6 +1,6 @@
 # Dynamic-IOR study (M12) — is object-based inhibition of return useful?
 
-*Track: **replication** (docs/adr/0005) — H1 is the thesis's own claim; from 2026-09-20 the study runs on `configs/thesis/attend.yaml` by default. The numbers below predate that profile (they were measured with the Itti-style colour feature and the defective eccentricity) and are superseded by the confirmatory run planned in `docs/HYPOTHESIS_CLOSURE_PLAN.md`.*
+*Track: **replication** (docs/adr/0005) — H1 is the thesis's own claim. **The evidence for H1 is the confirmatory run at the end of this document (2026-09-20, 30 fresh scenes per regime, thesis profile): object-based IOR reaches new objects sooner in every regime — supported for the quantity H1 names, conditional on held identity at high speed.** The sections before it are the exploration that led there, kept as history; their numbers were measured with a colour feature that was not the thesis's, a defective eccentricity, and ≤ 6 seeds.*
 
 *First cut, 2026-07-12. Tests hypothesis **H1**: in multi-object dynamic scenes,
 object-based inhibition of return (IOR) beats space-based and no IOR. This is
@@ -294,6 +294,88 @@ objects sooner once identity is held, and loses the sustained-coverage
 comparison to a plain location tag as long as the object files contain things
 that are not objects. That would move the open question from *tracking* (where
 M12 put it) to *segmentation*: what deserves an object file.
+
+### Outcome (30 fresh scenes per regime, seeds 1000–1029)
+
+`results/h1_confirmatory`; arm minus `spatial-ior`, paired over scenes, 95% CI.
+Coverage is 1.00 for every IOR arm (0.99 for the spatial arms in *standard*), so
+it does not discriminate. **Bold** = interval excludes zero.
+
+| Regime | Arm | latency | Δ latency | staleness | Δ staleness | off-object | labels / object |
+|---|---|---|---|---|---|---|---|
+| standard | greedy | 22.11 | **+19.17** | 11.81 | **+9.46** | 0.00 | 1.4 |
+| | spatial-ior | 2.94 | | 2.36 | | 0.02 | 1.7 |
+| | spatial-ior-mc | 2.71 | −0.23 [−0.80, +0.31] | 2.25 | −0.11 [−0.43, +0.21] | 0.03 | 1.7 |
+| | object-ior (thesis) | 1.77 | **−1.17 [−1.98, −0.52]** | 2.65 | +0.29 [−0.05, +0.57] | 0.32 | 1.9 |
+| | object-ior+id | 1.79 | **−1.15 [−1.98, −0.48]** | 2.58 | +0.22 [−0.10, +0.49] | 0.31 | 1.4 |
+| fast | greedy | 16.23 | **+12.22** | 10.10 | **+7.08** | 0.00 | 8.0 |
+| | spatial-ior | 4.00 | | 3.02 | | 0.00 | 6.4 |
+| | spatial-ior-mc | 3.54 | −0.46 [−1.03, +0.12] | 2.85 | −0.17 [−0.49, +0.16] | 0.01 | 6.5 |
+| | object-ior (thesis) | 3.65 | −0.35 [−1.27, +0.58] | 3.45 | **+0.43 [+0.07, +0.77]** | 0.15 | 7.6 |
+| | object-ior+aids | 2.04 | **−1.96 [−2.75, −1.18]** | 3.15 | +0.12 [−0.19, +0.43] | 0.34 | 3.7 |
+| | object-ior+id | 1.85 | **−2.15 [−2.92, −1.40]** | 2.64 | **−0.38 [−0.65, −0.11]** | 0.31 | 2.0 |
+| occlusion | greedy | 17.77 | **+15.21** | 10.00 | **+7.64** | 0.00 | 3.4 |
+| | spatial-ior | 2.57 | | 2.35 | | 0.02 | 3.3 |
+| | spatial-ior-mc | 2.25 | **−0.32 [−0.57, −0.07]** | 2.32 | −0.03 [−0.17, +0.10] | 0.13 | 3.3 |
+| | object-ior (thesis) | 2.05 | **−0.52 [−0.89, −0.17]** | 2.94 | **+0.59 [+0.39, +0.80]** | 0.34 | 3.6 |
+| | object-ior+id | 1.82 | **−0.75 [−1.10, −0.42]** | 2.63 | **+0.28 [+0.12, +0.45]** | 0.33 | 1.7 |
+
+Against the strengthened baseline, `object-ior+id` minus `spatial-ior-mc`:
+latency **−0.92** (standard), **−1.69** (fast), **−0.43** (occlusion), all
+intervals excluding zero; staleness **+0.34** (standard), −0.21 [−0.53, +0.05]
+(fast), **+0.31** (occlusion).
+
+**The predictions, scored.**
+
+1. *IOR ≫ no IOR* — **holds**, in every regime and on every metric, by a wide
+   margin.
+2. *The thesis's object-based IOR does not beat space-based IOR on staleness,
+   and is worse in fast* — **holds** (worse in *fast* and *occlusion*, no
+   difference in *standard*). Not predicted either way, and worth stating: even
+   with the thesis's own nearest-centroid correspondence it reaches new objects
+   sooner in *standard* and *occlusion*.
+3. *Better identity buys the first sweep, not the long run* — **partly
+   refuted, in object-based IOR's favour.** The latency and early-waste
+   advantage holds in every regime, and the off-object share is 0.31–0.33 as
+   predicted. But in *fast* `object-ior+id` also has **lower staleness** than
+   `spatial-ior` (−0.38 [−0.65, −0.11]) — the prediction said it would not. In
+   *occlusion* it is worse, in *standard* there is no difference.
+4. *Motion compensation is not what space-based IOR was missing* — **holds**:
+   `spatial-ior-mc` does not differ from `spatial-ior` in *fast* or *standard*;
+   it gains a little latency in *occlusion* (not predicted). `object-ior+id`
+   beats it on latency in all three regimes.
+
+### Verdict on H1
+
+H1: *"object-based IOR yields higher object coverage and lower novel-object
+detection latency than space-based IOR, and degrades gracefully with object
+speed — while space-based IOR collapses."*
+
+- **Novel-object latency: supported.** Object-based inhibition reaches new
+  objects sooner than space-based inhibition in all three regimes — against the
+  plain location tag and against the motion-compensated one. At low and medium
+  speed the thesis's own correspondence is enough; at high speed the advantage
+  exists only when identity is held (`+aids`, `+id`: about two labels per
+  object instead of eight).
+- **Graceful degradation with speed: supported, with held identity.** From
+  *standard* to *fast*, `spatial-ior`'s latency rises 2.94 → 4.00 and the
+  thesis's `object-ior` 1.77 → 3.65, while `object-ior+id` stays at 1.79 →
+  1.85. Space-based IOR degrades; it does not collapse (coverage stays 1.0).
+- **Coverage: no difference** — every IOR arm sees every object in 40 frames.
+- **Sustained coverage (staleness) — not part of H1 as stated, and not an
+  object-based win:** worse under occlusion, equal at low speed, better only at
+  high speed with held identity. The cost is visible in the off-object share:
+  about a third of the object-based arms' fixations go to object files that are
+  not objects, against 0–2% for a location tag.
+
+So the earlier reading of this document — "space-based IOR is at least as good
+as object-based, usually better" — **does not survive** the confirmatory run. It
+rested on a revisit metric that a handful of fixations decided, a few seeds,
+and a stage 1 that was not the thesis's. The thesis's claim holds for the
+quantity it names, under the identity condition M12 identified; and the
+remaining weakness has moved from *tracking* to *segmentation*: what deserves
+an object file. (That is also what M19 found from the other side, where
+proto-objects, not persistent identity, carried the effect.)
 
 ## Artifacts
 
