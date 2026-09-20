@@ -1,5 +1,7 @@
 # Scanpaths vs human gaze on stills (M11, H4)
 
+*Track: **replication** (docs/adr/0005) — H4 asks whether the thesis model's scanpaths are plausible; the study runs on the thesis profile (`configs/thesis/thesis.yaml`, `configs/thesis/attend.yaml`).*
+
 *Status: instrument built and verified end-to-end on synthetic data, 2026-07.
 The real MIT1003 numbers are gated on the dataset + its raw eye-tracking
 archive + scipy (see "Running it for real"); the headline table lands when that
@@ -103,6 +105,60 @@ DATA archive, and scipy is a fresh install. The instrument is complete and
 unit-tested (metrics, readouts, the I-DT extractor against a synthetic .mat
 fixture, the full scoring stack via `--demo`); the measurement is one download
 away — the same gating pattern as M13's weights and M18's key.
+
+## The real run (MIT1003, 2026-09-20)
+
+**Changes to the instrument before it** (found when the harness first met the
+real archive):
+
+- `thesis-field` is new and is *the thesis model*: the fixations the thesis
+  profile itself emits (neural-field selection + IOR). `thesis-wta` — a generic
+  Python readout of the same map — had been standing in for it.
+- `thesis-objfile` fed the second stage a stream of length one, which yields a
+  single focus. The still is now presented as a stream of identical frames (a
+  fixed gaze on a static scene); consecutive frames on one object file are one
+  fixation.
+- A Python model that cannot be constructed (DeepGaze without torch) is skipped
+  instead of stopping the study. This run has no learned model by decision.
+- Rows are kept per stimulus, so arms are compared *paired* over images, and a
+  long run resumes. `--limit` draws a seeded random sample (the archive's file
+  order groups images by collection).
+- `--profile thesis-extended=…` adds the reimplementation's old five-feature
+  default as a comparison arm.
+
+```bash
+eval/scanpath_vs_human.py --mit1003 --profile thesis-extended=configs/thesis-extended.yaml \
+    --out results/scanpath_vs_human
+```
+
+### Prediction, written down before the run
+
+Six images were scored while debugging the real-data path; nothing else of
+MIT1003 has been looked at. ScanMatch is the primary score, MultiMatch's five
+dimensions are reported; a difference "holds" if its paired 95% interval over
+stimuli excludes zero.
+
+1. **Above random, below centre.** `thesis-field` scores above the random
+   floor and **below the constant-centre path**: MIT1003 has a strong centre
+   bias and a central starting fixation, and the thesis model has neither a
+   centre prior nor a face or text channel. *(H4's "above random": refuted if
+   `thesis-field − random` does not exclude zero on the positive side. "Above
+   centre" is predicted to fail.)*
+2. **The ceiling is far.** `inter-observer − thesis-field` is large and
+   positive.
+3. **The second stage's ordering is not separable on stills.** `thesis-objfile
+   − thesis-wta` does not differ from zero: on a static image object files,
+   dwell and object-based inhibition re-order the same few salient regions, and
+   ScanMatch/MultiMatch are dominated by *where*, not by *in which order*.
+   *(This is H4's second clause; predicted to fail.)*
+4. **The thesis features beat the old default here too.** `thesis-wta −
+   thesis-extended-wta` is positive, as on V\*Bench and COCO-Search18.
+5. **A caveat about the instrument, to check rather than predict:** on the six
+   debugging images the constant-centre path scored as high as human-vs-human
+   agreement on ScanMatch (0.77 vs 0.77). If that holds on the full set,
+   ScanMatch at this grid does not separate "looks where people look" from
+   "stays in the middle", and the verdict has to rest on MultiMatch's direction
+   and position dimensions.
 
 ## Honest caveats (to report with the real numbers)
 
