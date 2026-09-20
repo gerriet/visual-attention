@@ -13,7 +13,7 @@ if(NOT Catch2_FOUND)
     FetchContent_MakeAvailable(Catch2)
 endif()
 
-add_executable(characterization_tests test_characterization.cpp test_config.cpp test_selection.cpp test_stereo_onset.cpp test_system.cpp test_processors.cpp test_alt_features.cpp test_kalman_mot.cpp test_normalization.cpp test_recognition.cpp test_priority.cpp)
+add_executable(characterization_tests test_characterization.cpp test_config.cpp test_selection.cpp test_stereo_onset.cpp test_system.cpp test_processors.cpp test_alt_features.cpp test_kalman_mot.cpp test_normalization.cpp test_recognition.cpp test_priority.cpp test_thesis_features.cpp)
 target_link_libraries(characterization_tests PRIVATE attention_core Catch2::Catch2WithMain)
 target_compile_definitions(characterization_tests PRIVATE
     ATTENTION_SOURCE_DIR="${CMAKE_SOURCE_DIR}")

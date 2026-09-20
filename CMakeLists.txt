@@ -39,6 +39,7 @@ add_library(attention_core STATIC
     src/pipeline/attention_pipeline.cpp
     src/pipeline/frame_source.cpp
     src/features/color_feature.cpp
+    src/features/munsell_color_feature.cpp
     src/features/intensity_feature.cpp
     src/features/orientation_feature.cpp
     src/features/eccentricity_feature.cpp

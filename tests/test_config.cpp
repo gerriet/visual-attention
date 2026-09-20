@@ -71,7 +71,9 @@ TEST_CASE("thesis profile enables the dissertation feature set with neural-field
   auto config = ConfigLoader::load((source_dir() / "configs" / "thesis.yaml").string());
 
   CHECK(enabled_count(config.pipeline.features) == 3);
-  CHECK(find_spec(config.pipeline.features, "color")->enabled);
+  // The thesis's own colour feature, not the Itti-Koch-style `color`
+  CHECK(find_spec(config.pipeline.features, "color-munsell")->enabled);
+  CHECK_FALSE(find_spec(config.pipeline.features, "color")->enabled);
   CHECK(find_spec(config.pipeline.features, "eccentricity")->enabled);
   CHECK(find_spec(config.pipeline.features, "symmetry")->enabled);
   CHECK_FALSE(find_spec(config.pipeline.features, "intensity")->enabled);
