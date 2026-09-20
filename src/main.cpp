@@ -147,6 +147,7 @@ struct AttendOptions
   float ior_decay = -1.0f;
   bool motion_prediction = false;
   bool appearance_matching = false;
+  std::string system_yaml;               // the config's attention_system: section (M19)
   std::vector<std::string> processors;   // recognition processors on attended ROIs (M13)
   std::string process_cadence = "dwell"; // dwell | frame | full-frame
   float roi_margin = -1.0f;              // <0 = keep the config default
@@ -183,9 +184,11 @@ void process_attend(const std::string& path, attention::pipeline::PipelineConfig
   }
 
   attention::system::AttentionSystem::Config cfg;
+  attention::system::AttentionSystem::apply_config_yaml(opt.system_yaml, cfg); // the config's attention_system:
   cfg.pipeline = pipeline_config;
-  cfg.object_store.motion_prediction = opt.motion_prediction;
-  cfg.object_store.appearance_matching = opt.appearance_matching;
+  // The CLI tracking flags switch the aids on; they never switch a config's off.
+  cfg.object_store.motion_prediction = cfg.object_store.motion_prediction || opt.motion_prediction;
+  cfg.object_store.appearance_matching = cfg.object_store.appearance_matching || opt.appearance_matching;
   if (!opt.behavior.empty())
   {
     cfg.behavior = opt.behavior; // dynamic-IOR ablation: greedy / spatial-ior / object-ior / exploration
@@ -555,7 +558,8 @@ void print_usage(const char* program_name, std::ostream& out = std::cerr)
   out << "  " << program_name << " data/test_images/input.png" << std::endl;
   out << "  " << program_name << " data/test_images/input.png --no-display" << std::endl;
   out << "  " << program_name << " data/test_images/input.png --debug=detailed --debug-print" << std::endl;
-  out << "  " << program_name << " --config configs/thesis.yaml data/test_images/inputc.png --no-display" << std::endl;
+  out << "  " << program_name << " --config configs/thesis/thesis.yaml data/test_images/inputc.png --no-display"
+      << std::endl;
   out << "  " << program_name << " --batch data/test_images/ --output results/" << std::endl;
   out << "  " << program_name << " --live 0 --config configs/live.yaml" << std::endl;
   out << "  " << program_name << " --live video.mp4 --processors roi-probe,region-descriptor" << std::endl;
@@ -782,6 +786,7 @@ int main(int argc, char** argv)
           opt.save_frames = false;
         }
       }
+      opt.system_yaml = config.attention_system_yaml;
       process_attend(seq_path, config.pipeline, opt);
       return 0;
     }
@@ -864,7 +869,7 @@ int main(int argc, char** argv)
         else if (arg.rfind("--", 0) != 0)
         {
           // Positional image overrides input.image, so profile configs
-          // (configs/thesis.yaml, configs/modern.yaml) work on any image
+          // (configs/thesis/thesis.yaml, configs/modern.yaml) work on any image
           config.input_image = arg;
         }
       }

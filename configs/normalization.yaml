@@ -1,7 +1,7 @@
 # Divisive-normalization selection profile: the thesis feature set, but the
 # competition done by input-scale-invariant divisive normalization (Reynolds &
 # Heeger) instead of the neural field (docs/SELECTION_BACKENDS.md, option D).
-# A drop-in A/B against configs/thesis.yaml that removes the field's worst
+# A drop-in A/B against configs/thesis/thesis.yaml that removes the field's worst
 # tuning problem (ignition depending on absolute input brightness).
 #
 # The thesis neural field stays the default everywhere; this is opt-in.

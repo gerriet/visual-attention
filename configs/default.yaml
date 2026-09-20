@@ -2,7 +2,7 @@
 # weighted-sum fusion, NMS selection).
 #
 # See also:
-#   configs/thesis.yaml  - dissertation feature set with IOR selection
+#   configs/thesis/thesis.yaml  - dissertation feature set with IOR selection
 #   configs/modern.yaml  - full modern baseline
 #   configs/classic_parameters.yaml - dissertation parameter values (reference)
 

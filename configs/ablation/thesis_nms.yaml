@@ -1,0 +1,30 @@
+# Ablation arm: thesis profile, selection swapped: NMS for the neural field.
+# One change at a time against configs/thesis/thesis.yaml (neural-field parameters as
+# there); results and reading: docs/FEATURE_ASSESSMENT.md, "Ablation".
+
+pipeline:
+  fusion: weighted-sum
+  selection: nms
+
+peaks:
+  min_distance: 30
+  threshold: 0.3
+  max_count: 10
+
+features:
+  color-munsell:
+    weight: 1.0
+    params:
+      exclusivity: 1.1
+  eccentricity:
+    weight: 1.0
+    params:
+      exclusivity: 1.1
+  symmetry:
+    weight: 1.0
+  color:
+    enabled: false
+  intensity:
+    enabled: false
+  orientation:
+    enabled: false

@@ -63,3 +63,29 @@ never a cherry-picked single scene), and record where each regime actually lives
   and naive object-IOR does not win by default"* — more useful than the thesis's
   unqualified claim, and the framework can now say exactly where each regime lives.
   Full data and reproduction: [../DYNAMIC_IOR_STUDY.md](../DYNAMIC_IOR_STUDY.md).
+
+## Update (2026-09)
+
+The identity-centric follow-up ran as part of M19: opt-in *persistent identity*
+in the object-file store. In a six-seed pilot per regime it takes object-IOR
+from clearly worse to level with space-IOR, and ahead on latency at high speed
+(`docs/DYNAMIC_IOR_STUDY.md`, "Persistent identity"). Six seeds without
+intervals: a direction, not yet a result — the statement above ("nearly tied —
+not a win") stands until the confirmatory run (≥ 20 fresh seeds per regime,
+paired intervals; `docs/HYPOTHESIS_CLOSURE_PLAN.md`). Note for that run: since
+this ADR the object arm has gained several mechanisms and the spatial arm one
+knob, so the fair comparison adds a strengthened spatial baseline
+(motion-compensated spatial IOR).
+
+## Update (2026-09-20): the confirmatory run
+
+Run on the thesis profile with 30 fresh scenes per regime, predictions written
+down beforehand, and the strengthened spatial baseline (`spatial-ior-mc`). The
+statement above — "across seeds and regimes space-based IOR is at least as good
+and usually marginally better" — **does not survive it**: it rested on a revisit
+metric decided by a handful of fixations, ≤ 6 seeds, and a stage 1 that was not
+the thesis's. Object-based IOR reaches new objects sooner in every regime
+(supported for the quantity H1 names; at high speed only with held identity —
+"only as good as its tracker" stands), and does not win on sustained coverage.
+The decision recorded here held up better than the result: *report whatever the
+ablation shows* is what made the correction possible.

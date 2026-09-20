@@ -72,6 +72,11 @@ class ConfigLoader
     bool save_saliency = true;
     std::string output_dir = "results/";
     bool display = false;
+
+    // The raw `attention_system:` section (the second stage under --attend),
+    // applied by system::AttentionSystem::apply_config_yaml — the system
+    // config lives in the system module, which this loader doesn't depend on.
+    std::string attention_system_yaml;
   };
 
   /**

@@ -6,6 +6,7 @@
 #include "attention/system/object_file.h"
 #include <catch2/catch_test_macros.hpp>
 #include <filesystem>
+#include <stdexcept>
 
 namespace fs = std::filesystem;
 using namespace attention;
@@ -172,6 +173,206 @@ TEST_CASE("appearance matching keeps object identity through a crossing", "[syst
   CHECK(position_only.second != position_only.first); // identity swapped at the crossing
 }
 
+namespace
+{
+system::Cluster coloured_at(int x, int y, const cv::Vec3f& colour)
+{
+  system::Cluster c = cluster_at(x, y, 0.8f);
+  c.appearance = colour;
+  return c;
+}
+} // namespace
+
+TEST_CASE("persistent identity re-identifies an object after a long gap", "[system][objectfile][identity]")
+{
+  // A red object is seen for three frames, then goes unobserved for 37 (past
+  // max_inactive_age), and reappears after a bounce — nowhere near where
+  // straight-line extrapolation puts it. A blue object stays in view.
+  const cv::Vec3f red(60, 60, 230), blue(240, 110, 70);
+  auto relabelled = [&](bool persistent)
+  {
+    system::ObjectFileStore::Config cfg;
+    cfg.motion_prediction = true;
+    cfg.appearance_matching = true;
+    cfg.persistent_identity = persistent;
+    system::ObjectFileStore store(cfg);
+    for (int f = 0; f < 3; ++f)
+    {
+      store.update({coloured_at(100 + 6 * f, 100, red), coloured_at(400, 300, blue)}, f);
+    }
+    const int red_label = label_near(store, {112, 100});
+    const int blue_label = label_near(store, {400, 300});
+    for (int f = 3; f < 40; ++f)
+    {
+      store.update({coloured_at(400, 300, blue)}, f);
+    }
+    store.update({coloured_at(150, 180, red), coloured_at(400, 300, blue)}, 40);
+    CHECK(label_near(store, {400, 300}) == blue_label);
+    return label_near(store, {150, 180}) != red_label;
+  };
+
+  CHECK_FALSE(relabelled(true)); // same object file: identity held across the gap
+  CHECK(relabelled(false));      // thesis default: aged out, a new file
+}
+
+TEST_CASE("persistent identity gives a newcomer of another colour its own file", "[system][objectfile][identity]")
+{
+  // Red vanishes; a green object appears where red was. Radius-only revival
+  // hands the newcomer red's identity; the colour veto doesn't.
+  const cv::Vec3f red(60, 60, 230), green(60, 200, 60);
+  auto newcomer_label_is_red = [&](bool persistent)
+  {
+    system::ObjectFileStore::Config cfg;
+    cfg.appearance_matching = true;
+    cfg.persistent_identity = persistent;
+    system::ObjectFileStore store(cfg);
+    for (int f = 0; f < 3; ++f)
+    {
+      store.update({coloured_at(100, 100, red)}, f);
+    }
+    const int red_label = label_near(store, {100, 100});
+    store.update({}, 3);
+    store.update({coloured_at(104, 100, green)}, 4);
+    return label_near(store, {104, 100}) == red_label;
+  };
+
+  CHECK_FALSE(newcomer_label_is_red(true));
+  CHECK(newcomer_label_is_red(false));
+}
+
+TEST_CASE("attention_system config section: parsed, defaults kept, typos rejected", "[system][config]")
+{
+  system::AttentionSystem::Config cfg;
+  system::AttentionSystem::apply_config_yaml(
+      "segment_fraction: 0.25\n"
+      "object_files:\n"
+      "  persistent_identity: true\n"
+      "  correspondence_radius: 45\n",
+      cfg);
+  CHECK(cfg.segment_fraction == 0.25f);
+  CHECK(cfg.object_store.persistent_identity);
+  CHECK(cfg.object_store.correspondence_radius == 45.0);
+  CHECK(cfg.object_store.max_inactive_age == system::ObjectFileStore::Config{}.max_inactive_age);
+
+  system::AttentionSystem::Config untouched;
+  system::AttentionSystem::apply_config_yaml("", untouched);
+  CHECK_FALSE(untouched.object_store.persistent_identity);
+
+  CHECK_THROWS_AS(system::AttentionSystem::apply_config_yaml("object_files:\n  reid_color_gate: 20\n", cfg),
+                  std::runtime_error);
+  CHECK_THROWS_AS(system::AttentionSystem::apply_config_yaml("segmnt_fraction: 0.2\n", cfg), std::runtime_error);
+}
+
+TEST_CASE("segmentation: closing bridges an object's fragments, oversized regions are dropped", "[system][segment]")
+{
+  // Two crescents of one moving disk, 6 px apart, and a diffuse region
+  // covering 60% of the map.
+  cv::Mat saliency = cv::Mat::zeros(200, 300, CV_32F);
+  cv::rectangle(saliency, cv::Rect(40, 40, 12, 30), cv::Scalar(1.0f), cv::FILLED);
+  cv::rectangle(saliency, cv::Rect(58, 40, 12, 30), cv::Scalar(1.0f), cv::FILLED);
+  cv::rectangle(saliency, cv::Rect(120, 0, 180, 200), cv::Scalar(0.6f), cv::FILLED);
+  auto clusters = [&](int close, float max_fraction)
+  {
+    system::AttentionSystem::Config cfg;
+    cfg.segment_close = close;
+    cfg.max_cluster_fraction = max_fraction;
+    return system::AttentionSystem(cfg).segment(saliency).size();
+  };
+
+  CHECK(clusters(0, 0.0f) == 3);  // thesis default: two fragments + the diffuse region
+  CHECK(clusters(4, 0.0f) == 2);  // the fragments bridged into one object
+  CHECK(clusters(4, 0.25f) == 1); // and the diffuse region dropped
+}
+
+TEST_CASE("proto-objects: one cluster per object, touching objects apart, background dropped",
+          "[system][segment][proto]")
+{
+  // Two touching disks (red, blue) on a dark ground, salient only along two
+  // broken onset arcs each, plus a salient blob over empty background.
+  cv::Mat image(200, 300, CV_8UC3, cv::Scalar(25, 25, 25));
+  const cv::Point red_centre(100, 100), blue_centre(139, 100);
+  const cv::Scalar red(60, 60, 230), blue(240, 110, 70); // BGR
+  cv::circle(image, red_centre, 20, red, cv::FILLED);
+  cv::circle(image, blue_centre, 20, blue, cv::FILLED);
+  cv::Mat saliency = cv::Mat::zeros(image.size(), CV_32F);
+  for (const cv::Point& centre : {red_centre, blue_centre})
+  {
+    cv::ellipse(saliency, centre, cv::Size(20, 20), 0, 10, 160, cv::Scalar(1.0), 3);
+    cv::ellipse(saliency, centre, cv::Size(20, 20), 0, 190, 340, cv::Scalar(1.0), 3);
+  }
+  cv::circle(saliency, cv::Point(250, 50), 10, cv::Scalar(0.8), cv::FILLED);
+
+  system::AttentionSystem::Config cfg;
+  // Thesis path: the touching disks' arcs meet at the contact point, so it
+  // yields two clusters that each span *both* objects, plus the blob.
+  CHECK(system::AttentionSystem(cfg).segment(saliency, image).size() == 3);
+
+  cfg.proto_objects = true;
+  const auto objects = system::AttentionSystem(cfg).segment(saliency, image);
+  REQUIRE(objects.size() == 2);
+  for (const auto& object : objects)
+  {
+    const bool is_red = cv::norm(object.centroid - red_centre) < cv::norm(object.centroid - blue_centre);
+    CHECK(cv::norm(object.centroid - (is_red ? red_centre : blue_centre)) <= 2.0);
+    const cv::Scalar colour = is_red ? red : blue;
+    CHECK(cv::norm(object.appearance - cv::Vec3f(static_cast<float>(colour[0]), static_cast<float>(colour[1]),
+                                                 static_cast<float>(colour[2]))) < 10.0);
+  }
+}
+
+TEST_CASE("persistent identity folds a second file on one object into the first", "[system][objectfile][identity]")
+{
+  // One red object; on frame 1 a second, look-alike cluster appears on it (a
+  // partial fragment). Without merging, both files persist.
+  const cv::Vec3f red(60, 60, 230);
+  auto active_after = [&](bool persistent)
+  {
+    system::ObjectFileStore::Config cfg;
+    cfg.appearance_matching = true;
+    cfg.persistent_identity = persistent;
+    system::ObjectFileStore store(cfg);
+    system::Cluster whole = coloured_at(100, 100, red);
+    whole.bbox = cv::Rect(90, 90, 20, 20);
+    store.update({whole}, 0);
+    const int label = store.active_files().front().label;
+    system::Cluster fragment = coloured_at(104, 102, red);
+    fragment.bbox = cv::Rect(100, 98, 8, 8);
+    store.update({whole, fragment}, 1);
+    return std::make_pair(store.active_files().size(), label == store.active_files().front().label);
+  };
+
+  const auto persistent = active_after(true);
+  CHECK(persistent.first == 1u);
+  CHECK(persistent.second); // the older label survives
+  CHECK(active_after(false).first == 2u);
+}
+
+TEST_CASE("persistent identity folds an inactive duplicate into the active file", "[system][objectfile][identity]")
+{
+  // A second, look-alike file is born on a fragment just beside the object
+  // (no box overlap), then the fragment vanishes: its inactive file would
+  // otherwise wait to be revived on the object instead of the real file.
+  const cv::Vec3f red(60, 60, 230);
+  auto inactive_after = [&](bool persistent)
+  {
+    system::ObjectFileStore::Config cfg;
+    cfg.appearance_matching = true;
+    cfg.persistent_identity = persistent;
+    system::ObjectFileStore store(cfg);
+    system::Cluster whole = coloured_at(100, 100, red);
+    whole.bbox = cv::Rect(90, 90, 20, 20);
+    system::Cluster fragment = coloured_at(100, 125, red);
+    fragment.bbox = cv::Rect(95, 120, 10, 10);
+    store.update({whole}, 0);
+    store.update({whole, fragment}, 1);
+    store.update({whole}, 2);
+    return store.inactive_files().size();
+  };
+
+  CHECK(inactive_after(true) == 0u);
+  CHECK(inactive_after(false) == 1u);
+}
+
 TEST_CASE("AttentionSystem produces a scanpath over the motion sequence", "[system]")
 {
   const fs::path dir = fs::path(ATTENTION_SOURCE_DIR) / "data" / "test_images" / "motion_seq";
@@ -254,6 +455,40 @@ TEST_CASE("IOR-ablation behaviors differ by inhibition domain", "[system][behavi
     store.update({strong, weak}, 1);
     CHECK(behavior->select_focus(store, 1)->label != strong_label); // location inhibited
   }
+}
+
+TEST_CASE("motion-compensated spatial IOR: the tag travels with the object it was left on", "[system][behavior][ior]")
+{
+  // The strengthened space-based baseline of the H1 study. A strong object
+  // moves 25 px per frame past a tight (15 px) tag; a weak one stands still.
+  // A plain location tag is left behind, so the strong object wins again and
+  // again; a tag that keeps the object's velocity stays on it — without using
+  // the object's identity after the deposit.
+  system::IorBehavior::Params params;
+  params.ior_radius = 15.0f;
+
+  auto focus_at_frame_2 = [&](const std::string& name)
+  {
+    auto behavior = system::create_behavior(name, params);
+    system::ObjectFileStore store;
+    int strong_label = -1;
+    const system::ObjectFile* focus = nullptr;
+    for (int f = 0; f < 3; ++f)
+    {
+      store.update({cluster_at(20 + 25 * f, 40, 0.9f), cluster_at(150, 150, 0.5f)}, f);
+      if (f == 0)
+      {
+        strong_label = label_near(store, {20, 40});
+      }
+      focus = behavior->select_focus(store, f);
+      REQUIRE(focus != nullptr);
+    }
+    REQUIRE(label_near(store, {70, 40}) == strong_label); // identity held; only the tag differs
+    return focus->label == strong_label;
+  };
+
+  CHECK(focus_at_frame_2("spatial-ior"));          // escaped its tag: re-fixated
+  CHECK_FALSE(focus_at_frame_2("spatial-ior-mc")); // the tag kept up: attention moves on
 }
 
 TEST_CASE("AttentionSystem in Feature mode keeps no object files", "[system]")

@@ -1,9 +1,17 @@
+# Thesis track (docs/adr/0005): only components that implement the dissertation
+# belong here; the modern track (configs/modern.yaml and everything else under
+# configs/) is free to move away from it.
+#
 # Thesis profile: the feature set of the original dissertation
 # (Backer 2004), loosely equivalent by design (see docs/V2_ROADMAP.md).
 #
-# The original static features were color, eccentricity, and symmetry
-# (stereo and onset follow in roadmap M5). Intensity and orientation are
-# Itti-Koch-style additions of the reimplementation and stay disabled here.
+# The original static features were colour contrast, eccentricity, and
+# symmetry (stereo and onset: configs/thesis/stereo.yaml, configs/thesis/attend.yaml).
+#  - color-munsell is the thesis's colour feature (MTM/Munsell segmentation
+#    contrast, §5.3.2). `color` — like intensity and orientation — is an
+#    Itti-Koch-style addition of the reimplementation and stays disabled here.
+#  - exclusivity 1.1 is the thesis's odd-man-popout weighting (§5.5.3, "1.1 for
+#    all features in all experiments"); symmetry has no categories to weight.
 #
 # Selection: two-stage neural-field selection (roadmap M3) — 2D Amari field
 # dynamics ported from the dissertation's nf2d, with the cluster/Objectfile
@@ -25,12 +33,18 @@ pipeline:
     ior_decay: 0.8        # thesis: inhibition reduced 20% per frame
 
 features:
-  color:
+  color-munsell:
     weight: 1.0
+    params:
+      exclusivity: 1.1
   eccentricity:
     weight: 1.0
+    params:
+      exclusivity: 1.1
   symmetry:
     weight: 1.0
+  color:
+    enabled: false
   intensity:
     enabled: false
   orientation:

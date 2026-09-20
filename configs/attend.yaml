@@ -1,3 +1,7 @@
+# Modern track (docs/adr/0005): the second-stage profile the usefulness studies
+# run on (H2, H7) — free to change when a measured improvement says so. The
+# dissertation's own second-stage profile is configs/thesis/attend.yaml (H1).
+#
 # AttentionSystem profile (roadmap M6): the classic feature set feeding the
 # symbolic second stage. Use with --attend on a temporal sequence:
 #
@@ -20,10 +24,17 @@ pipeline:
   selection: nms
 
 features:
-  color:
+  # Stage 1 = configs/modern.yaml (the best measured base, 2026-09-20) + onset
+  color-munsell:
     weight: 1.0
+    params:
+      exclusivity: 1.1
+  color:
+    enabled: false
   eccentricity:
     weight: 1.0
+    params:
+      exclusivity: 1.1
   symmetry:
     weight: 1.0
   onset:

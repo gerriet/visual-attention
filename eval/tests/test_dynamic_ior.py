@@ -51,5 +51,37 @@ class TestScorer(unittest.TestCase):
         self.assertEqual(m["coverage"], 0.0)
 
 
+class TestStaleness(unittest.TestCase):
+    """The metric that keeps scoring after every object has been seen once."""
+
+    @staticmethod
+    def gt(frames=6):
+        return {"frames": frames, "objects": [
+            {"id": i, "positions": [{"frame": f, "x": 50 + 100 * i, "y": 50, "visible": True}
+                                    for f in range(frames)]} for i in range(2)]}
+
+    def test_alternating_beats_staring_although_both_cover_everything(self):
+        gt = self.gt()
+        alternate = [{"frame": f, "x": 50 + 100 * (f % 2), "y": 50, "label": f % 2} for f in range(6)]
+        stare = [{"frame": 0, "x": 50, "y": 50, "label": 0}] + \
+                [{"frame": f, "x": 150, "y": 50, "label": 1} for f in range(1, 6)]
+        a, b = dio.score(gt, alternate, 28.0), dio.score(gt, stare, 28.0)
+        self.assertEqual(a["coverage"], 1.0)
+        self.assertEqual(b["coverage"], 1.0)
+        self.assertLess(a["staleness"], b["staleness"])
+
+    def test_off_object_fixations_are_counted_and_identity_switches_show(self):
+        gt = self.gt()
+        path = [{"frame": 0, "x": 50, "y": 50, "label": 1}, {"frame": 1, "x": 300, "y": 300, "label": 9},
+                {"frame": 2, "x": 50, "y": 50, "label": 2}, {"frame": 3, "x": 150, "y": 50, "label": 3}]
+        m = dio.score(gt, path, 28.0)
+        self.assertAlmostEqual(m["off_object"], 0.25)
+        self.assertAlmostEqual(m["labels_per_object"], 1.5)  # object 0 seen under two labels
+
+    def test_regimes_and_arms_are_consistent(self):
+        self.assertIn(dio.REFERENCE_ARM, dio.STUDY_ARMS)
+        self.assertEqual(set(dio.REGIMES), {"standard", "fast", "occlusion"})
+
+
 if __name__ == "__main__":
     unittest.main()

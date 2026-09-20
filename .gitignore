@@ -27,12 +27,13 @@ debug_output/
 *.log
 
 # Large data files (download separately)
-data/MIT1003/
+data/MIT1003
 data/PASCAL_VOC/
 data/middlebury/
-data/DAVIS/
-data/COCO-Search18/
+data/DAVIS
+data/COCO-Search18
 data/vstar_bench/
+data/hr_bench/
 
 # Model weights (tools/fetch_models.py downloads these; never committed)
 models/
@@ -55,3 +56,4 @@ docs/thesis/
 
 # Internal working notes — local only, never part of the public repo
 CONTEXT_public-release.md
+tmp/

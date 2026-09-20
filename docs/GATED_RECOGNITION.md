@@ -1,5 +1,7 @@
 # Gated recognition — attention-gated perception (M13, H2)
 
+*Track: **modern** (docs/adr/0005) — a usefulness claim; runs on `configs/attend.yaml`, which is free to change.*
+
 *Status: first full pass, 2026-07. Code: recognition processors + label memory
 + the `identification` behavior; experiments below are reproducible from one
 command each.*

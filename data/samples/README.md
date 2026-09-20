@@ -28,7 +28,7 @@ redistributed here.
 ```bash
 # Real stereo pair through the depth feature (near surfaces pop out)
 ./build/attention --stereo data/samples/stereo/aloe_left.jpg data/samples/stereo/aloe_right.jpg \
-    --config configs/stereo.yaml --no-display
+    --config configs/thesis/stereo.yaml --no-display
 
 # The video instead of a webcam — live overlay with object-file plugins
 ./build/attention --live data/samples/video/vtest.avi --config configs/live.yaml \

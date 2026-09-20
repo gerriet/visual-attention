@@ -1,27 +1,58 @@
-# Modern profile: the full current feature set with default parameters.
-# Baseline for the modern track (roadmap M7) — learned models run Python-side
-# and are compared via the interchange format, not through this config.
+# Modern profile: the best stage 1 we know how to build (docs/adr/0005 — "modern"
+# always names the best measured profile, and changes when a measurement says
+# so). Judged by usefulness, not by fidelity to the thesis; the dissertation's
+# own profile is configs/thesis/thesis.yaml and stays an arm in every benchmark.
+#
+# Chosen 2026-09-20 by a one-change-at-a-time ablation on V*Bench target
+# coverage against chance, validated on COCO-Search18 search (both in
+# docs/FEATURE_ASSESSMENT.md, "Ablation"). The best base that can be measured
+# today is the dissertation's own feature set — so this profile starts equal to
+# configs/thesis/thesis.yaml, and is free to leave it:
+#  - neural-field selection  — decisive on V*Bench: the same features read out
+#    by NMS are at chance
+#  - color-munsell           — the feature that carries the information
+#    (swapping in the Itti-Koch `color`: -0.09 [-0.16, -0.03] coverage)
+#  - eccentricity, symmetry, exclusivity — no measurable effect on V*Bench, but
+#    a two-feature profile without symmetry and exclusivity finds fewer
+#    COCO-Search18 targets (found@10 -0.09 [-0.17, -0.01]); they stay until a
+#    measurement on both benchmarks says otherwise
+#  - the Itti-Koch intensity / orientation channels add nothing measurable.
 
 pipeline:
   fusion: weighted-sum
-  selection: nms
+  selection: neural-field
+  selection_params:
+    alpha: 0.5
+    beta: 30.0
+    resting: -0.25
+    global_mult: 1.0
+    kernel_s: 5.0
+    kernel_k: 0.06
+    max_cycles: 55
+    change_thresh: 0.02
+    ior_decay: 0.8
 
 features:
-  color:
+  color-munsell:
     weight: 1.0
-  intensity:
-    weight: 1.0
-  orientation:
-    weight: 1.0
+    params:
+      exclusivity: 1.1
   eccentricity:
     weight: 1.0
+    params:
+      exclusivity: 1.1
   symmetry:
     weight: 1.0
+  color:
+    enabled: false
+  intensity:
+    enabled: false
+  orientation:
+    enabled: false
 
 peaks:
-  min_distance: 30
-  threshold: 0.3
   max_count: 10
+  ior_strength: 0.8
 
 output:
   output_dir: "results/"

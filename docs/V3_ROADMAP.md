@@ -2,8 +2,8 @@
 
 *Drafted 2026-07-10; sharpened the same day against `docs/RESEARCH_POSITIONING.md`
 (priority-map framing, scanpath-variability scoring, and the VLM front-end —
-milestones M17/M18 and hypotheses H5/H6). v2 (`docs/V2_ROADMAP.md`, M0–M9) built the instrument: the
-thesis model reimplemented (loose behavioral equivalence), a fully pluggable
+milestones M17/M18 and hypotheses H5/H6; M19 and H7 were added 2026-09-15).
+v2 (`docs/V2_ROADMAP.md`, M0–M9) built the instrument: the thesis model reimplemented (loose behavioral equivalence), a fully pluggable
 pipeline (features / fusion / selection / behaviors / processors as
 registries), six alternative saliency operators, a Python evaluation layer,
 and a live demonstrator. v3 uses the instrument: replicate the thesis
@@ -89,6 +89,14 @@ large learned models lack and increasingly need.
   the attended ROIs (fovea) plus a low-res global view preserves task accuracy
   at a large fraction of the visual tokens/FLOPs of the full-resolution image,
   and the saving grows with input resolution.
+- **H7 — Object files as a video token cache (H1 × H6).** At a matched
+  visual-token budget per video, an object-file front-end (object-based IOR +
+  persistent object files) answers object-centric questions better than
+  budget-matched uniform frame sampling and better than a spatial-IOR
+  front-end; the gap grows with object count and speed, and shrinks with
+  tracking errors (every identity switch is a re-send). *Where the second
+  stage earns its keep: M12 showed object-IOR only ties space-IOR on
+  exploration; H7 tests the predicted win — persistent, identity-keyed memory.*
 
 ## Milestones
 
@@ -120,6 +128,9 @@ where the thesis used lab imagery. Deliverable:
 v2 plot, verdict **replicated / partially / diverged** with explanation.
 Divergences are findings, not failures (document, don't chase pixel parity).
 
+**Status (2026-09-19): not started.** No dossier, no `experiments/replication/`.
+Needs no VLM, no API key and no dataset — the thesis text and the binary.
+
 ### M10b — Selection backends: robust multi-blob tracking without the field's tuning
 
 The Amari field works but is hard to parametrize (13 coupled, input-scale-
@@ -147,6 +158,14 @@ Build order (all opt-in; thesis field stays default):
   (genuinely new since the thesis, per RESEARCH_POSITIONING.md). A cheap
   "sample the priority map every N frames" readout is a biologically-topical
   alternative temporal story worth an experiment, not a core dependency.
+
+**Status (2026-07-12): B and D done; the payoff experiment is open.**
+`kalman-mot` (B) and `normalization` (D) ship as opt-in selection strategies
+(`configs/kalman.yaml`, `configs/normalization.yaml`, Catch2 + CTest coverage).
+E, F, A and C are not built. The A/B this milestone exists for — same saliency
+stream, vary only the backend → tracking accuracy, parameter sensitivity,
+runtime — has not been run, and neither backend has been entered as an arm in
+M12 or M19; `docs/SELECTION_BACKENDS.md` therefore carries no verdicts yet.
 
 Deliverable: the backends behind config keys + `docs/SELECTION_BACKENDS.md`
 verdicts. This **pairs with M12**: the payoff experiment is same saliency
@@ -244,6 +263,27 @@ object-IOR from clearly-worse to *nearly tied* with space-IOR — but not past i
 on exploration metrics. Remaining (the likely object-IOR win): identity-centric
 metrics + *persistent* object memory vs necessarily-decaying spatial memory;
 seeds+CIs; DAVIS. See `docs/DYNAMIC_IOR_STUDY.md`.
+
+**Update (2026-09-15, with M19):** opt-in *persistent identity* in the
+object-file store takes object-IOR from clearly worse to level with space-IOR,
+and ahead on latency at high speed — in a six-seed pilot without intervals: a
+direction, not yet a result. **Still open from this milestone's own list:** ≥ 20
+seeds per cell with intervals (and a seed loop in `eval/dynamic_ior.py` — the
+tables so far were averaged by hand), the speed × count × occlusion sweep, the
+Abb. 6.14 scenario, DAVIS scoring of H1, and a strengthened spatial baseline
+(motion-compensated spatial IOR). Plan: `docs/HYPOTHESIS_CLOSURE_PLAN.md`.
+
+**Confirmatory run (2026-09-20): H1 supported for the quantity it names.**
+Thesis profile, 30 fresh scenes per regime, predictions written down first,
+one command (`eval/dynamic_ior.py --regime all --seeds 30 --seed0 1000`).
+Object-based IOR reaches new objects sooner than space-based IOR in every
+regime (−1.2 / −2.2 / −0.8 frames; also against the motion-compensated tag) and
+degrades gracefully with speed when identity is held (latency 1.79 → 1.85,
+space-based 2.94 → 4.00); at high speed the thesis's own correspondence is not
+enough. Coverage is 1.0 for all IOR arms. On sustained coverage (staleness) it
+does not win — a third of its fixations go to object files that are not
+objects: the open problem has moved from tracking to segmentation. Still open:
+the speed × count sweep, the Abb. 6.14 scenario, DAVIS.
 
 ### M13 — Recognition processors (attention-gated perception, H2)
 
@@ -396,13 +436,15 @@ vision models." Guard against the non-goal: stay the *controller*, don't become
 another VLM.
 
 **Status (2026-07-20): instrument built + verified end-to-end on a mock; real
-V\*Bench run gated on a keyed VLM.** The first cut rides the existing
+V\*Bench run gated on a keyed VLM (ungated 2026-09: a local Ollama backend is
+now the default).** The first cut rides the existing
 `--emit-json` interchange (no new C++ mode; the full C++ virtual fovea stays
 M15's): `eval/vlm_frontend.py` crops K native-res fovea windows around the top
 saliency fixations plus one low-res global view, and scores three arms
 (`full-res` / `uniform`-at-matched-budget / `fovea`) with a pluggable
-`VLMBackend` (`mock` default + `claude`, anthropic SDK, opus-4-8, base64 blocks,
-real `count_tokens`). Token cost is reported both as a provider-independent
+`VLMBackend` (`mock` + `claude`, anthropic SDK, opus-5, base64 blocks, real
+`count_tokens`; since 2026-09 an `ollama` default, local `qwen3.8:27b`, real
+token counts from `prompt_eval_count`). Token cost is reported both as a provider-independent
 patch estimate (CI-safe) and the backend's real token count when keyed; only the
 fraction vs full-res is compared. The **mock answers correctly iff the target is
 delivered at usable resolution**, so the synthetic `--demo --check` smoke is a
@@ -411,9 +453,80 @@ accuracy at 27% of full-res tokens where the token-matched uniform downsample
 drops to 0%** (a crop lands on the small salient target the downsample loses).
 Crops are bottom-up now with the M17 `top_down_map` slot wired for
 question-conditioned (H5×H6) crops later. V\*Bench adapter added
-(`eval/datasets/vstar.py`). This env has no VLM credentials, so the real
-V\*Bench numbers + figure land on a keyed run. Full story:
-`docs/VLM_FRONT_END.md`.
+(`eval/datasets/vstar.py`). **First real numbers (2026-09-15, local Qwen,
+pilot scale, with an oracle-crop arm and the question-conditioned `fovea-td`
+arm — VLM grounding on the global view → M17 `top_down_map` → crops; V\*Bench +
+HR-Bench 8K):** oracle crops beat full resolution on single-target questions at
+a third of the tokens (1.00 vs 0.85), so the front-end works when attention
+lands; bottom-up crops rarely land (10% of targets covered); grounding lifts
+coverage to 65% and accuracy 0.45 → 0.70 but doesn't yet beat the same-budget
+uniform arm. (The HR-Bench pilot rows were first scored with the correct
+option always "A", which inflated the blind uniform arm; fixed and rerun
+2026-09-19 — and the two-way
+relative-position questions sit at chance at this n, so "relations favour the
+whole view" is not yet shown.) Open: the full V\*Bench run and a budget sweep.
+Full story: `docs/VLM_FRONT_END.md`.
+
+### M19 — Object files as a video token cache (H7 = H1 × H6)
+
+Why: M18 works on stills, where the second stage is idle — a single image is a
+stream of length one, so object files, IOR and identity never engage, and the
+still-image gains come from *what* to look at (top-down), not from attention
+dynamics. The system's distinctive part — tracked object files, object-based
+IOR, persistent memory — shows its advantage only on dynamic scenes. M12's
+honest result says where to look: object-IOR only ties space-IOR on
+*exploration*; the predicted win is persistent identity-keyed memory vs
+necessarily-decaying spatial memory. A video VLM front-end is exactly the task
+that needs it: a video VLM pays tokens per frame, and deciding which pixels to
+(re)send requires knowing *what* has been seen, not *where* — spatial memory
+cannot tell "the same object moved" from "a new object arrived", so it either
+re-sends moved objects (wasted tokens) or suppresses newcomers that appear
+where an old crop was (misses). Paper A leads with this; the still-image study
+is its per-frame component.
+
+Arms (same VLM, same question, matched budget except the reference):
+`frames-full` (T native frames — the naive reference, ~10× the budget),
+`frames-uniform` (the same T frames downsampled to the budget — the standard
+video-VLM input), `space-ior` (overview + K crops at spatial-IOR fixations,
+deduplicated by *location*), `object-ior` (overview + K crops, one per *object
+file*), `oracle` (one crop per ground-truth object). Later: question-
+conditioned crops (M18's `fovea-td`), re-send-on-change, object files as text
+memory.
+
+Stages:
+1. **Synthetic (v1):** `tools/make_dynamic_scene.py --tags --late` — disks
+   carrying a small code legible only at native resolution, some arriving
+   mid-video; `eval/vlm_video.py` asks per object "what code is on the
+   ⟨colour⟩ disk?". Sweeps: speed × object count × K, ≥ 10 seeds.
+2. **Real video:** DAVIS-2017 with templated questions from the masks.
+3. **Working memory:** object files (labels, trajectories) handed to the VLM
+   as text next to the crops — closes M13 Tier 3; re-send on appearance change.
+
+Metrics: accuracy vs visual tokens; objects delivered legibly; crop
+efficiency (crops spent on not-yet-seen objects); M12's scanpath coverage /
+latency / waste for context. Honesty: publish the regimes where space-IOR ties
+or wins (slow scenes, few objects) and the cost of label switches.
+Deliverable: `docs/VLM_VIDEO.md`.
+
+**Status (2026-09-18): v1 done and merged into main.**
+The thesis object files lost identity to segmentation — saliency on moving
+disks is hollow onset rings plus symmetry responses between objects — so
+opt-in **proto-object segmentation** (seed by figure-ground colour contrast,
+grow by colour, drop background clusters) and **persistent identity** were
+added. At a code size calibrated to the VLM (8 px: readable from a native
+crop, at chance from the downsampled views), **with a real VLM (local Qwen,
+10 scenes, same token budget): identity-keyed crops 0.95, location-keyed
+crops 0.80, budget-matched frames 0.27 (chance 0.25)** — H7's effect;
+proto-objects carry it (thesis segmentation: 0.45 vs 0.52). DAVIS-2017 (30
+sequences, categories hand-labelled): every arm 0.96–0.98 at 480p — no
+separation. The pre-registered harder test (the same sequences at full
+resolution, run 2026-09-18) **refuted the prediction**: every budget arm still
+answers alike (0.957–0.978), because "which of these can be seen?" survives
+downsampling — the task, not the resolution, is the limit, so the H7 evidence
+stays synthetic until a real-video task needs fine detail. Identity on real,
+textured video remains the open problem. Full
+story: `docs/VLM_VIDEO.md`; where this stands for a publication (and what a
+reviewer would object to): `docs/PAPER_READINESS.md`.
 
 ## Datasets
 
@@ -428,15 +541,20 @@ V\*Bench numbers + figure land on a keyed run. Full story:
 | PETS2006 | left-luggage scenario (M16) | pointer only |
 | COCO-Search18 | target-present visual search (M17 top-down ablation) | adapter in repo (`eval/datasets/cocosearch18.py`) |
 | V*Bench / hi-res VQA | VLM token-vs-accuracy curve (M18) | adapter in repo (`eval/datasets/vstar.py`) |
+| HR-Bench 4K/8K | the same at higher resolution (M18) | adapter in repo (`eval/datasets/hrbench.py`) |
+| Synthetic tagged dynamic scenes | video token cache (M19) | generator in repo (`tools/make_dynamic_scene.py --tags`) |
 
 Corpora stay pointed-to, never redistributed (v2 convention).
 
 ## Conventions for the phase
 
-- `experiments/<area>/<name>/` = config + runner + README; results land
-  outside git (`results/`), reports and key plots land in `docs/`.
+- Study runners live in `eval/` (one script per study, each with a mock-backed
+  CTest smoke) and stimulus generators in `tools/`; results land outside git
+  (`results/`), reports and key plots land in `docs/`. (The originally planned
+  `experiments/<area>/<name>/` layout was never adopted.)
 - Every quantitative claim: ≥20 seeds where stochastic, bootstrap CIs, and
-  train/test splits for anything tuned.
+  train/test splits for anything tuned. *As of 2026-09 only the H5 synthetic
+  study meets this bar; closing the gap is `docs/HYPOTHESIS_CLOSURE_PLAN.md`.*
 - Every experiment reproducible from one command; smoke-test versions wired
   into CTest where they're fast enough.
 - The thesis model remains the default everywhere; everything new is opt-in
@@ -444,7 +562,7 @@ Corpora stay pointed-to, never redistributed (v2 convention).
 
 ## Recommended order & rationale
 
-**M10 → M10b → M12 → M13 → M17 → M11 → M14 → M15 → M18 → M16.**
+**M10 → M10b → M12 → M13 → M17 → M11 → M14 → M15 → M18 → M19 → M16.**
 Replication first (anchors credibility, and its stimulus generators feed M12).
 Then the selection backends (M10b), because the headline H1 study wants them as
 baselines and the Kalman backend hands M12 its occlusion handling. Then the H1
