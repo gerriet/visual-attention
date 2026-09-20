@@ -346,6 +346,28 @@ what every YAML is layered on) is still the old five features with NMS.
 Changing it touches every profile that disables features explicitly; it needs
 the configs to stop inheriting a hidden base first.
 
+### Tiling (2026-09-20): a modest gain, not yet a significant one
+
+`eval/vlm_frontend.py --tiles 2` — the whole image plus a 2 × 2 grid of
+overlapping native-resolution tiles, fixations merged by rank — on the modern
+profile, same 191 items:
+
+| | top-1 | top-3 | top-5 | top-10 | minus chance | minus untiled |
+|---|---|---|---|---|---|---|
+| untiled | 0.05 | 0.13 | 0.24 | 0.39 | +0.17 [+0.11, +0.24] | — |
+| 2 × 2 tiles | 0.05 | **0.18** | 0.26 | **0.45** | +0.23 [+0.16, +0.30] | +0.06 [−0.02, +0.14] |
+
+The direction is right (top-3, the crop budget actually used, goes 0.13 → 0.18;
+the legibility-oracle accuracy of the `fovea` arm 0.12 → 0.15, against 0.10 for
+random crops and 0.18 for the same-budget uniform downsample), but the paired
+interval still includes zero, and it costs five pipeline runs per image. Tiling
+also yields more fixations (33 per image on average): the targets are covered
+by the top 20 on 66% and by the top 30 on 81% of items — the information is
+there, the *ranking* across tiles is what is weak (per-tile saliency values are
+not comparable, so the merge is a plain round-robin). Better ranking — or a
+question-conditioned source to do the ranking — is where the next gain is;
+finer grids are not worth running before that.
+
 ### What the first (pre-port) measurement does and does not show
 
 What this does and does not show. It does not show that bottom-up saliency
