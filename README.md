@@ -31,7 +31,10 @@ How faithful, component by component: stereo, the neural fields and — since
 exclusivity weighting are ports of the original sources and the thesis's
 equations; onset and the symbolic second stage are reconstructions from the
 thesis text, because their sources did not survive; symmetry has the thesis's
-core with additions. `configs/thesis.yaml` is the dissertation profile;
+core with additions. `configs/thesis/` holds the dissertation profiles (the
+replication track — finite, to be frozen when done); everything else is the
+modern track, free to move away from the thesis
+([ADR-0005](docs/adr/0005-two-tracks-replication-and-modern.md)).
 `configs/default.yaml` adds Itti–Koch-style colour, intensity and orientation
 features that the thesis did not have. Details and what is still open:
 [docs/FEATURE_ASSESSMENT.md](docs/FEATURE_ASSESSMENT.md).
@@ -85,7 +88,7 @@ cmake --build build -j
 ./build/attention data/samples/images/butterfly.jpg --no-display
 
 # Classic (thesis) vs. modern feature profile on the same image
-./build/attention --config configs/thesis.yaml data/test_images/inputc.png --no-display
+./build/attention --config configs/thesis/thesis.yaml data/test_images/inputc.png --no-display
 ./build/attention --config configs/modern.yaml data/test_images/inputc.png --no-display
 
 # Live overlay on a webcam/video with per-object ROI processors (ESC to quit)
@@ -171,7 +174,7 @@ The load-bearing choices are recorded as short ADRs:
 - [Registry- and config-driven strategies](docs/adr/0002-registry-config-driven-strategies.md)
 - [File-based interchange instead of FFI](docs/adr/0003-file-interchange-not-ffi.md)
 - [IOR as a controlled ablation, and an honest negative result](docs/adr/0004-ior-ablation-honest-negative-result.md)
-- [Two tracks: a finite replication, an open-ended modern system](docs/adr/0005-two-tracks-replication-and-modern.md) *(proposed)*
+- [Two tracks: a finite replication, an open-ended modern system](docs/adr/0005-two-tracks-replication-and-modern.md)
 
 ## Context — where this sits
 

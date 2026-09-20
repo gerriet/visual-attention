@@ -10,7 +10,7 @@
     "variant": "weighted-sum+neural-field-3d"
   },
   "params": {
-    "feature_weights": {"color": 1, "eccentricity": 1, "symmetry": 1, "stereo": 1.5},
+    "feature_weights": {"eccentricity": 1, "symmetry": 1, "stereo": 1.5, "color-munsell": 1},
     "peaks": {
       "min_distance": 30,
       "threshold": 0.3,
@@ -22,22 +22,22 @@
   },
   "saliency_map": "result_saliency.png",
   "fixations": [
-    {"n": 0, "x": 160, "y": 125, "value": 0.881446},
-    {"n": 1, "x": 168, "y": 117, "value": 0.629573},
-    {"n": 2, "x": 88, "y": 77, "value": 0.618806},
-    {"n": 3, "x": 144, "y": 173, "value": 0.564323},
-    {"n": 4, "x": 85, "y": 152, "value": 0.558012},
-    {"n": 5, "x": 75, "y": 101, "value": 0.547631},
-    {"n": 6, "x": 117, "y": 64, "value": 0.515636},
-    {"n": 7, "x": 131, "y": 173, "value": 0.506918},
-    {"n": 8, "x": 133, "y": 64, "value": 0.426389},
-    {"n": 9, "x": 179, "y": 189, "value": 0.414175}
+    {"n": 0, "x": 144, "y": 173, "value": 0.707391},
+    {"n": 1, "x": 179, "y": 125, "value": 0.581598},
+    {"n": 2, "x": 85, "y": 75, "value": 0.573288},
+    {"n": 3, "x": 171, "y": 133, "value": 0.566509},
+    {"n": 4, "x": 133, "y": 173, "value": 0.559309},
+    {"n": 5, "x": 173, "y": 64, "value": 0.551864},
+    {"n": 6, "x": 88, "y": 157, "value": 0.540779},
+    {"n": 7, "x": 173, "y": 96, "value": 0.527597},
+    {"n": 8, "x": 168, "y": 173, "value": 0.507278},
+    {"n": 9, "x": 176, "y": 75, "value": 0.502349}
   ],
   "timing_ms": {
-    "pyramid": 3,
-    "features": {"color": 4, "eccentricity": 5, "stereo": 34, "symmetry": 7},
+    "pyramid": 2,
+    "features": {"color-munsell": 3, "eccentricity": 3, "stereo": 33, "symmetry": 7},
     "integration": 0,
-    "peak_detection": 17,
-    "total": 70
+    "peak_detection": 25,
+    "total": 73
   }
 }

@@ -104,7 +104,7 @@ void register_builtin_features()
 
   // The dissertation's colour feature (MTM/Munsell segmentation contrast,
   // §5.3.2). `color` above is the reimplementation's Itti-Koch-style feature;
-  // configs/thesis.yaml selects this one instead.
+  // configs/thesis/thesis.yaml selects this one instead.
   registry.add("color-munsell",
                [](const YAML::Node& params)
                {

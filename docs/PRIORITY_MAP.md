@@ -1,5 +1,7 @@
 # Priority map — the two missing terms (M17, H5)
 
+*Track: **modern** (docs/adr/0005) — the priority-map terms are additions to the thesis model, judged by usefulness.*
+
 *Status: first full pass, 2026-07. Code: a `PriorityConfig` fusion extension
 (top-down + history/value channels) + the H5 study on synthetic search and
 COCO-Search18. Reproducible from one command each.*

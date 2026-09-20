@@ -68,7 +68,7 @@ class StereoFeature : public FeatureExtractor
     // reconstructed here as the pixel count of a level under a uniform spread
     // (matched pixels / disparity levels), so the exponent reads "how many
     // times fuller than average". Only the Exponential mode applies. Off by
-    // default; configs/stereo.yaml leaves it off.
+    // default; configs/thesis/stereo.yaml: 1.1.
     Exclusivity exclusivity;
   };
 

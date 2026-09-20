@@ -8,6 +8,7 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <set>
 #include <string>
 
 namespace fs = std::filesystem;
@@ -68,7 +69,7 @@ TEST_CASE("default config runs all five features with NMS", "[config]")
 
 TEST_CASE("thesis profile enables the dissertation feature set with neural-field selection", "[config]")
 {
-  auto config = ConfigLoader::load((source_dir() / "configs" / "thesis.yaml").string());
+  auto config = ConfigLoader::load((source_dir() / "configs" / "thesis" / "thesis.yaml").string());
 
   CHECK(enabled_count(config.pipeline.features) == 3);
   // The thesis's own colour feature, not the Itti-Koch-style `color`
@@ -85,22 +86,58 @@ TEST_CASE("thesis profile enables the dissertation feature set with neural-field
   attention::pipeline::AttentionPipeline pipeline(config.pipeline);
 }
 
-TEST_CASE("modern profile enables all features", "[config]")
+TEST_CASE("thesis-extended profile enables the reimplementation's original five features", "[config]")
 {
-  auto config = ConfigLoader::load((source_dir() / "configs" / "modern.yaml").string());
+  auto config = ConfigLoader::load((source_dir() / "configs" / "thesis-extended.yaml").string());
   CHECK(enabled_count(config.pipeline.features) == 5);
   CHECK(config.pipeline.effective_selection() == "nms");
 }
 
-TEST_CASE("every shipped config loads and constructs a pipeline", "[config]")
+TEST_CASE("thesis-track configs enable only components of the dissertation", "[config][thesis-track]")
 {
-  for (const auto& entry : fs::directory_iterator(source_dir() / "configs"))
+  // docs/adr/0005: configs/thesis/ is the replication track. A modern component
+  // (an Itti-Koch channel, an alternative operator, a non-thesis selection
+  // backend) never enters it — it gets a sibling profile outside instead.
+  const std::set<std::string> thesis_features = {"color-munsell", "eccentricity", "symmetry", "stereo", "onset"};
+  // nms is allowed: under --attend the second stage selects, the pipeline's own
+  // selection is unused (configs/thesis/attend.yaml)
+  const std::set<std::string> thesis_selection = {"neural-field", "neural-field-3d", "nms"};
+
+  int profiles = 0;
+  for (const auto& entry : fs::directory_iterator(source_dir() / "configs" / "thesis"))
   {
     if (entry.path().extension() != ".yaml")
     {
       continue;
     }
+    ++profiles;
     DYNAMIC_SECTION("config: " << entry.path().filename().string())
+    {
+      auto config = ConfigLoader::load(entry.path().string());
+      for (const auto& spec : config.pipeline.features)
+      {
+        if (spec.enabled)
+        {
+          INFO("feature: " << spec.type);
+          CHECK(thesis_features.count(spec.type) == 1);
+        }
+      }
+      CHECK(thesis_selection.count(config.pipeline.effective_selection()) == 1);
+    }
+  }
+  CHECK(profiles >= 3); // thesis, stereo, attend
+}
+
+TEST_CASE("every shipped config loads and constructs a pipeline", "[config]")
+{
+  // Recursive: the thesis track and the ablation arms live in subdirectories
+  for (const auto& entry : fs::recursive_directory_iterator(source_dir() / "configs"))
+  {
+    if (entry.path().extension() != ".yaml")
+    {
+      continue;
+    }
+    DYNAMIC_SECTION("config: " << fs::relative(entry.path(), source_dir() / "configs").string())
     {
       auto config = ConfigLoader::load(entry.path().string());
       attention::pipeline::AttentionPipeline pipeline(config.pipeline);

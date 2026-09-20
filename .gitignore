@@ -27,11 +27,11 @@ debug_output/
 *.log
 
 # Large data files (download separately)
-data/MIT1003/
+data/MIT1003
 data/PASCAL_VOC/
 data/middlebury/
-data/DAVIS/
-data/COCO-Search18/
+data/DAVIS
+data/COCO-Search18
 data/vstar_bench/
 data/hr_bench/
 

@@ -72,7 +72,7 @@ class MunsellColorFeature : public FeatureExtractor
     float max_segment = 0.15f;   // as fractions of the image area
     float max_contrast = 32.0f;  // MTM contrast mapped to 1 before the sigmoid
     float sigmoid_beta = 3.0f;   // eq. 5.12
-    Exclusivity exclusivity;     // off by default; configs/thesis.yaml: 1.1
+    Exclusivity exclusivity;     // off by default; configs/thesis/thesis.yaml: 1.1
   };
 
   /// One colour segment, as grown by the region-growing pass.

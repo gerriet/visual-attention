@@ -17,7 +17,7 @@ Two aggregation modes:
 
 Usage:
   python -m attention_eval.benchmark --images DIR_OR_FILES --out DIR \\
-      --model cpp:../build/attention:../configs/thesis.yaml=thesis \\
+      --model cpp:../build/attention:../configs/thesis/thesis.yaml=thesis \\
       --model spectral-residual --model center-bias [--reference thesis]
   python -m attention_eval.benchmark --dataset mit1003 --out DIR \\
       --model spectral-residual --model center-bias

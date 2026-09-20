@@ -1,5 +1,7 @@
 # Object files as a video token cache (M19, H7)
 
+*Track: **modern** (docs/adr/0005) — a usefulness claim. Per the 2026-09-20 decision the modern stage 1 is optimised first and H7 is confirmed once, on that system.*
+
 *Status (2026-09-18): harness built; model-free findings (the mock is a
 legibility oracle) and real-VLM results (local Qwen) on synthetic scenes and
 DAVIS-2017 below. With a real VLM the H7 effect holds on the synthetic scenes

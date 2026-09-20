@@ -193,7 +193,7 @@ if(Python3_Interpreter_FOUND)
                     --images ${CMAKE_SOURCE_DIR}/data/test_images/input.png
                              ${CMAKE_SOURCE_DIR}/data/test_images/inputc.png
                     --out ${CMAKE_BINARY_DIR}/benchmark_smoke
-                    --model cpp:$<TARGET_FILE:attention>:${CMAKE_SOURCE_DIR}/configs/thesis.yaml=thesis
+                    --model cpp:$<TARGET_FILE:attention>:${CMAKE_SOURCE_DIR}/configs/thesis/thesis.yaml=thesis
                     --model spectral-residual --model center-bias --reference thesis
                     --report ${CMAKE_BINARY_DIR}/benchmark_smoke/report.md
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/eval)
@@ -207,7 +207,7 @@ if(Python3_Interpreter_FOUND)
         COMMAND attention --stereo
                 ${CMAKE_SOURCE_DIR}/data/test_images/stereo/left.png
                 ${CMAKE_SOURCE_DIR}/data/test_images/stereo/right.png
-                --config ${CMAKE_SOURCE_DIR}/configs/stereo.yaml
+                --config ${CMAKE_SOURCE_DIR}/configs/thesis/stereo.yaml
                 --emit-json ${CMAKE_BINARY_DIR}/behavioral/stereo.json
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
     set_tests_properties(emit_json_stereo PROPERTIES FIXTURES_SETUP stereo_json)
@@ -235,9 +235,26 @@ if(Python3_Interpreter_FOUND)
                 --pos-tol 20)
     set_tests_properties(scanpath_attend PROPERTIES FIXTURES_REQUIRED attend_scanpath)
 
+    # The same over the thesis-track second-stage profile (the one H1 runs on:
+    # colour contrast in MTM, exclusivity — docs/adr/0005)
+    add_test(NAME emit_scanpath_thesis_attend
+        COMMAND attention --attend ${CMAKE_SOURCE_DIR}/data/test_images/motion_seq
+                --config ${CMAKE_SOURCE_DIR}/configs/thesis/attend.yaml
+                --output ${CMAKE_BINARY_DIR}/thesis_attend
+                --emit-scanpath ${CMAKE_BINARY_DIR}/thesis_attend/scanpath.json
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+    set_tests_properties(emit_scanpath_thesis_attend PROPERTIES FIXTURES_SETUP thesis_attend_scanpath)
+
+    add_test(NAME scanpath_thesis_attend
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/eval/compare_scanpath_json.py
+                ${CMAKE_SOURCE_DIR}/tests/golden/thesis_attend/scanpath.json
+                ${CMAKE_BINARY_DIR}/thesis_attend/scanpath.json
+                --pos-tol 20)
+    set_tests_properties(scanpath_thesis_attend PROPERTIES FIXTURES_REQUIRED thesis_attend_scanpath)
+
     # Thesis profile (neural-field selection) behavioral golden
     add_test(NAME emit_json_thesis_inputc
-        COMMAND attention --config ${CMAKE_SOURCE_DIR}/configs/thesis.yaml
+        COMMAND attention --config ${CMAKE_SOURCE_DIR}/configs/thesis/thesis.yaml
                 ${CMAKE_SOURCE_DIR}/data/test_images/inputc.png
                 --no-display --emit-json ${CMAKE_BINARY_DIR}/behavioral/thesis_inputc.json
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR})

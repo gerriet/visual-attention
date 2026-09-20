@@ -1,6 +1,6 @@
 # ADR-0005 — Two tracks: a finite replication, an open-ended modern system
 
-**Status:** proposed (2026-09-20) · awaiting Gerriet's decision on the open points below
+**Status:** accepted (2026-09-20; proposed the same day, open points decided by Gerriet — see "Decisions")
 
 ## Context
 
@@ -31,7 +31,7 @@ cost the modern system:
 - Every study had to decide ad hoc which profile it was about. H1 (a claim *of
   the thesis*) and H6/H7 (a claim *about usefulness*) ran on the same configs.
 
-## Decision (proposed)
+## Decision
 
 Separate the tracks by **profile, tests and definition of done — not by
 repository or branch.** They share one codebase, one registry architecture and
@@ -84,17 +84,33 @@ This is already the pattern; the ADR makes it the rule.
   the thesis profile stays an arm in every modern benchmark, so it is exercised
   by the same harnesses forever.
 
-## Open points for the decision
+## Decisions on the open points (Gerriet, 2026-09-20)
 
-1. **Second-stage configs.** `configs/attend*.yaml` (used by H1 *and* H7) still
-   run the Itti-style `color`. Split them into a thesis variant (`color-munsell`,
-   exclusivity) for H1 and a modern variant for H7?
-2. **Where the modern default starts.** Keep today's five-feature default as the
-   starting point, or start from the best measured crop source once the coverage
-   experiments are in?
-3. **Naming.** `thesis` / `modern` is already taken by `configs/modern.yaml`
-   (which is merely the thesis features plus Itti's, and misleads); rename it
-   when the split happens.
-4. **How strict is "frozen".** Tag + frozen goldens (proposed), or additionally a
-   CI job that fails when files under a `thesis/` path change without a
-   `Replication:` line in the commit message?
+1. **Second-stage configs: split — thesis on H1, modern on H7.**
+   `configs/thesis/attend.yaml` (colour contrast in MTM, exclusivity) is the
+   profile `eval/dynamic_ior.py` runs by default; `configs/attend.yaml` and its
+   `attend_identity` / `attend_proto` variants are modern-track and free to
+   change. Consequence for the order of work: **optimise the modern stage 1
+   before the H7 confirmatory run**, so that H7 is confirmed once, on the system
+   it will be reported for — not on a profile that is about to be replaced.
+2. **The modern default starts from the best base we can measure**, not from
+   the historical five-feature set. The one-at-a-time ablation between the
+   profiles (`configs/ablation/`, docs/FEATURE_ASSESSMENT.md) decides it; the
+   choice is validated on a second benchmark before it becomes the default.
+3. **Naming: "modern" means the best modern profile.** The old
+   `configs/modern.yaml` (the thesis features plus Itti–Koch channels — never
+   modern, and at chance on V\*Bench) is now `configs/thesis-extended.yaml`;
+   `configs/modern.yaml` is reserved for the best profile and changes with it.
+   Intermediate variants get descriptive names (`thesis-extended`, …).
+4. **"Frozen" = tag + frozen goldens**, as proposed: when the replication track
+   is done it is tagged `replication-v1`; no commit-message CI rule.
+
+## Implemented so far
+
+- `configs/thesis/{thesis,stereo,attend}.yaml`; a test
+  (`[thesis-track]` in `tests/test_config.cpp`) fails if a profile there enables
+  anything but dissertation components.
+- Fidelity tests: `tests/test_thesis_features.cpp`; behavioural goldens for all
+  three thesis profiles (`thesis_inputc`, `stereo`, `thesis_attend`).
+- `eval/dynamic_ior.py` (H1) defaults to the thesis second-stage profile.
+- `configs/ablation/` — the arms that decide the modern default.

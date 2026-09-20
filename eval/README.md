@@ -45,7 +45,7 @@ eval/.venv/bin/python -m attention_eval.models --list
 eval/.venv/bin/python -m attention_eval.benchmark \
     --images data/test_images \
     --out results/bench \
-    --model cpp:build/attention:configs/thesis.yaml=thesis \
+    --model cpp:build/attention:configs/thesis/thesis.yaml=thesis \
     --model spectral-residual --model center-bias --reference thesis
 
 # Or against a public fixation dataset (ground truth), once downloaded

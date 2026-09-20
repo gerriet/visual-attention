@@ -45,11 +45,12 @@ output:
   display: false
 """
 
-PRIOR_YAML = BOTTOM_UP_YAML + """\
+PRIORITY_BLOCK = """\
 priority:
   top_down_weight: %(weight)s
   top_down_map: %(map)s
 """
+PRIOR_YAML = BOTTOM_UP_YAML + PRIORITY_BLOCK
 
 
 def import_adapter():
@@ -114,6 +115,18 @@ def run_model(binary, image, config_text, work_dir, tag):
         return json.load(fh)["fixations"]
 
 
+def profile_yaml(path):
+    """(bottom-up, prior) config templates from a pipeline profile (--config):
+    the profile as it is, and the profile with the category prior in its
+    top-down slot. The profile brings its own selection and fixation count;
+    fixations beyond --cap are ignored by the scores."""
+    with open(path) as fh:
+        text = fh.read().replace("%", "%%")
+    if "\npriority:" in "\n" + text:
+        sys.exit("--config %s already has a priority: block; the prior arm adds its own" % path)
+    return text, text.rstrip("\n") + "\n" + PRIORITY_BLOCK
+
+
 def first_hit(fixations, bbox, cap):
     bx, by, bw, bh = bbox
     for i, f in enumerate(fixations):
@@ -131,12 +144,17 @@ def main():
                     help="unique (image, task) validation trials to run (0 = all)")
     ap.add_argument("--top-down-weight", type=float, default=1.5)
     ap.add_argument("--cap", type=int, default=10, help="model fixation budget")
+    ap.add_argument("--config", default=None,
+                    help="pipeline profile to score instead of the built-in default feature set "
+                         "(e.g. configs/thesis/thesis.yaml) — compares stage-1 profiles on search")
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args()
 
     if not os.path.exists(args.binary):
         sys.exit("binary not found: %s (build first: cmake --build build)" % args.binary)
     adapter = import_adapter()
+    bottom_up_template, prior_template = (profile_yaml(args.config) if args.config
+                                          else (BOTTOM_UP_YAML, PRIOR_YAML))
     if not adapter.available():
         sys.exit("COCO-Search18 not found under data/COCO-Search18 — "
                  "see eval/datasets/cocosearch18.py for download steps")
@@ -173,13 +191,13 @@ def main():
 
         work = os.path.join(args.out, "runs", "%s_%s" % (task.replace(" ", "_"),
                                                          os.path.splitext(name)[0]))
-        bottom_up_yaml = BOTTOM_UP_YAML % {"cap": args.cap}
+        bottom_up_yaml = bottom_up_template % {"cap": args.cap}
         fx = run_model(args.binary, image, bottom_up_yaml, work, "bottom_up")
-        bottom_up.append(first_hit(fx, bbox, args.cap))
-        prior_yaml = PRIOR_YAML % {"cap": args.cap, "weight": args.top_down_weight,
-                                   "map": priors[task]}
+        bottom_up.append(first_hit(fx[:args.cap], bbox, args.cap))
+        prior_yaml = prior_template % {"cap": args.cap, "weight": args.top_down_weight,
+                                       "map": priors[task]}
         fx = run_model(args.binary, image, prior_yaml, work, "prior")
-        prior.append(first_hit(fx, bbox, args.cap))
+        prior.append(first_hit(fx[:args.cap], bbox, args.cap))
         if (n + 1) % 25 == 0:
             print("  %d/%d trials" % (n + 1, len(keys)), file=sys.stderr)
 

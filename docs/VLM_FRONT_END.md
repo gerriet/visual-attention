@@ -1,5 +1,7 @@
 # Attention as a VLM token-budget allocator (M18, H6)
 
+*Track: **modern** (docs/adr/0005) — a usefulness claim; the thesis profile is one arm, not the subject.*
+
 *Status: instrument built and verified end-to-end on a mock backend, 2026-07.
 Since 2026-09 the default backend is a local open-weights VLM (Ollama,
 `qwen3.8:27b`), so the real V\*Bench measurement needs no credentials (see

@@ -1,11 +1,12 @@
-# Modern track (docs/adr/0005): the second-stage profile the usefulness studies
-# run on (H2, H7) — free to change when a measured improvement says so. The
-# dissertation's own second-stage profile is configs/thesis/attend.yaml (H1).
+# Thesis track (docs/adr/0005): only components that implement the dissertation.
+# This is the profile the replication-track studies run on — H1 (object- vs
+# space-based inhibition of return, eval/dynamic_ior.py) and the M10 dossier.
+# The modern-track second-stage profile is configs/attend.yaml.
 #
-# AttentionSystem profile (roadmap M6): the classic feature set feeding the
-# symbolic second stage. Use with --attend on a temporal sequence:
+# AttentionSystem profile (roadmap M6): the dissertation's feature set feeding
+# the symbolic second stage. Use with --attend on a temporal sequence:
 #
-#   ./attention --attend <dir|video> --config configs/attend.yaml \
+#   ./attention --attend <dir|video> --config configs/thesis/attend.yaml \
 #       --output results/attend --emit-scanpath results/scanpath.json
 #
 # --attend runs the full system: features → fusion → saliency (this config),
@@ -24,14 +25,20 @@ pipeline:
   selection: nms
 
 features:
-  color:
+  color-munsell:
     weight: 1.0
+    params:
+      exclusivity: 1.1
   eccentricity:
     weight: 1.0
+    params:
+      exclusivity: 1.1
   symmetry:
     weight: 1.0
   onset:
     weight: 1.0
+  color:
+    enabled: false
   intensity:
     enabled: false
   orientation:

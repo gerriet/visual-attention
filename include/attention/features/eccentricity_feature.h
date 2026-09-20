@@ -71,7 +71,7 @@ class EccentricityFeature : public FeatureExtractor
     bool equalize = true;            // histogram-equalise first, as the original does
     float saliency_offset = 0.0f;    // eccentricities below it give no saliency (source: 0.2)
     float min_oriented = 0.05f;      // below this eccentricity a segment has no orientation
-    Exclusivity exclusivity;         // off by default; configs/thesis.yaml: 1.1
+    Exclusivity exclusivity;         // off by default; configs/thesis/thesis.yaml: 1.1
     int compute_at_scale = 0;        // pyramid level (0 = full resolution, -1 = auto:
                                      // quarter resolution for images larger than 640px)
   };

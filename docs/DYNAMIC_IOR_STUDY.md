@@ -1,5 +1,7 @@
 # Dynamic-IOR study (M12) — is object-based inhibition of return useful?
 
+*Track: **replication** (docs/adr/0005) — H1 is the thesis's own claim; from 2026-09-20 the study runs on `configs/thesis/attend.yaml` by default. The numbers below predate that profile (they were measured with the Itti-style colour feature and the defective eccentricity) and are superseded by the confirmatory run planned in `docs/HYPOTHESIS_CLOSURE_PLAN.md`.*
+
 *First cut, 2026-07-12. Tests hypothesis **H1**: in multi-object dynamic scenes,
 object-based inhibition of return (IOR) beats space-based and no IOR. This is
 the thesis's raison d'être for its symbolic second stage.*

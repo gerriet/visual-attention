@@ -42,7 +42,7 @@ struct Exclusivity
   Mode mode = Mode::Exponential;
   // c (Exponential, >= 1) or p (Power, >= 0). The defaults switch the
   // weighting off, so a feature behaves as plain saliency unless a config
-  // (configs/thesis.yaml: 1.1) turns it on.
+  // (configs/thesis/thesis.yaml: 1.1) turns it on.
   float strength = 1.0f;
 
   bool enabled() const { return mode == Mode::Exponential ? strength > 1.0f : strength > 0.0f; }
