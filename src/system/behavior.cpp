@@ -175,18 +175,27 @@ const ObjectFile* IorBehavior::select_focus(ObjectFileStore& store, int frame)
     return nullptr;
   }
 
+  // Motion-compensated tags travel with the velocity they were deposited with.
+  if (mode_ == Mode::SpatialMoving)
+  {
+    for (auto& spot : spatial_)
+    {
+      spot.loc += spot.velocity;
+    }
+  }
+
   // Pick the active object with the highest (saliency − current inhibition).
   const ObjectFile* best = nullptr;
   float best_score = -std::numeric_limits<float>::max();
   for (const auto& file : active)
   {
     float inhibition = 0.0f;
-    if (mode_ == Mode::Spatial)
+    if (mode_ == Mode::Spatial || mode_ == Mode::SpatialMoving)
     {
       for (const auto& spot : spatial_)
       {
-        const float dx = static_cast<float>(file.centroid.x - spot.loc.x);
-        const float dy = static_cast<float>(file.centroid.y - spot.loc.y);
+        const float dx = static_cast<float>(file.centroid.x) - spot.loc.x;
+        const float dy = static_cast<float>(file.centroid.y) - spot.loc.y;
         inhibition += spot.strength * std::exp(-(dx * dx + dy * dy) / (2.0f * params_.ior_radius * params_.ior_radius));
       }
     }
@@ -211,9 +220,19 @@ const ObjectFile* IorBehavior::select_focus(ObjectFileStore& store, int frame)
   const cv::Point where = best->centroid;
 
   // Deposit inhibition on the winner, then decay every tag (thesis §8.3).
-  if (mode_ == Mode::Spatial)
+  if (mode_ == Mode::Spatial || mode_ == Mode::SpatialMoving)
   {
-    spatial_.push_back({where, params_.ior_strength});
+    cv::Point2f velocity(0.0f, 0.0f);
+    if (mode_ == Mode::SpatialMoving && best->trajectory.size() >= 2)
+    {
+      // Mean displacement over the last few frames of the winner's trajectory
+      // — the only use of the object file; from here on the tag is on its own.
+      const std::size_t span = std::min<std::size_t>(best->trajectory.size() - 1, 3);
+      const cv::Point delta = best->trajectory.back() - best->trajectory[best->trajectory.size() - 1 - span];
+      velocity = cv::Point2f(static_cast<float>(delta.x), static_cast<float>(delta.y)) / static_cast<float>(span);
+    }
+    spatial_.push_back(
+        {cv::Point2f(static_cast<float>(where.x), static_cast<float>(where.y)), params_.ior_strength, velocity});
     for (auto& spot : spatial_)
     {
       spot.strength *= params_.ior_decay;
@@ -255,6 +274,10 @@ std::unique_ptr<Behavior> create_behavior(const std::string& name, const IorBeha
   {
     return std::make_unique<IorBehavior>(IorBehavior::Mode::None, "greedy", ior_params);
   }
+  if (name == "spatial-ior-mc")
+  {
+    return std::make_unique<IorBehavior>(IorBehavior::Mode::SpatialMoving, "spatial-ior-mc", ior_params);
+  }
   if (name == "spatial-ior")
   {
     return std::make_unique<IorBehavior>(IorBehavior::Mode::Spatial, "spatial-ior", ior_params);
@@ -263,8 +286,9 @@ std::unique_ptr<Behavior> create_behavior(const std::string& name, const IorBeha
   {
     return std::make_unique<IorBehavior>(IorBehavior::Mode::Object, "object-ior", ior_params);
   }
-  throw std::runtime_error("Unknown behavior '" + name +
-                           "'. Available: exploration, identification, greedy, spatial-ior, object-ior");
+  throw std::runtime_error(
+      "Unknown behavior '" + name +
+      "'. Available: exploration, identification, greedy, spatial-ior, spatial-ior-mc, object-ior");
 }
 
 } // namespace system

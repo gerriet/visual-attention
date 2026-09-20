@@ -457,6 +457,40 @@ TEST_CASE("IOR-ablation behaviors differ by inhibition domain", "[system][behavi
   }
 }
 
+TEST_CASE("motion-compensated spatial IOR: the tag travels with the object it was left on", "[system][behavior][ior]")
+{
+  // The strengthened space-based baseline of the H1 study. A strong object
+  // moves 25 px per frame past a tight (15 px) tag; a weak one stands still.
+  // A plain location tag is left behind, so the strong object wins again and
+  // again; a tag that keeps the object's velocity stays on it — without using
+  // the object's identity after the deposit.
+  system::IorBehavior::Params params;
+  params.ior_radius = 15.0f;
+
+  auto focus_at_frame_2 = [&](const std::string& name)
+  {
+    auto behavior = system::create_behavior(name, params);
+    system::ObjectFileStore store;
+    int strong_label = -1;
+    const system::ObjectFile* focus = nullptr;
+    for (int f = 0; f < 3; ++f)
+    {
+      store.update({cluster_at(20 + 25 * f, 40, 0.9f), cluster_at(150, 150, 0.5f)}, f);
+      if (f == 0)
+      {
+        strong_label = label_near(store, {20, 40});
+      }
+      focus = behavior->select_focus(store, f);
+      REQUIRE(focus != nullptr);
+    }
+    REQUIRE(label_near(store, {70, 40}) == strong_label); // identity held; only the tag differs
+    return focus->label == strong_label;
+  };
+
+  CHECK(focus_at_frame_2("spatial-ior"));          // escaped its tag: re-fixated
+  CHECK_FALSE(focus_at_frame_2("spatial-ior-mc")); // the tag kept up: attention moves on
+}
+
 TEST_CASE("AttentionSystem in Feature mode keeps no object files", "[system]")
 {
   const fs::path dir = fs::path(ATTENTION_SOURCE_DIR) / "data" / "test_images" / "motion_seq";

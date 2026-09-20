@@ -76,3 +76,16 @@ paired intervals; `docs/HYPOTHESIS_CLOSURE_PLAN.md`). Note for that run: since
 this ADR the object arm has gained several mechanisms and the spatial arm one
 knob, so the fair comparison adds a strengthened spatial baseline
 (motion-compensated spatial IOR).
+
+## Update (2026-09-20): the confirmatory run
+
+Run on the thesis profile with 30 fresh scenes per regime, predictions written
+down beforehand, and the strengthened spatial baseline (`spatial-ior-mc`). The
+statement above — "across seeds and regimes space-based IOR is at least as good
+and usually marginally better" — **does not survive it**: it rested on a revisit
+metric decided by a handful of fixations, ≤ 6 seeds, and a stage 1 that was not
+the thesis's. Object-based IOR reaches new objects sooner in every regime
+(supported for the quantity H1 names; at high speed only with held identity —
+"only as good as its tracker" stands), and does not win on sustained coverage.
+The decision recorded here held up better than the result: *report whatever the
+ablation shows* is what made the correction possible.

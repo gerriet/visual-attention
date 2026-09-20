@@ -179,6 +179,15 @@ if(Python3_Interpreter_FOUND)
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
         set_tests_properties(vlm_video_smoke PROPERTIES
             FAIL_REGULAR_EXPRESSION "check failed;Traceback;Error")
+        # H1 study harness, smoke: one generated scene of one regime through every
+        # arm (incl. the motion-compensated spatial baseline and persistent identity)
+        add_test(NAME dynamic_ior_smoke
+            COMMAND ${EVAL_PYTHON} ${CMAKE_SOURCE_DIR}/eval/dynamic_ior.py
+                    --binary $<TARGET_FILE:attention> --regime standard --seeds 1
+                    --out ${CMAKE_BINARY_DIR}/dynamic_ior_smoke
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+        set_tests_properties(dynamic_ior_smoke PROPERTIES
+            PASS_REGULAR_EXPRESSION "summary:" FAIL_REGULAR_EXPRESSION "Traceback")
         add_test(NAME eval_report_smoke
             COMMAND ${EVAL_PYTHON} -m attention_eval.report
                     ${CMAKE_SOURCE_DIR}/tests/golden/inputc/result.json

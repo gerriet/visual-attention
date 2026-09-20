@@ -84,6 +84,18 @@ class Exploration : public Behavior
  *                             revisits — the space-based weakness in motion.
  *   Object  ("object-ior")  — inhibit recently attended OBJECTS (decaying); the
  *                             tag follows the object as it moves.
+ *   SpatialMoving ("spatial-ior-mc") — the strengthened space-based baseline
+ *                             (docs/HYPOTHESIS_CLOSURE_PLAN.md): a location tag
+ *                             that keeps the velocity its object had when it
+ *                             was attended and drifts with it — dead reckoning,
+ *                             no identity after the deposit. It removes
+ *                             space-based IOR's one structural weakness (the
+ *                             object moves out from under its tag) without
+ *                             taking on object-based IOR's (every label switch
+ *                             loses the tag). If object-IOR cannot beat this,
+ *                             its advantage is motion compensation, not
+ *                             identity. A tag does not bounce: after its object
+ *                             changes direction it is simply wrong.
  * Focus score = object saliency − inhibition; the winner is re-inhibited.
  */
 class IorBehavior : public Behavior
@@ -93,7 +105,8 @@ class IorBehavior : public Behavior
   {
     None,
     Spatial,
-    Object
+    Object,
+    SpatialMoving
   };
 
   struct Params
@@ -115,8 +128,9 @@ class IorBehavior : public Behavior
  private:
   struct Spot
   {
-    cv::Point loc;
+    cv::Point2f loc;
     float strength;
+    cv::Point2f velocity; // px/frame; zero except in SpatialMoving
   };
 
   Mode mode_;

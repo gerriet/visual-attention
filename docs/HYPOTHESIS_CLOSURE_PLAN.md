@@ -162,9 +162,12 @@ No stereo-video work is planned; mark H3 and M15 *deferred* in the roadmap.
 
 Replication track — finite; close it and freeze it:
 
-1. **H1 confirmatory run** on `configs/thesis/attend.yaml` (instrument fixes
-   first: seed loop, paired intervals, a revisit metric that does not saturate,
-   the motion-compensated spatial-IOR arm). CPU only.
+1. ~~H1 confirmatory run~~ — **done 2026-09-20.** Verdict: supported for
+   novel-object latency in every regime (conditional on held identity at high
+   speed), graceful degradation with speed supported, coverage no difference,
+   sustained coverage not an object-based win (`docs/DYNAMIC_IOR_STUDY.md`).
+   Left for the dossier: the tracker dose–response figure (advantage vs
+   ID-switch rate, with `kalman-mot`), the Abb. 6.14 scenario.
 2. **M11** as soon as MIT1003 is on disk (H4).
 3. **M10 replication dossier** — the colour and eccentricity variation curves
    (Abb. 5.13, 5.20) are now replicable; writing-heavy, runs alongside.
