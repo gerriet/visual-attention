@@ -225,6 +225,76 @@ segmentation settings that address it (`segment_close`,
 `max_cluster_fraction`) are documented with the M19 findings in
 `docs/VLM_VIDEO.md`.
 
+## The confirmatory run (2026-09-20)
+
+Everything above is exploration: ≤ 6 hand-averaged seeds, no intervals, a
+colour feature that was not the thesis's and a defective eccentricity, a
+revisit metric that stops counting once every object has been seen, and a
+spatial arm that never got a strengthened version. This section replaces it as
+the evidence for H1 (`docs/HYPOTHESIS_CLOSURE_PLAN.md`, `docs/adr/0005`).
+
+**Instrument.** `eval/dynamic_ior.py --regime all --seeds 30 --seed0 1000` —
+one command, scenes generated per seed, every arm on identical scenes, paired
+bootstrap differences over scenes. Profile: `configs/thesis/attend.yaml` (the
+thesis's colour contrast, eccentricity, symmetry, exclusivity, plus onset).
+
+| Arm | Inhibition rides on | Identity held by |
+|---|---|---|
+| `greedy` | nothing | — |
+| `spatial-ior` | decaying location tags | — |
+| `spatial-ior-mc` | location tags that drift with the velocity of the object they were left on (**the strengthened space-based baseline**) | — (dead reckoning) |
+| `object-ior` | object files | the thesis's nearest-centroid correspondence |
+| `object-ior+aids` | object files | + motion prediction, appearance |
+| `object-ior+id` | object files | + persistent identity |
+
+Regimes as above: *standard* (speed 6, 60-px tag, one occlusion), *fast*
+(speed 40, 20-px tag), *occlusion* (speed 20, 18-px tag, 10-frame occlusion).
+
+**Metrics.** Primary: **mean latency** (how soon a new object is attended) and
+**staleness** — the mean, over all frames and visible objects, of the frames
+since that object was last attended. Staleness is new: revisit waste only
+accrues until every object has been seen once (2–8 frames of 40), so it is
+decided by a handful of fixations; staleness scores how evenly attention keeps
+cycling through the scene for the whole video, which is what inhibition of
+return is *for*. Secondary: revisit waste, the share of fixations on no object
+(previously dropped from every denominator), and distinct labels per attended
+object (the tracker's identity switches).
+
+### Prediction, written down before the run
+
+Development seeds 0–9 (the run that shaped these predictions) are in
+`results/h1_dev`; the test seeds 1000–1029 have not been generated at the time
+of this commit. A difference "holds" if its paired 95% interval excludes zero.
+
+1. **IOR ≫ no IOR.** `greedy` is worst on latency, staleness and coverage in
+   every regime. *(H1's first half; refuted if any IOR arm fails to beat it.)*
+2. **The thesis's object-based IOR does not beat space-based IOR.** `object-ior`
+   (thesis correspondence) is no better than `spatial-ior` on staleness in any
+   regime, and worse in *fast*. *(H1 as the thesis states it; refuted if
+   `object-ior` beats `spatial-ior` on staleness in *fast* or *occlusion*.)*
+3. **Better identity buys the first sweep, not the long run.** `object-ior+id`
+   reaches new objects sooner (lower latency) and wastes fewer early revisits
+   than `spatial-ior` in *fast* and *occlusion* — but its **staleness is not
+   better** in any regime, because about a third of its fixations land on no
+   object: object-based IOR works through *every* object file, including
+   low-saliency background clusters, while a location tag that a moving object
+   leaves behind simply frees that object again. *(Refuted if `object-ior+id`
+   has lower staleness than `spatial-ior` in *fast* or *occlusion*, or if its
+   off-object share is below 0.15.)*
+4. **Motion compensation is not what space-based IOR was missing.**
+   `spatial-ior-mc` does not differ from `spatial-ior` on latency or staleness
+   in *fast* and *occlusion* (at these speeds a 20-px tag is outrun within a
+   frame either way, and a dead-reckoned tag does not survive a bounce); it may
+   help in *standard*. `object-ior+id` beats it on latency in *fast*.
+   *(Refuted if `spatial-ior-mc` beats `spatial-ior` on staleness in *fast*.)*
+
+If 2 and 3 hold, the verdict for H1 is: **not supported as stated; supported
+under a condition and for one quantity** — object-based inhibition finds new
+objects sooner once identity is held, and loses the sustained-coverage
+comparison to a plain location tag as long as the object files contain things
+that are not objects. That would move the open question from *tracking* (where
+M12 put it) to *segmentation*: what deserves an object file.
+
 ## Artifacts
 
 - `tools/make_dynamic_scene.py` — scene + `gt.json` generator (`dynamic-scene-gt/v1`).
