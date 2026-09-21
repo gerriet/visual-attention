@@ -451,6 +451,7 @@ the thesis's nearest-centroid correspondence, 1.7 with persistent identity**
 | Abb. 6.11, 6.12 | systems of several 2D fields with global inhibition and per-feature weights | not implemented: the reimplementation has the single 2D field and the 3D field only |
 | Abb. 6.13 | the 3D field with local inhibition on a stereo scene | the 3D field is ported and tested; a dynamics experiment like the 2D ones needs the harness extended to the depth volume |
 | §9.3.2, §9.3.3 | flanker compatibility; early vs late selection | qualitative demonstrations |
+| **§9.2, Abb. 9.1–9.2** (= WAPCV 2003, Fig. 4–5) | **the thesis's own quantitative test of its central claim:** world-model quality (recognized objects, position error) of the two-stage model against a conventional inhibition-map model, 1/3/5 static × 0–5 dynamic objects, 50 runs of 40 frames | **missed when this dossier was built** (it drew on ch. 5–6); found 2026-09-21 on reading the WAPCV paper. Fully specified and CPU-only — to be replicated as finding 22. See `WAPCV_2003_NOTES.md`, which also records that the "thesis correspondence" of finding 10 is weaker than thesis §7.2.3 and that `--attend` forms object files from saliency segments, not from the field's activity clusters |
 
 ## What the dossier says about the reimplementation
 

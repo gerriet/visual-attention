@@ -49,6 +49,9 @@ Source: `docs/DYNAMIC_IOR_STUDY.md`. Profile `configs/thesis/attend.yaml`.
 | 2.6 | Labels per object, occlusion: 2.8 (thesis correspondence) vs 1.5 (persistent identity) | re-run table | same as 2.3 | ok. Note: dossier finding 10 still quotes the *first* run's 3.6 / 1.7 |
 | 2.7 | Scores of the four predictions in the re-run: 1 holds, 2–4 refuted | "The predictions, scored again" | — | ok |
 | 2.8 | Exploration phase reported space-based IOR "at least as good, usually better" | sections before "The confirmatory run"; `docs/adr/0004` | ≤ 6 seeds, no intervals | ok (history; quote, do not re-measure) |
+| 2.10 | **The thesis's own experiment (§9.2, Abb. 9.2 = WAPCV 2003 Fig. 5)**: world-model quality, two-stage vs conventional model | target values from the thesis: conventional ahead at 0 dynamic objects, two-stage ahead otherwise; position error < 0.5 px vs 0.5–5 px | not built; spec in `docs/replication/WAPCV_2003_NOTES.md` | **open** — before DAVIS |
+| 2.11 | Arm labels: the plain `object-ior` arm is position-only, *weaker* than thesis §7.2.3; `+aids`/`+id` approximate §7.2.3 | `docs/replication/WAPCV_2003_NOTES.md`, finding D | — | check — `docs/DYNAMIC_IOR_STUDY.md`, the dossier (finding 10) and `object_file.h` still say "the thesis's nearest-centroid correspondence" |
+| 2.12 | In `--attend` object files come from saliency segments, not from the field's activity clusters; H1 ran without the field in the loop | `attention_system.h`; notes, finding E | — | ok as a stated limitation; closed by 2.10 |
 | 2.9 | **Real video (DAVIS 2017)** | — | not built | **open** — see README, "Still to run" |
 
 ## Study 3 — H4

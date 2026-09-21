@@ -49,8 +49,8 @@ attention for active vision: a bottom-up stage of region-based features and a
 neural field, and a symbolic second stage that tracks a few \emph{object files}
 and inhibits return to \emph{objects} rather than to locations. Its central
 claim---that object-based inhibition of return is what a serial attention system
-needs in a dynamic scene---was argued from a handful of demonstrations. Twenty
-years later I reimplemented the model and tested it again: 24 of the thesis's own
+needs in a dynamic scene---rested on one simulation experiment without
+intervals and on demonstrations. Twenty years later I reimplemented the model and tested it again: 24 of the thesis's own
 experimental findings, its central claim under a protocol with predictions
 committed before each confirmatory run, and its scanpaths against human gaze.
 Twenty-two findings replicate and two replicate in part. The central claim holds:
@@ -78,8 +78,10 @@ outside attention modelling can follow \citep{backer2004}. Cite the two earlier
 English-language publications of the model \citep{backer2001,backer2003}, since the
 thesis is in German.}
 
-\todo{Why re-test now. (i) The claim was never tested with statistics: the thesis
-argues from demonstrations. (ii) The idea---a small symbolic world model that
+\todo{Why re-test now. (i) The claim's only quantitative support is the
+world-model experiment of thesis \S9.2 \citep[Fig.~5]{backer2003}: simulated
+master maps, 50 runs per condition, means without intervals, one hand-set
+baseline. (ii) The idea---a small symbolic world model that
 decides where an expensive serial process looks next---has a new use as a
 front-end for models with a token budget; that use needs the claim to be true.
 Keep (ii) to two sentences: it is the subject of separate work and not evaluated
@@ -298,9 +300,10 @@ in the range the thesis names, but the map correlation with the default is only
 pixel-wise correlation is a stricter reading. Identity through occlusion
 (Abb.~6.14) is tracked in the object files here, not in the fields, so the figure
 is not reproduced as such; the question is measured in Section~\ref{sec:h1}
-(occlusion regime, Table~\ref{tab:h1}: 2.8 labels per attended object with the
-thesis's correspondence, 1.5 with persistent identity---identity is not reliably
-kept by the thesis's correspondence alone).
+(occlusion regime, Table~\ref{tab:h1}: 2.8 labels per attended object with
+position-only correspondence, 1.5 with feature-led revival of inactive object
+files, which is what thesis \S7.2.3 describes). \todo{revisit this verdict: with
+the correspondence the thesis specifies it may be ``replicated''.}
 
 \subsection{Depth}
 \todo{Synthetic pairs with known disparity: exact recovery for $d=0\ldots14$;
@@ -340,7 +343,7 @@ arguments} of the original's setter functions. The program that configured the
 dissertation system set different ones: a narrower excitatory centre, a separate
 broad inhibitory surround, and eight times the global inhibition, on a
 $64\times64$ field (Appendix~\ref{app:params}). Table~\ref{tab:field} shows the
-thesis's field experiments under both.
+thesis's field experiments \citep[published in English as][]{backer2002} under both.
 
 \begin{table}[t]
 \caption{Field dynamics (thesis Abb.~6.4--6.10) under the deployed system's
@@ -399,6 +402,26 @@ inhibition of return yields lower novel-object latency than space-based
 inhibition and degrades gracefully with object speed. \todo{quote the thesis's
 own formulation with page reference, in translation.}
 
+\subsection{The thesis's own test}
+\label{sec:worldmodel}
+\todo{Not yet replicated; found late (it is in thesis \S9.2 and is the main
+result of \citealp{backer2003}, and the dossier, built from chapters 5--6, missed
+it). Simulated two-dimensional master maps: $5\times5$-pixel objects, static or
+moving by at most 2~px per frame, at least 14~px apart, uniform noise of half the
+object amplitude; 1, 3 or 5 static and 0--5 dynamic objects; 50 runs of 40
+frames per condition. A conventional model (blur, inhibit, maximum; simulated
+recognition in 3 frames; an $8\times8$ inhibition mark decaying by 0.8 per frame;
+identity bound to the location of recognition) against the two-stage model in its
+simplest variant (one 2D field of local inhibition, object files on its activity
+clusters, exploration behaviour, recognition in 4 frames). Measures: mean number
+of objects whose identity \emph{and} position (within 20~px) the world model
+holds, and their mean position error. Reported: the conventional model leads
+without dynamic objects; with any, the two-stage model leads and scales better;
+position error $<0.5$~px against 0.5--5~px. This measures what the system
+\emph{knows}, where the study below measures where attention \emph{goes}; it is
+also the one experiment defined on the chain field $\to$ clusters $\to$ object
+files (see Limitations). To be replicated as finding 22, with intervals.}
+
 \subsection{Design}
 Behaviours that are identical except in what they inhibit, over the same
 features, fusion and object-file tracking (Table~\ref{tab:arms}); synthetic scenes
@@ -411,7 +434,13 @@ regimes: \emph{standard} (speed 6~px/frame, 60-px tag, one occlusion),
 \begin{table}[t]
 \caption{Arms. \arm{spatial-ior-mc} is the strengthened version of the arm
 expected to lose: its location tags drift with the velocity of the object they
-were left on.}
+were left on. The thesis's correspondence (\S7.2.3) uses position \emph{and}
+feature similarity and revives inactive object files primarily by their
+features; \arm{+aids} and \arm{+id} approximate that, the plain arm is weaker
+than it. \todo{the project's documents call the plain arm ``the thesis's
+correspondence'' and the others extensions; relabel there, and list the
+differences of \arm{+id} from \S7.2.3: colour as the only feature, a summed
+cost, no maximum age.}}
 \label{tab:arms}
 \small
 \begin{tabularx}{\linewidth}{@{}lXX@{}}
@@ -421,9 +450,9 @@ Arm & Inhibition rides on & Identity held by \\
 \arm{greedy} & nothing & --- \\
 \arm{spatial-ior} & decaying location tags & --- \\
 \arm{spatial-ior-mc} & location tags moving by dead reckoning & --- \\
-\arm{object-ior} & object files & the thesis's nearest-centroid correspondence \\
-\arm{object-ior+aids} & object files & + motion prediction, appearance \\
-\arm{object-ior+id} & object files & + persistent identity \\
+\arm{object-ior} & object files & position only (an ablation of thesis \S7.2.3) \\
+\arm{object-ior+aids} & object files & + motion prediction, feature similarity \\
+\arm{object-ior+id} & object files & + feature-led revival of inactive files \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -493,8 +522,8 @@ occlusion& \arm{greedy}          & 19.64 & \sig{+15.35} & 10.40 & \sig{+7.79} & 
 
 \subsection{Result}
 See Table~\ref{tab:h1}. Object-based inhibition of return beats space-based
-inhibition on latency and on staleness in all three regimes, with the thesis's
-own nearest-centroid correspondence already. Against the strengthened baseline,
+inhibition on latency and on staleness in all three regimes, even with
+position-only correspondence. Against the strengthened baseline,
 \arm{object-ior+id} minus \arm{spatial-ior-mc}: latency $-0.36$ / $-1.73$ /
 $-0.50$, staleness $-0.39$ / $-1.11$ / $-0.36$ (standard / fast / occlusion),
 every interval excluding zero. The share of fixations on no object fell from
@@ -526,8 +555,8 @@ coverage'': no difference; every arm with inhibition sees every object within 40
 frames. Space-based inhibition ``collapses'' with speed: it degrades badly
 (latency 2.61~$\to$~6.08) but still sees every object. Identity matters less than
 the exploration phase concluded: persistent identity brings labels per object
-from 5.5 to 1.7 at high speed and adds a further 0.4 frames; the thesis's
-correspondence carries most of the advantage.
+from 5.5 to 1.7 at high speed and adds a further 0.4 frames; position-only
+correspondence already carries most of the advantage.
 
 \subsection{Real video}
 \label{sec:realvideo}
@@ -694,8 +723,7 @@ Lessons, as far as one case supports them:
 \subsection{What the thesis got right, and what it overstated}
 \todo{Right: object-based inhibition in dynamic scenes; the field's dynamics as
 described; feature behaviour. Overstated or untested: ``higher coverage'',
-``collapses''; the multi-scale explanation of stereo robustness; identity through
-occlusion with nearest-centroid correspondence (2.8 labels per object). Not a
+``collapses''; the multi-scale explanation of stereo robustness. Not a
 model of human free viewing, and never claimed to be.}
 
 \section{Limitations}
@@ -716,6 +744,13 @@ model of human free viewing, and never claimed to be.}
         2D-versus-3D integration (Abb.~5.33, 5.35), systems of several fields
         (6.11, 6.12; not implemented), the 3D field's dynamics (6.13), the
         qualitative demonstrations of thesis \S9.3.
+  \item \textbf{Object files are not formed from the neural field in Study~2.}
+        In the thesis the first selection stage is the field, and object files
+        are created for its activity clusters; the reimplementation's second
+        stage segments the fused saliency map instead (a documented
+        approximation). Study~2 therefore tests object-based inhibition over
+        object files, not the thesis's complete chain. \todo{the replication of
+        \S9.2 closes this.}
   \item \textbf{The model changed between the two confirmatory H1 runs}
         (Section~\ref{sec:threeruns}); both are reported.
   \item \textbf{No learned saliency model} in Study~3.
