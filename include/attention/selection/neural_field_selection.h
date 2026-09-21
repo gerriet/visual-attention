@@ -50,6 +50,7 @@ namespace selection
  *   input_mult: 1.0       # input gain
  *   kernel_s: 5.0         # lateral kernel spread ("Backer version")
  *   kernel_k: 0.06        # lateral kernel amplitude
+ *   kernel_k2, kernel_s2  # inhibitory part (default: k/3, s*sqrt(10) — "Backer version")
  *   kernel_size: 41       # lateral kernel support (odd)
  *   max_cycles: 50        # thesis experiments: cutoff 55, ~10 typical
  *   change_thresh: 0.01   # mean |du| convergence (old code 0.01, thesis 0.02)
@@ -70,6 +71,14 @@ class NeuralFieldSelection : public SelectionStrategy
     float input_mult = 1.0f;
     float kernel_s = 5.0f;
     float kernel_k = 0.06f;
+    // Inhibitory part of the lateral kernel
+    //   K(r) = k * exp(-r^2 / s^2) - k2 * exp(-r^2 / s2^2).
+    // Negative = the "Backer version" of nf2d.h setkernels(): k2 = k / 3,
+    // s2 = s * sqrt(10). The dissertation system itself (esab2.C, single 2D
+    // field) called set_DoG_kernels(15, 15, 3.3, 0.12, 14, 0.03) instead — see
+    // configs/thesis/field_esab2.yaml and the replication dossier.
+    float kernel_k2 = -1.0f;
+    float kernel_s2 = -1.0f;
     int kernel_size = 41;
     int max_cycles = 50;
     int cycles_per_frame = 0; // >0: run exactly this many cycles per frame (no
@@ -89,12 +98,22 @@ class NeuralFieldSelection : public SelectionStrategy
 
   std::vector<core::Peak> select(const cv::Mat& saliency, core::RunState& state) const override;
 
- private:
   /**
-   * Run field cycles until convergence (mean |du| < change_thresh, min 3
-   * cycles, max max_cycles). Mutates activity in place.
+   * The field dynamics alone — no resizing, no inhibition of return, no
+   * readout: relax `activity` (CV_32F, same size as `input`; mutated in place)
+   * on `input` until mean |du| < change_thresh (min 3 cycles, max max_cycles),
+   * or for exactly cycles_per_frame cycles if that is set. Returns the number
+   * of cycles run. This is what select() does per frame; it is public so the
+   * thesis's field experiments (hysteresis, bifurcation, noise, tracking — ch.
+   * 6.2/6.3) can drive the field with synthetic input (tools/field_dynamics).
    */
-  void run_to_convergence(cv::Mat& activity, const cv::Mat& input, const cv::Mat& border) const;
+  int relax(cv::Mat& activity, const cv::Mat& input) const;
+
+  /// A field at its resting level, the state select() starts a stream from.
+  cv::Mat resting_field(const cv::Size& size) const { return cv::Mat(size, CV_32F, cv::Scalar(params_.resting)); }
+
+ private:
+  int run_to_convergence(cv::Mat& activity, const cv::Mat& input, const cv::Mat& border) const;
 
   cv::Mat sigmoid(const cv::Mat& activity) const;
   cv::Mat make_border_suppression(const cv::Size& size) const;

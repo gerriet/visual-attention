@@ -22,7 +22,11 @@ add_test(NAME characterization COMMAND characterization_tests)
 
 # CLI contract: every binary answers --help with a usage synopsis, and the
 # main CLI rejects unknown flags instead of treating them as an image path.
-foreach(bin attention pipeline_test debug_color)
+# Field dynamics harness (replication dossier): one fast experiment end to end
+add_test(NAME field_dynamics_smoke COMMAND field_dynamics --params esab2 convergence memory)
+set_tests_properties(field_dynamics_smoke PROPERTIES PASS_REGULAR_EXPRESSION "cycles_to_stable")
+
+foreach(bin attention pipeline_test debug_color field_dynamics)
     add_test(NAME help_${bin} COMMAND ${bin} --help)
     set_tests_properties(help_${bin} PROPERTIES PASS_REGULAR_EXPRESSION "Usage")
 endforeach()

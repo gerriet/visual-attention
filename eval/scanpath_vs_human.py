@@ -196,6 +196,37 @@ def run_mit1003(args):
         stimuli = stimuli[: args.limit]
     for n, (stimulus, _fixmap, _fixpts) in enumerate(stimuli):
         if stimulus.stem in rows:
+            if args.refresh_field:
+                # Only the model's own scanpath depends on the selection stage:
+                # after a change to the field parameters, re-score that arm and
+                # keep the rest (the maps, and every readout of them, are unchanged).
+                with Image.open(stimulus) as im:
+                    size = im.size
+                humans = [seq for _subj, seq in mit1003.iter_scanpaths(stimulus.stem, size)]
+                with tempfile.TemporaryDirectory() as workdir:
+                    saliency, field = pipeline_map(args.binary, stimulus, args.config, workdir)
+                row = rows[stimulus.stem]
+                row["thesis-field"] = score_vs_humans(field[: args.n], humans, size)
+                row["_field_fixations"] = len(field)
+                # Length-matched control (post hoc, added when the field's own
+                # parameters cut its scanpath to ~4 fixations): the field decides
+                # how many fixations it makes, and both metrics are sensitive to
+                # path length. Score every arm at the model's length k against
+                # the first k fixations of each observer.
+                k = min(len(field), args.n)
+                for arm in [a for a in row if a.endswith("@k")]:
+                    del row[arm]
+                if k >= 2:
+                    humans_k = [h[:k] for h in humans if len(h) >= k]
+                    if len(humans_k) >= 2:
+                        rng = np.random.RandomState(args.seed + n)
+                        row["inter-observer@k"] = interobserver_ceiling(humans_k, size)
+                        row["thesis-field@k"] = score_vs_humans(field[:k], humans_k, size)
+                        row["thesis-wta@k"] = score_vs_humans(readout.wta_ior(saliency, size, n=k), humans_k, size)
+                        row["center@k"] = score_vs_humans(center_path(size, k), humans_k, size)
+                        row["random@k"] = score_vs_humans(random_path(size, k, rng), humans_k, size)
+                if (n + 1) % 100 == 0:
+                    print("  refreshed %d" % (n + 1), file=sys.stderr)
             continue
         with Image.open(stimulus) as im:
             size = im.size
@@ -238,6 +269,8 @@ def run_mit1003(args):
     per_arm = {}
     for row in rows.values():
         for arm, scores in row.items():
+            if arm.startswith("_"):
+                continue  # bookkeeping, not an arm
             per_arm.setdefault(arm, {k: [] for k in MM_DIMS + ("scanmatch",)})
             for k in MM_DIMS + ("scanmatch",):
                 if not np.isnan(scores[k]):
@@ -248,7 +281,8 @@ def run_mit1003(args):
 
 
 # The comparisons H4 is about, paired over stimuli (every arm sees every image).
-PAIRS = [("thesis-field", "center"), ("thesis-field", "random"), ("thesis-wta", "center"),
+PAIRS = [("thesis-field@k", "random@k"), ("thesis-field@k", "center@k"), ("thesis-field@k", "thesis-wta@k"),
+         ("inter-observer@k", "thesis-field@k"), ("thesis-field", "center"), ("thesis-field", "random"), ("thesis-wta", "center"),
          ("thesis-objfile", "thesis-wta"), ("thesis-field", "thesis-wta"),
          ("inter-observer", "thesis-field")]
 
@@ -323,6 +357,7 @@ def demo(args):
 # --- aggregate + report ------------------------------------------------------
 
 ARM_ORDER = ["inter-observer", "thesis-field", "thesis-objfile", "thesis-wta", "thesis-stoch-best",
+             "inter-observer@k", "thesis-field@k", "thesis-wta@k", "center@k", "random@k",
              "spectral-residual-wta", "center-bias-wta", "deepgaze-iie-wta", "center", "random"]
 
 
@@ -370,6 +405,9 @@ def main():
                     help="another C++ profile as a <NAME>-wta arm (repeatable)")
     ap.add_argument("--no-operators", action="store_true", help="skip the Python saliency-model arms")
     ap.add_argument("--resume", action="store_true", help="keep the stimuli already scored in --out/rows.json")
+    ap.add_argument("--refresh-field", action="store_true",
+                    help="with --resume: re-score only the thesis-field arm of the stimuli already scored "
+                         "(after a change to the selection stage; the saliency maps do not depend on it)")
     ap.add_argument("--mit1003", action="store_true")
     ap.add_argument("--demo", action="store_true", help="synthetic stack check (no dataset/binary/scipy)")
     ap.add_argument("--check", action="store_true", help="with --demo: assert ceiling >= model > floor")

@@ -32,8 +32,9 @@ and the exclusivity weighting are ports of the original sources and the thesis's
 equations; onset and the symbolic second stage are reconstructions from the
 thesis text, because their sources did not survive. The
 [replication dossier](docs/replication/REPLICATION_DOSSIER.md) re-runs the
-thesis's own feature experiments: all three static features reproduce every
-finding tested. `configs/thesis/` holds the dissertation profiles (the
+thesis's own experiments — features, depth, and the dynamics of the neural
+field: 21 of 23 findings reproduce and 2 partially, the field's with the parameters the
+dissertation system actually used. `configs/thesis/` holds the dissertation profiles (the
 replication track — finite, to be frozen when done); everything else is the
 modern track, free to move away from the thesis
 ([ADR-0005](docs/adr/0005-two-tracks-replication-and-modern.md)).

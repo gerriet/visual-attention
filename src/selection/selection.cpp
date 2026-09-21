@@ -265,6 +265,8 @@ std::unique_ptr<SelectionStrategy> create_selection_strategy(const std::string& 
     read_param(strategy_params, "input_mult", nf.input_mult);
     read_param(strategy_params, "kernel_s", nf.kernel_s);
     read_param(strategy_params, "kernel_k", nf.kernel_k);
+    read_param(strategy_params, "kernel_k2", nf.kernel_k2);
+    read_param(strategy_params, "kernel_s2", nf.kernel_s2);
     read_param(strategy_params, "kernel_size", nf.kernel_size);
     read_param(strategy_params, "max_cycles", nf.max_cycles);
     read_param(strategy_params, "cycles_per_frame", nf.cycles_per_frame);

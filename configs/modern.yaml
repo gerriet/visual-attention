@@ -18,6 +18,10 @@
 #    measurement on both benchmarks says otherwise
 #  - the Itti-Koch intensity / orientation channels add nothing measurable.
 
+# Field parameters: the ones this profile was measured with (the port's
+# defaults). configs/thesis/thesis.yaml has since moved to the dissertation
+# system's own field parameters for fidelity; whether they are also *better* is
+# a measurement to make, not an assumption (docs/FEATURE_ASSESSMENT.md).
 pipeline:
   fusion: weighted-sum
   selection: neural-field

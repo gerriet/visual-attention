@@ -13,21 +13,33 @@
 #  - exclusivity 1.1 is the thesis's odd-man-popout weighting (§5.5.3, "1.1 for
 #    all features in all experiments"); symmetry has no categories to weight.
 #
-# Selection: two-stage neural-field selection (roadmap M3) — 2D Amari field
-# dynamics ported from the dissertation's nf2d, with the cluster/Objectfile
-# readout of thesis chapters 6/7 in minimal form. Parameters are the original
-# code defaults; the thesis itself is qualitative about most of them.
+# Selection: the 2D dynamic neural field with local inhibition (thesis §6.3),
+# ported from nf2d.h, with the cluster/Objectfile readout of ch. 6/7 in minimal
+# form. The field parameters are those the dissertation system itself set for
+# this field (esab2.C, neuralmode 2):
+#     nf2d->setparameters(0.33, 8, -0.33, 30, ...);        alpha, global, resting, beta
+#     nf2d->set_DoG_kernels(15, 15, 3.3, 0.12, 14, 0.03);  size, s, k, s2, k2
+# on a 64 x 64 field. With them the thesis's field experiments replicate (Abb.
+# 6.4-6.10: hysteresis, bifurcation, noise suppression up to amplitude 1.2,
+# merging of two maxima below distance 5; docs/replication/REPLICATION_DOSSIER.md)
+# — with the default arguments of the original's setkernels()/setparameters(),
+# which this profile used until 2026-09, they do not. The convergence criterion
+# and the cycle cutoff are the thesis text's (mean |du| < 0.02, 55 cycles).
 
 pipeline:
   fusion: weighted-sum
   selection: neural-field
   selection_params:
-    alpha: 0.5
+    alpha: 0.33
     beta: 30.0
-    resting: -0.25
-    global_mult: 1.0
-    kernel_s: 5.0
-    kernel_k: 0.06
+    resting: -0.33
+    global_mult: 8.0
+    kernel_size: 15
+    kernel_s: 3.3
+    kernel_k: 0.12
+    kernel_s2: 14.0
+    kernel_k2: 0.03
+    field_max_size: 64
     max_cycles: 55        # thesis: cutoff 55 cycles, ~10 typical
     change_thresh: 0.02   # thesis: mean |du| < 0.02
     ior_decay: 0.8        # thesis: inhibition reduced 20% per frame
