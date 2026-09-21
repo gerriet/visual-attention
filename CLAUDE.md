@@ -58,3 +58,9 @@ on attended native-resolution ROIs only — headless under `--attend`
   entry points, and add a `help_<binary>` test in `tests/CMakeLists.txt`.
 - Current measured performance and known gaps: `docs/PERFORMANCE.md`
   ("Current performance (v2)").
+
+## Coding
+- **Performance is a feature, measured not guessed.** Hot loops get a
+  criterion benchmark before optimization.
+- **Comments focus on why**, the code says what. Public items get doc comments.
+- **Document invariants and pre- and postconditions** as comments, when significant.
