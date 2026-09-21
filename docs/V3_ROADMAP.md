@@ -145,9 +145,17 @@ exactly across distances and in a random-dot stereogram, 10.0 → 9.9 px under
 σ ≈ 90 noise, several orientations better than one, and the variance threshold
 admitting wrong pixels when low and dropping correct ones when very high (the
 port's default, 3.0, sits in the too-low range for noisy 8-bit images — a
-calibration note, not yet changed). Not attempted yet: the field dynamics of
-Abb. 6.10–6.13 (need a harness that drives the field directly), the qualitative
-ch. 9 demos.
+calibration note, not yet changed). **Field dynamics added (Abb. 6.4–6.10):
+they replicate — with the field parameters the dissertation system actually
+used** (`esab2.C`: DoG kernel 3.3 / 0.12 / 14 / 0.03, global inhibition 8,
+resting −0.33, 64 × 64): two maxima merge below distance 5 and re-split only at
+13, noise outside a pulse stays at zero up to amplitude 1.2 exactly as the text
+says, ~10 cycles to converge, tracking within ~10 cycles per frame. The port had
+run the field on the default arguments of the original's setter functions, with
+which none of that holds; `configs/thesis/thesis.yaml` now carries the system's
+parameters (`build/field_dynamics`, finding B of the dossier). Not attempted:
+the multi-field systems of Abb. 6.11/6.12 (not implemented), a dynamics
+experiment for the 3D field (6.13), the qualitative ch. 9 demos.
 
 ### M10b — Selection backends: robust multi-blob tracking without the field's tuning
 

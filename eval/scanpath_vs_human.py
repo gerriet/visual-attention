@@ -196,6 +196,19 @@ def run_mit1003(args):
         stimuli = stimuli[: args.limit]
     for n, (stimulus, _fixmap, _fixpts) in enumerate(stimuli):
         if stimulus.stem in rows:
+            if args.refresh_field:
+                # Only the model's own scanpath depends on the selection stage:
+                # after a change to the field parameters, re-score that arm and
+                # keep the rest (the maps, and every readout of them, are unchanged).
+                with Image.open(stimulus) as im:
+                    size = im.size
+                humans = [seq for _subj, seq in mit1003.iter_scanpaths(stimulus.stem, size)]
+                with tempfile.TemporaryDirectory() as workdir:
+                    _map, field = pipeline_map(args.binary, stimulus, args.config, workdir)
+                rows[stimulus.stem]["thesis-field"] = score_vs_humans(field[: args.n], humans, size)
+                rows[stimulus.stem]["_field_fixations"] = len(field)
+                if (n + 1) % 100 == 0:
+                    print("  refreshed %d" % (n + 1), file=sys.stderr)
             continue
         with Image.open(stimulus) as im:
             size = im.size
@@ -238,6 +251,8 @@ def run_mit1003(args):
     per_arm = {}
     for row in rows.values():
         for arm, scores in row.items():
+            if arm.startswith("_"):
+                continue  # bookkeeping, not an arm
             per_arm.setdefault(arm, {k: [] for k in MM_DIMS + ("scanmatch",)})
             for k in MM_DIMS + ("scanmatch",):
                 if not np.isnan(scores[k]):
@@ -370,6 +385,9 @@ def main():
                     help="another C++ profile as a <NAME>-wta arm (repeatable)")
     ap.add_argument("--no-operators", action="store_true", help="skip the Python saliency-model arms")
     ap.add_argument("--resume", action="store_true", help="keep the stimuli already scored in --out/rows.json")
+    ap.add_argument("--refresh-field", action="store_true",
+                    help="with --resume: re-score only the thesis-field arm of the stimuli already scored "
+                         "(after a change to the selection stage; the saliency maps do not depend on it)")
     ap.add_argument("--mit1003", action="store_true")
     ap.add_argument("--demo", action="store_true", help="synthetic stack check (no dataset/binary/scipy)")
     ap.add_argument("--check", action="store_true", help="with --demo: assert ceiling >= model > floor")

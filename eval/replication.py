@@ -22,6 +22,9 @@ Replication track (docs/adr/0005): only dissertation components are exercised.
   stereo-noise  Abb. 5.30  disparity estimates under independent noise in both images
   stereo-orientations Abb. 5.31 one vs several near-vertical Gabor orientations
   stereo-variance Abb. 5.32 the variance threshold: high drops correct pixels, low admits wrong ones
+  field         Abb. 6.4-6.10 the neural field driven with synthetic activation (build/field_dynamics):
+                           hysteresis, bifurcation, noise, convergence, tracking, two approaching
+                           maxima — under the dissertation system's field parameters and the port's
 
 Stereo stimuli are rendered pairs with known disparity (textured surfaces, a
 random-dot stereogram); the depth response is |disparity| / search range (eq.
@@ -285,6 +288,21 @@ def exp_stereo_variance(binary, seeds=3):
     return {"rows": rows, "default": 3.0}
 
 
+# --- neural field ---------------------------------------------------------------
+
+def exp_field(binary):
+    """The field experiments run in C++ (examples/field_dynamics.cpp drives the
+    field directly); here they are run once per parameter set and collected."""
+    harness = os.path.join(os.path.dirname(os.path.abspath(binary)), "field_dynamics")
+    if not os.path.exists(harness):
+        sys.exit("field harness not found: %s (build first: cmake --build build)" % harness)
+    out = {}
+    for parameter_set in ("esab2", "port"):
+        result = subprocess.run([harness, "--params", parameter_set], check=True, capture_output=True, text=True)
+        out[parameter_set] = json.loads(result.stdout)
+    return out
+
+
 # --- experiments --------------------------------------------------------------
 
 def exp_shapes(binary):
@@ -464,6 +482,7 @@ EXPERIMENTS = {
     "stereo-noise": exp_stereo_noise,
     "stereo-orientations": exp_stereo_orientations,
     "stereo-variance": exp_stereo_variance,
+    "field": exp_field,
 }
 
 
@@ -574,6 +593,47 @@ def plot_all(results, directory):
         ax.set_title("Abb. 5.32: the variance threshold")
         ax.legend(frameon=False, fontsize=8)
         save(fig, "stereo_variance.png")
+    if "field" in results:
+        sets = (("esab2", "dissertation system (esab2.C)", "#2a78d6"), ("port", "port defaults (until 2026-09)", "#e34948"))
+        fig, axes = plt.subplots(1, 2, figsize=(9.6, 3.4))
+        for name, label, colour in sets:
+            a, b = results["field"][name]["approach"], results["field"][name]["bifurcation"]
+            axes[0].plot(a["distance"], a["cluster_separation"], "o-", ms=3, color=colour, label=label + ": approaching")
+            axes[0].plot(b["distance"], b["cluster_separation"], "--", color=colour, alpha=0.6, label=label + ": separating")
+        axes[0].plot([0, 30], [0, 30], ":", color="#52514e", lw=0.8)
+        axes[0].set_xlabel("distance of the two input maxima (px)")
+        axes[0].set_ylabel("distance of the two clusters (0 = one cluster)")
+        axes[0].set_title("Abb. 6.5 / 6.10: two maxima")
+        axes[0].legend(frameon=False, fontsize=7)
+        for name, label, colour in sets:
+            n = results["field"][name]["noise"]
+            axes[1].plot(n["noise_amplitude"], n["active_outside_zero_mean"], "o-", ms=3, color=colour, label=label)
+            axes[1].plot(n["noise_amplitude"], n["active_outside"], "--", color=colour, alpha=0.6,
+                         label=label + ", noise added on top")
+        axes[1].axvline(1.2, color="#52514e", lw=0.8, ls=":")
+        axes[1].set_xlabel("noise amplitude (pulse amplitude 1; dotted: the thesis's 1.2)")
+        axes[1].set_ylabel("share of active neurons outside the pulse")
+        axes[1].set_title("Abb. 6.6: noise suppression")
+        axes[1].legend(frameon=False, fontsize=7)
+        save(fig, "field_two_maxima_noise.png")
+
+        fig, axes = plt.subplots(1, 2, figsize=(9.6, 3.4))
+        h = results["field"]["esab2"]["hysteresis"]
+        axes[0].plot(h["alpha"], h["position_alpha_rising"], "o-", ms=3, color="#2a78d6", label="alpha rising")
+        axes[0].plot(h["alpha"], h["position_alpha_falling"], "s--", ms=3, color="#1baf7a", label="alpha falling")
+        axes[0].set_xlabel("alpha (peak at 16: alpha, peak at 48: 1 - alpha)")
+        axes[0].set_ylabel("position of the activation cluster")
+        axes[0].set_title("Abb. 6.4: hysteresis (dissertation parameters)")
+        axes[0].legend(frameon=False, fontsize=8)
+        t = results["field"]["esab2"]["tracking"]
+        for row in t["rows"]:
+            needed = [c if c > 0 else float("nan") for c in row["cycles_needed"]]
+            axes[1].plot(t["speed_px_per_frame"], needed, "o-", ms=3, label="amplitude %.1f" % row["amplitude"])
+        axes[1].set_xlabel("target speed (px per frame)")
+        axes[1].set_ylabel("update cycles per frame needed")
+        axes[1].set_title("Abb. 6.9: tracking (dissertation parameters)")
+        axes[1].legend(frameon=False, fontsize=7, ncol=2)
+        save(fig, "field_hysteresis_tracking.png")
     if "shapes" in results and results["shapes"].get("stimulus") is not None:
         results["shapes"]["stimulus"].save(os.path.join(directory, "shapes_stimulus.png"))
 
