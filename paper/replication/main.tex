@@ -51,8 +51,9 @@ and inhibits return to \emph{objects} rather than to locations. Its central
 claim---that object-based inhibition of return is what a serial attention system
 needs in a dynamic scene---rested on one simulation experiment without
 intervals and on demonstrations. Twenty years later I reimplemented the model and tested it again: 24 of the thesis's own
-experimental findings, its central claim under a protocol with predictions
+experimental findings (among them its one quantitative test of the central claim), that claim under a protocol with predictions
 committed before each confirmatory run, and its scanpaths against human gaze.
+\todo{update the count when replication-v2 is tagged: 25 findings, 22 replicated, 3 in part.}
 Twenty-two findings replicate and two replicate in part. The central claim holds:
 on 30 fresh scenes per regime, object-based inhibition reaches new objects sooner
 and keeps cycling through a scene more evenly than space-based inhibition, also
@@ -404,23 +405,66 @@ own formulation with page reference, in translation.}
 
 \subsection{The thesis's own test}
 \label{sec:worldmodel}
-\todo{Not yet replicated; found late (it is in thesis \S9.2 and is the main
-result of \citealp{backer2003}, and the dossier, built from chapters 5--6, missed
-it). Simulated two-dimensional master maps: $5\times5$-pixel objects, static or
-moving by at most 2~px per frame, at least 14~px apart, uniform noise of half the
-object amplitude; 1, 3 or 5 static and 0--5 dynamic objects; 50 runs of 40
-frames per condition. A conventional model (blur, inhibit, maximum; simulated
-recognition in 3 frames; an $8\times8$ inhibition mark decaying by 0.8 per frame;
-identity bound to the location of recognition) against the two-stage model in its
-simplest variant (one 2D field of local inhibition, object files on its activity
-clusters, exploration behaviour, recognition in 4 frames). Measures: mean number
-of objects whose identity \emph{and} position (within 20~px) the world model
-holds, and their mean position error. Reported: the conventional model leads
-without dynamic objects; with any, the two-stage model leads and scales better;
-position error $<0.5$~px against 0.5--5~px. This measures what the system
-\emph{knows}, where the study below measures where attention \emph{goes}; it is
-also the one experiment defined on the chain field $\to$ clusters $\to$ object
-files (see Limitations). To be replicated as finding 22, with intervals.}
+The thesis contains one quantitative test of its central claim (\S9.2; the main
+result of \citealp{backer2003}), which the first version of the dossier, built
+from chapters 5--6, had missed. Two models explore the same simulated master map
+of attention and each keeps a world model---which object is where. Objects are
+$5\times5$ pixels, static or moving on straight paths by at most 2~px per axis
+and frame, at least 14~px apart, under uniform noise of half their amplitude;
+1, 3 or 5 static and 0--5 dynamic objects; 50 runs of 40 frames per condition.
+Recognition is simulated: it names the object under the focus after 3 frames
+(conventional) or 4 (two-stage).
+The \emph{conventional} model blurs, subtracts a decaying inhibition map ($8\times8$
+marks, $\times0.8$ per frame) and takes the maximum; an identity stays bound to the
+place where its object was selected. The \emph{two-stage} model is the thesis's
+simplest variant---one 2D field of local inhibition, object files on its activity
+clusters with the correspondence of \S7.2.3, the exploration behaviour---and an
+identity moves with its object file. Measures: the mean number of objects whose
+identity the world model holds within 20~px of the truth, and the mean position
+error of those. What the sources leave open (map size, velocity distribution,
+noise mean, when the conventional model's recognition looks at the focus) was
+fixed on development seeds, the last in the conventional model's favour; two
+variants were declared in advance; predictions were committed before the 50
+confirmatory runs (\texttt{3edd62f}). \src{dossier, finding 22; eval/replication.py --only world-model}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{world_model.png}
+\caption{Thesis Abb.~9.2 / \citet[Fig.~5]{backer2003} rebuilt: recognized objects
+(left axes) and position error (right axes) for 1, 3 and 5 static objects. Dotted:
+the thesis's curves, read off the published figure. \todo{redraw for print.}}
+\label{fig:worldmodel}
+\end{figure}
+
+\paragraph{Result (Figure~\ref{fig:worldmodel}).} The two-stage model is within
+0.01 of its optimum---every object recognized at the first opportunity and never
+lost---in all 18 conditions, and its curve is the thesis's curve (within 0.25 in
+17 of 18 conditions). The field produces exactly as many activity clusters as
+there are objects in every condition. Its position error is 0.53--0.95~px; the
+conventional model's grows with the number of moving objects to 4--7~px. Pooled
+over the static counts, two-stage minus conventional recognized objects for 0--5
+dynamic objects: $-0.18$, $-0.21$, $-0.10$, $+0.14$, $+0.28$, $+0.44$, every
+interval excluding zero. So the thesis's scaling claim and its position-error
+claim replicate in direction and size; two statements do not: ``ahead as soon as
+anything moves'' (here: from three moving objects on) and ``below 0.5~px in every
+condition''. The first is the baseline's doing: the conventional model rebuilt
+from the description reaches its own optimum in static scenes (4.00 with five
+objects) where the thesis's reached about 3.3, so the two-stage model's extra
+frame per recognition is paid back later. Why the thesis's baseline fell short
+the sources do not say. Four of five predictions held; the one about the variants
+was half right (with recognition looking at the focus when it \emph{ends}, two
+dynamic objects are a tie and the lead from three on grows to $+0.61$).
+
+\paragraph{A third parameter finding.} Building this experiment exposed what
+Finding~B had missed: over a stream the deployed system ran its field for a
+\emph{fixed 20 cycles per frame} (its convergence test compared a summed change
+with a threshold no noisy field meets) with an input gain of 0.765. With the
+port's convergence test the field stops after about three cycles, a moving
+object's cluster stays behind, self-sustained, and the object file stays with the
+ghost.
+
+This experiment measures what the system \emph{knows}; the study below measures
+where attention \emph{goes}.
 
 \subsection{Design}
 Behaviours that are identical except in what they inhibit, over the same
