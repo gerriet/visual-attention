@@ -105,6 +105,31 @@ This is already the pattern; the ADR makes it the rule.
 4. **"Frozen" = tag + frozen goldens**, as proposed: when the replication track
    is done it is tagged `replication-v1`; no commit-message CI rule.
 
+## The replication track is closed: tag `replication-v1` (2026-09-21)
+
+The definition of done is met — the dossier has a verdict for each of 24
+findings (22 replicated, 2 partially; `docs/replication/REPLICATION_DOSSIER.md`),
+H1 has its confirmatory run (supported, three independent seed blocks, under the
+thesis text's parameters and under the dissertation system's), H4 has its run on
+all of MIT1003, and the fidelity tests pass. The state is tagged
+`replication-v1`.
+
+From here on:
+
+- **Frozen:** everything under `configs/thesis/`, the components it selects
+  (`color-munsell`, `eccentricity`, `symmetry`, `stereo`, `onset`, the neural
+  fields, the object-file stage and its thesis behaviors) in their default
+  behaviour, and the thesis goldens (`thesis_inputc`, `stereo`, `thesis_attend`).
+  A change to any of them needs a stated replication reason — a deviation from
+  the thesis found, or a bug — and re-runs the dossier
+  (`eval/replication.py --all`).
+- **Free:** everything else. Modern-track work adds siblings and new profiles,
+  and may change `configs/modern.yaml`, `configs/attend*.yaml` and the defaults
+  at will; the thesis profile stays an arm in every modern benchmark.
+- Not attempted, and not blocking: the multi-field systems of Abb. 6.11/6.12
+  (not implemented), a dynamics experiment for the 3D field (6.13), the
+  qualitative ch. 9 demonstrations.
+
 ## Implemented so far
 
 - `configs/thesis/{thesis,stereo,attend}.yaml`; a test

@@ -186,8 +186,10 @@ Replication track — finite; close it and freeze it:
    2026-09-21: the thesis text's values are the profile, the system's
    (`esab2.C`) a runnable sibling (`configs/thesis/*_esab2.yaml`); compared on
    every model-free benchmark — no decisive difference, the text slightly ahead,
-   **H1 holds under both** on a third seed block. Left before the tag: the
-   stereo variance threshold (needs a real stereo pair).
+   **H1 holds under both** on a third seed block. ~~The stereo variance
+   threshold~~ — checked on three Middlebury pairs with ground truth: a low
+   threshold is best, the default (3.0) stays; 82–85% of disparities correct on
+   real imagery. **Nothing is left before the `replication-v1` tag.**
 4. Tag `replication-v1`, freeze the thesis goldens.
 
 Modern track — optimise first, then confirm once:

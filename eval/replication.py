@@ -22,6 +22,8 @@ Replication track (docs/adr/0005): only dissertation components are exercised.
   stereo-noise  Abb. 5.30  disparity estimates under independent noise in both images
   stereo-orientations Abb. 5.31 one vs several near-vertical Gabor orientations
   stereo-variance Abb. 5.32 the variance threshold: high drops correct pixels, low admits wrong ones
+  stereo-real   (calibration) the variance threshold on real pairs with ground truth (Middlebury
+                           2001: Tsukuba, Venus, Sawtooth; data/Middlebury, see eval/datasets/middlebury.py)
   text-vs-code  (no figure) the feature experiments under the thesis text's parameters and under
                            the ones the dissertation system set (esab2.C): do both reproduce them?
   field         Abb. 6.4-6.10 the neural field driven with synthetic activation (build/field_dynamics):
@@ -207,7 +209,9 @@ def stereo_map(binary, left, right, params=None):
             fh.write(config_text([]) + "  stereo:\n    weight: 1.0\n    params:\n"
                      + "".join("      %s: %s\n" % (k, v) for k, v in merged.items()))
         out = os.path.join(tmp, "features")
-        subprocess.run([binary, "--stereo", paths[0], paths[1], "--config", config, "--emit-features", out],
+        # abspath: the CLI runs in the temp directory (it writes a visualization into its cwd)
+        subprocess.run([os.path.abspath(binary), "--stereo", paths[0], paths[1], "--config", config,
+                        "--emit-features", out],
                        check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, cwd=tmp)
         return np.asarray(Image.open(os.path.join(out, "feature_stereo.png"))).astype(np.float64) / 65535.0
 
@@ -302,6 +306,59 @@ def exp_stereo_variance(binary, seeds=3):
                      "faint_surface_correct": float(np.mean(faint_kept)),
                      "flat_band_wrong": float(np.mean(flat_wrong))})
     return {"rows": rows, "default": 3.0}
+
+
+# Middlebury 2001 scenes whose disparities fit the 16-px search range at the
+# feature's 256-px working size: (left, right, ground truth for the left view, its scale)
+MIDDLEBURY = os.path.join(REPO, "data", "Middlebury")
+REAL_PAIRS = {
+    "tsukuba": ("scene1.row3.col3.ppm", "scene1.row3.col4.ppm", "truedisp.row3.col3.pgm", 16.0),
+    "venus": ("im2.ppm", "im6.ppm", "disp2.pgm", 8.0),
+    "sawtooth": ("im2.ppm", "im6.ppm", "disp2.pgm", 8.0),
+}
+
+
+def exp_stereo_real(binary):
+    """The variance threshold gates out windows without enough structure. Its
+    scale depends on the gain of the Gabor filters, which the original sources
+    do not settle, so it is calibrated here against ground truth: per threshold,
+    the share of pixels with a correct disparity (within 1 px at the working
+    size), a wrong one, or none — overall and on textureless pixels."""
+    missing = [n for n, f in REAL_PAIRS.items() if not os.path.exists(os.path.join(MIDDLEBURY, n, f[0]))]
+    if missing:
+        sys.exit("Middlebury scenes not found (%s) under %s — see eval/datasets/middlebury.py"
+                 % (", ".join(missing), MIDDLEBURY))
+    thresholds = [0.0, 3.0, 5.0, 10.0, 15.0, 20.0, 30.0, 40.0, 60.0, 80.0, 120.0]
+    scenes = {}
+    for name, (left_file, right_file, truth_file, truth_scale) in REAL_PAIRS.items():
+        folder = os.path.join(MIDDLEBURY, name)
+        left = np.asarray(Image.open(os.path.join(folder, left_file)).convert("L")).astype(np.float64)
+        right = np.asarray(Image.open(os.path.join(folder, right_file)).convert("L")).astype(np.float64)
+        truth = np.asarray(Image.open(os.path.join(folder, truth_file))).astype(np.float64) / truth_scale
+        work = 256.0 / max(left.shape)          # the feature works on a 256-px image
+        valid = truth > 0
+        # Textureless: little grey-value variation in a 9 x 9 neighbourhood
+        pil = Image.fromarray(left.astype(np.uint8))
+        from PIL import ImageFilter
+        mean = np.asarray(pil.filter(ImageFilter.BoxBlur(4))).astype(np.float64)
+        mean_sq = np.asarray(Image.fromarray(np.clip(left * left / 255.0, 0, 255).astype(np.uint8))
+                             .filter(ImageFilter.BoxBlur(4))).astype(np.float64) * 255.0
+        flat = valid & (np.sqrt(np.clip(mean_sq - mean * mean, 0, None)) < 4.0)
+        rows = []
+        for threshold in thresholds:
+            depth = stereo_map(binary, left, right, {"variance_threshold": threshold})
+            estimate = depth * STEREO_RANGE             # working-size pixels
+            accepted = depth > 0
+            right_value = np.abs(estimate - truth * work) <= 1.0
+            rows.append({"threshold": threshold,
+                         "correct": float((valid & accepted & right_value).sum() / valid.sum()),
+                         "wrong": float((valid & accepted & ~right_value).sum() / valid.sum()),
+                         "rejected": float((valid & ~accepted).sum() / valid.sum()),
+                         "flat_wrong": float((flat & accepted & ~right_value).sum() / max(flat.sum(), 1)),
+                         "flat_correct": float((flat & accepted & right_value).sum() / max(flat.sum(), 1))})
+        scenes[name] = {"rows": rows, "flat_share": float(flat.sum() / valid.sum()),
+                        "max_disparity_working_px": float(truth.max() * work)}
+    return {"scenes": scenes, "thresholds": thresholds}
 
 
 def exp_text_vs_code(binary):
@@ -534,6 +591,7 @@ EXPERIMENTS = {
     "stereo-noise": exp_stereo_noise,
     "stereo-orientations": exp_stereo_orientations,
     "stereo-variance": exp_stereo_variance,
+    "stereo-real": exp_stereo_real,
     "text-vs-code": exp_text_vs_code,
     "field": exp_field,
 }
@@ -687,6 +745,23 @@ def plot_all(results, directory):
         axes[1].set_title("Abb. 6.9: tracking (dissertation parameters)")
         axes[1].legend(frameon=False, fontsize=7, ncol=2)
         save(fig, "field_hysteresis_tracking.png")
+    if "stereo-real" in results:
+        r = results["stereo-real"]
+        fig, ax = plt.subplots(figsize=(5.4, 3.5))
+        colours = {"tsukuba": "#2a78d6", "venus": "#1baf7a", "sawtooth": "#eda100"}
+        for name, scene in r["scenes"].items():
+            x = [max(row["threshold"], 1.0) for row in scene["rows"]]
+            ax.plot(x, [row["correct"] for row in scene["rows"]], "o-", ms=3, color=colours.get(name, "#52514e"),
+                    label="%s: correct" % name)
+            ax.plot(x, [row["wrong"] for row in scene["rows"]], "s--", ms=3, color=colours.get(name, "#52514e"),
+                    alpha=0.7, label="%s: wrong" % name)
+        ax.axvline(3.0, color="#52514e", lw=0.8, ls=":")
+        ax.set_xscale("log")
+        ax.set_xlabel("variance threshold (log; dotted: the default)")
+        ax.set_ylabel("share of pixels with ground truth")
+        ax.set_title("The variance threshold on real stereo pairs")
+        ax.legend(frameon=False, fontsize=7, ncol=2)
+        save(fig, "stereo_real_threshold.png")
     if "shapes" in results and results["shapes"].get("stimulus") is not None:
         results["shapes"]["stimulus"].save(os.path.join(directory, "shapes_stimulus.png"))
 

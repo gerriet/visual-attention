@@ -48,7 +48,8 @@ been ported from the original and the affected rows re-run.
 | 12 | Abb. 5.29 | Depth is found in a random-dot stereogram | **replicated** — the square exists only as a disparity and is recovered completely |
 | 13 | Abb. 5.30 | Under independent noise the disparity estimate "changes only in a very small range" | **replicated** — 10.0 → 9.9 px at σ ≈ 90 grey levels, *without* the multi-scale scheme the thesis credits for it |
 | 14 | Abb. 5.31 | Several near-vertical orientations help; beyond one, the choice matters little | **replicated** |
-| 15 | Abb. 5.32 | Only very high variance thresholds drop correct results; very low ones admit wrong pixels on structureless surfaces | **replicated**, with a calibration note: the port's default sits in the "too low" range |
+| 15 | Abb. 5.32 | Only very high variance thresholds drop correct results; very low ones admit wrong pixels on structureless surfaces | **replicated** on the synthetic scene; on real pairs (Middlebury) a low threshold is simply best — the default stays |
+| 15b | on Abb. 5.25 | "In the great majority of regions the disparity is determined correctly" | **replicated** on independent real data: 82–85% of pixels within 1 px on three Middlebury pairs |
 | 16 | Abb. 6.4 | Hysteresis: the activation cluster changes place only after the formerly weaker input is clearly stronger | **replicated** with the dissertation system's field parameters (switch at α = 0.55 rising, held down to 0.25 falling); *diverged* with the port's defaults (finding B) |
 | 17 | Abb. 6.5 | Bifurcation: from a certain distance two maxima give two clusters | **replicated** |
 | 18 | Abb. 6.6 | Noise suppression: for a pulse of amplitude 1, only signal-caused activation up to noise amplitude 1.2 | **replicated** exactly with the dissertation parameters (zero outside the pulse up to 1.2, first activation at 1.4; zero-mean noise); *diverged* with the port's defaults |
@@ -254,15 +255,42 @@ from 40 upwards correct pixels start to go, the faint surface first (88% at 40,
 to 240. Both halves of the thesis's statement hold, and there is a broad window
 between them.
 
-*Calibration note.* The port's default threshold (3.0) lies **below** that
-window for an 8-bit image with σ = 3 noise: it does not reject structureless
-regions. The thesis sets the threshold "empirically", and its scale depends on
-the gain of the original Gabor implementation, which the sources do not settle
-(the same unknown as for symmetry). On the repository's stereo golden and H3's
-planned stimuli — textured everywhere — this has no effect; on real stereo
-imagery with sky, walls or floors it would. A value near 20 is what this
-experiment supports; changing the default is a replication-track decision that
-should wait for a real stereo pair to check it against.
+*Calibration — checked on real stereo pairs (2026-09-21), and the first reading
+corrected.* On this synthetic scene the port's default threshold (3.0) lies below
+the window: it lets a band of pure sensor noise through. That suggested raising
+it (the dissertation system used 75, on its own Gabor scale). Real imagery says
+otherwise. Three Middlebury 2001 pairs with ground truth — Tsukuba, Venus,
+Sawtooth, the ones whose disparities fit the 16-px search range at the feature's
+256-px working size (`eval/replication.py --only stereo-real`) — share of pixels
+with a correct disparity (within 1 px) / a wrong one / none:
+
+![correct and wrong disparities against the variance threshold, three real pairs](figures/stereo_real_threshold.png)
+
+| Threshold | Tsukuba | Venus | Sawtooth |
+|---|---|---|---|
+| 0 | 0.86 / 0.14 / 0.00 | 0.84 / 0.10 / 0.06 | 0.83 / 0.12 / 0.06 |
+| **3 (default)** | **0.85 / 0.15 / 0.00** | **0.82 / 0.12 / 0.06** | **0.82 / 0.12 / 0.06** |
+| 10 | 0.82 / 0.16 / 0.02 | 0.74 / 0.14 / 0.12 | 0.79 / 0.15 / 0.06 |
+| 20 | 0.77 / 0.18 / 0.05 | 0.67 / 0.13 / 0.20 | 0.74 / 0.17 / 0.10 |
+| 40 | 0.70 / 0.20 / 0.10 | 0.59 / 0.14 / 0.27 | 0.64 / 0.18 / 0.19 |
+| 80 | 0.55 / 0.21 / 0.25 | 0.48 / 0.14 / 0.39 | 0.50 / 0.20 / 0.31 |
+
+Raising the threshold never buys fewer wrong pixels — their share stays at
+12–20% — it only discards correct ones. The reason is visible when the pixels
+are split by local texture: on the 40–50% of each image with little grey-value
+variation, **81–86% of the disparities are correct at threshold 0**; the spatial
+integration of eq. 5.14 carries them from their textured surroundings. The
+errors sit at occlusions and depth edges, which no variance threshold addresses.
+A band of pure noise, as in the synthetic scene, is the one case the threshold
+exists for, and real scenes here do not contain it. **The default stays at 3.0**;
+the thesis's statement about Abb. 5.32 holds as the synthetic experiment shows
+it, and the practical advice is the opposite of what that experiment alone
+suggested: keep the threshold low.
+
+This is also an independent check of the thesis's summary of its depth feature —
+"in the great majority of regions the disparity has been determined correctly"
+(on Abb. 5.25): 82–85% of all pixels with ground truth, on real pairs the
+thesis never saw, with the single-scale port.
 
 ### 16–21 · Abb. 6.4–6.10 — the dynamics of the neural field (added 2026-09-21)
 
@@ -351,7 +379,7 @@ Where it differs from the thesis text, the replication profile follows the
 | Symmetry | radii 6–15, width 3, 12 orientations (Tab. 5.1) | offset 6, step 3, 4 bands, 12 orientations, k0 0.75, r 0.5 | the same |
 | Eccentricity: growth share / variance ratio | 0.65 / 2 | 0.78 / 1.5 (4 dilations, 0.05–30 %, 4-connected) | the text's |
 | Colour: cc_add / cc_mult | 8 / 5 | 12 / 6 (min 0.06 %, max 12 %, max contrast 32, no exclusivity) | the text's |
-| Stereo: variance threshold / correlation cutoff | "empirical" / not mentioned | 75 / 0.75, window 12 | 3.0 / none — see the calibration note above; the system's 75 is on its own Gabor scale, but it confirms that the working value is *high* |
+| Stereo: variance threshold / correlation cutoff | "empirical" / not mentioned | 75 / 0.75, window 12 | 3.0 / none. The system's 75 is on its own Gabor scale and cannot be transferred; on real pairs with ground truth a low threshold is best in the port's units (calibration above) |
 | Feature weights (symmetry, eccentricity, colour, depth) | "identical weights ≡ 1" in the example (Abb. 5.33) | 1.2, 0.35, 1.6, 0.7 ("standard diss version": 1.25, 0.25, 1.5, 0.75) | 1.0 each |
 | Default field architecture | three variants compared | the 3D field (`neuralmode = 3`) | 2D field for stills, 3D for stereo pairs |
 
@@ -447,6 +475,9 @@ Replication-track definition of done (ADR-0005): ~~fix symmetry~~ → ~~re-run H
 and M11 with it~~ → ~~the stereo experiments~~ → ~~the field dynamics~~ (Abb.
 6.4–6.10 done; 6.11–6.13 documented as not implemented / not attempted) →
 ~~decide on the open parameter questions~~ (decided 2026-09-21: the text's values
-are the profile, the system's are a runnable sibling; compared above) → tag
-`replication-v1`. Still open and small: the stereo variance threshold (the port's
-3.0 is too low; a real stereo pair is needed to set it).
+are the profile, the system's are a runnable sibling; compared above) →
+~~the stereo variance threshold~~ (checked on real pairs 2026-09-21: the default
+is right) → **tagged `replication-v1` on 2026-09-21.** The thesis profiles, the
+components they select and their goldens are frozen from that tag
+(`docs/adr/0005-two-tracks-replication-and-modern.md`); a later change to them
+needs a replication reason and a re-run of this dossier.

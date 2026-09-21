@@ -29,6 +29,17 @@ threads added by the 2026 positioning pass (below) turn the master saliency map
 into a full **priority map** (M17) and reframe the whole instrument as an
 attention front-end for large vision models (M18).
 
+## Status (2026-09-21): the replication track is closed
+
+Tagged **`replication-v1`**. The dissertation's model is reimplemented from its
+surviving sources and its text; 22 of 24 of its findings reproduce and 2
+partially (`docs/replication/REPLICATION_DOSSIER.md`); its central claim, H1 —
+object-based inhibition of return beats space-based in dynamic scenes — is
+supported on three independent blocks of scenes; H4 (human scanpaths) is
+answered. The thesis profiles are frozen (ADR-0005). What remains in this
+roadmap is the **modern track**: H2, H5, H6, H7 and the milestones that serve
+them, judged by usefulness.
+
 ## Positioning: sharpen, don't redirect (2026)
 
 `docs/RESEARCH_POSITIONING.md` places this work against 2025–26 attention
@@ -144,8 +155,9 @@ experiments added (Abb. 5.28–5.32): all five replicate** — disparity recover
 exactly across distances and in a random-dot stereogram, 10.0 → 9.9 px under
 σ ≈ 90 noise, several orientations better than one, and the variance threshold
 admitting wrong pixels when low and dropping correct ones when very high (the
-port's default, 3.0, sits in the too-low range for noisy 8-bit images — a
-calibration note, not yet changed). **Field dynamics added (Abb. 6.4–6.10):
+port's default, 3.0, looked too low on the synthetic scene; checked on three
+Middlebury pairs with ground truth it is right — raising it only discards
+correct disparities, 82–85% of which are within 1 px on real imagery). **Field dynamics added (Abb. 6.4–6.10):
 they replicate — with the field parameters the dissertation system actually
 used** (`esab2.C`: DoG kernel 3.3 / 0.12 / 14 / 0.03, global inhibition 8,
 resting −0.33, 64 × 64): two maxima merge below distance 5 and re-split only at
