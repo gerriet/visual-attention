@@ -1,10 +1,11 @@
 # Replication dossier — the dissertation's findings, re-run (M10)
 
 *Track: **replication** (docs/adr/0005). First version 2026-09-20; symmetry
-ported and re-run 2026-09-21. Every number here is printed by one command:*
+ported and re-run, and the stereo experiments added, 2026-09-21. Every number
+here is printed by one command:*
 
 ```bash
-eval/replication.py --all        # CPU only, ~10 min; figures land in docs/replication/figures
+eval/replication.py --all        # CPU only, ~15 min; figures land in docs/replication/figures
 ```
 
 The dissertation (Backer 2004, ch. 5–6) supports its features and its selection
@@ -43,8 +44,13 @@ been ported from the original and the affected rows re-run.
 | 7 | Abb. 5.21 | The colour-contrast maximum is robust to added noise | **replicated** — on the object at every noise level tested |
 | 8 | Abb. 5.22 | Colour contrast is insensitive to `cc_add` / `cc_mult` over a broad range; only clearly different values change the salient regions (ball, picture) | **replicated** — and the same two regions are the salient ones |
 | 9 | Abb. 5.34 | Exclusivity lowers the saliency of common orientations / colours relative to unique ones | **replicated** |
+| 11 | Abb. 5.28 | The depth response follows an object's distance | **replicated** — the estimated disparity equals the true one at every step |
+| 12 | Abb. 5.29 | Depth is found in a random-dot stereogram | **replicated** — the square exists only as a disparity and is recovered completely |
+| 13 | Abb. 5.30 | Under independent noise the disparity estimate "changes only in a very small range" | **replicated** — 10.0 → 9.9 px at σ ≈ 90 grey levels, *without* the multi-scale scheme the thesis credits for it |
+| 14 | Abb. 5.31 | Several near-vertical orientations help; beyond one, the choice matters little | **replicated** |
+| 15 | Abb. 5.32 | Only very high variance thresholds drop correct results; very low ones admit wrong pixels on structureless surfaces | **replicated**, with a calibration note: the port's default sits in the "too low" range |
 | 10 | Abb. 6.14 | Object identity survives temporary occlusion when several objects are tracked | **partially** — different architecture; see the H1 occlusion regime |
-| — | Abb. 5.28–5.32, 5.33, 5.35, 6.10–6.13, §9.3 | stereo variation / noise / threshold, superposition, 2D vs 3D integration, field dynamics, flanker and early-vs-late selection | **not attempted** (below) |
+| — | Abb. 5.33, 5.35, 6.10–6.13, §9.3 | superposition, 2D vs 3D integration, field dynamics, flanker and early-vs-late selection | **not attempted** (below) |
 
 ## The findings
 
@@ -189,6 +195,69 @@ the ball's response drops from 0.71 to 0.12.
 The odd one out gains by the factor the formula predicts for orientation; for
 colour the sigmoid that follows (eq. 5.12) stretches the ratio further.
 
+### 11–15 · Abb. 5.28–5.32 — the depth feature (added 2026-09-21)
+
+Rendered stereo pairs with known disparity: a random-dot ground at disparity 0
+and a random-dot surface shifted by *d* pixels in the right image (a nearer
+surface), 256 × 256, search range 16 px, three orientations — the parameters of
+`configs/thesis/stereo.yaml`. The depth response is |d| / search range (eq.
+5.16), so it reads back as a disparity estimate. Random dots carry no monocular
+cue: every pair is also a random-dot stereogram (Abb. 5.29).
+
+![depth response against the surface's disparity](figures/stereo_distance.png)
+
+**Distance (5.28) and the random-dot stereogram (5.29).** For d = 0, 2, …, 14
+the estimated disparity on the surface is 0.0, 2.0, …, 14.0 — exact — with 100%
+of the surface pixels within one pixel of the truth, and the ground at 0. The
+stereogram's square (its mean grey differs from the ground's by 3 levels out of
+255; there is nothing to see in either image alone) is recovered completely.
+
+![correct surface pixels under noise, for one, three and five orientations](figures/stereo_noise_orientations.png)
+
+**Noise (5.30).** Independent normally distributed noise in the two images, five
+seeds per level. The estimated disparity of a surface at 10 px is 10.0 up to
+σ ≈ 38 grey levels, 9.99 at σ ≈ 64 (98% of pixels within 1 px) and 9.91 at
+σ ≈ 90 (92%) — "the estimate changes only in a very small range", as the thesis
+says. The thesis attributes this to its multi-scale scheme, which restricts the
+search at high resolution by the result at low resolution; that scheme is *not*
+ported (documented in `stereo_feature.h`), and the single-scale correlation with
+the spatial integration of eq. 5.14 is already this robust on these stimuli. So
+the finding replicates; the thesis's explanation for it is not tested here.
+
+**Orientations (5.31).** At σ = 25 every orientation set is perfect, so the
+comparison is made under strong noise. Share of surface pixels within 1 px /
+share of ground pixels with a wrong disparity:
+
+| noise σ | vertical only | + ±30° | + ±15°, ±30° |
+|---|---|---|---|
+| 90 | 0.84 / 0.16 | **0.92 / 0.08** | 0.91 / 0.09 |
+| 115 | 0.71 / 0.31 | **0.82 / 0.20** | 0.80 / 0.22 |
+
+"The method profits from several orientations, but apart from the case of a
+single orientation the results differ only slightly" — exactly that.
+
+![the variance threshold: what it admits and what it drops](figures/stereo_variance.png)
+
+**Variance threshold (5.32).** The scene gets a textureless band and a second
+surface whose texture has a tenth of the contrast; both images carry a little
+sensor noise (σ = 3). Thresholds up to 5 let the textureless band through — 89%
+of its pixels receive a wrong disparity, the thesis's "erroneously classified
+pixels … on the surface of the ball"; from about 20 the band is rejected (1%);
+from 40 upwards correct pixels start to go, the faint surface first (88% at 40,
+49% at 80, none at 160), while the high-contrast surface survives everything up
+to 240. Both halves of the thesis's statement hold, and there is a broad window
+between them.
+
+*Calibration note.* The port's default threshold (3.0) lies **below** that
+window for an 8-bit image with σ = 3 noise: it does not reject structureless
+regions. The thesis sets the threshold "empirically", and its scale depends on
+the gain of the original Gabor implementation, which the sources do not settle
+(the same unknown as for symmetry). On the repository's stereo golden and H3's
+planned stimuli — textured everywhere — this has no effect; on real stereo
+imagery with sky, walls or floors it would. A value near 20 is what this
+experiment supports; changing the default is a replication-track decision that
+should wait for a real stereo pair to check it against.
+
 ### 10 · Abb. 6.14 — tracking several objects through occlusion — partially
 
 The thesis compares variants of its neural fields. The reimplementation tracks
@@ -204,7 +273,6 @@ the thesis's nearest-centroid correspondence, 1.7 with persistent identity**
 
 | Thesis | Finding | Why not yet |
 |---|---|---|
-| Abb. 5.28, 5.30, 5.32 | stereo: distance variation, noise, variance threshold | needs rendered stereo pairs with controlled disparity; the stereo feature is a port with a behavioural test, so this is the likeliest next *replicated* |
 | Abb. 5.33, 5.35 | superposition; 2D vs 3D integration | qualitative figures on lab stereo imagery |
 | Abb. 6.10–6.13 | field dynamics: two maxima (repulsion from distance 10, merging from 5), per-feature weighted field systems, several salient objects, local inhibition in 3D | need the field driven by synthetic activation directly (a C++ harness, not the image CLI); the systems of several fields with global inhibition (6.11, 6.12) are not implemented |
 | §9.3.2, §9.3.3 | flanker compatibility; early vs late selection | qualitative demonstrations |
@@ -214,11 +282,14 @@ the thesis's nearest-centroid correspondence, 1.7 with persistent identity**
 - The three static features, all ported from the original sources in 2026-09 —
   **eccentricity, colour contrast and symmetry — reproduce every thesis finding
   tested**, quantitatively where the thesis gives an equation. Exclusivity does
-  too.
+  too, and so does the **depth feature** (a port from the start): disparity is
+  recovered exactly, robustly under noise, and its two parameters behave as the
+  thesis describes.
 - The dossier earned its keep on its first run: it found that symmetry, the one
   feature not yet re-ported, answered beside objects instead of on them.
 - Identity through occlusion holds only with the extensions, not with the
   thesis's correspondence — consistent with H1.
 
-Replication-track definition of done (ADR-0005): ~~fix symmetry~~ → re-run H1
-and M11 with it (in progress) → the stereo experiments → tag `replication-v1`.
+Replication-track definition of done (ADR-0005): ~~fix symmetry~~ → ~~re-run H1
+and M11 with it~~ → ~~the stereo experiments~~ → the field dynamics of Abb.
+6.10–6.13 (or an explicit decision to leave them out) → tag `replication-v1`.

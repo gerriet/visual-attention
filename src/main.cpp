@@ -586,7 +586,7 @@ void print_usage(const char* program_name, std::ostream& out = std::cerr)
   out << "  --output <dir>       Specify output directory for batch/sequence mode (default: input_dir/results_batch)"
       << std::endl;
   out << "  --emit-json <path>   Write result JSON + saliency map in the interchange format" << std::endl;
-  out << "  --emit-features <dir> Write each feature map as a 16-bit PNG on a fixed [0,1] scale (single image)"
+  out << "  --emit-features <dir> Write each feature map as a 16-bit PNG on a fixed [0,1] scale (image, --stereo)"
       << std::endl;
   out << "                       (see docs/INTERCHANGE_FORMAT.md; single-image and config modes)" << std::endl;
   out << "  --help, -h           Show this help and exit" << std::endl;
@@ -819,6 +819,10 @@ int main(int argc, char** argv)
         {
           emit_json_path = argv[++i];
         }
+        else if (arg == "--emit-features" && i + 1 < argc)
+        {
+          emit_features_dir = argv[++i];
+        }
         else if (arg == "--no-display")
         {
           config.display = false;
@@ -838,6 +842,11 @@ int main(int argc, char** argv)
       {
         attention::io::ResultWriter::write(pipeline, emit_json_path);
         std::cout << "✓ Saved result JSON: " << emit_json_path << std::endl;
+      }
+      if (!emit_features_dir.empty())
+      {
+        attention::io::ResultWriter::write_features(pipeline, emit_features_dir);
+        std::cout << "✓ Saved feature maps: " << emit_features_dir << std::endl;
       }
       fs::create_directories(config.output_dir);
       cv::Mat vis = pipeline.visualize(false);

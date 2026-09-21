@@ -202,15 +202,15 @@ if(Python3_Interpreter_FOUND)
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
         set_tests_properties(scanpath_vs_human_smoke PROPERTIES
             FAIL_REGULAR_EXPRESSION "check failed;Traceback;Error")
-        # Replication dossier (M10), smoke: two experiments end to end through
-        # --emit-features (absolute feature maps); the values themselves are
+        # Replication dossier (M10), smoke: three experiments end to end through
+        # --emit-features (absolute feature maps; also in --stereo mode); the values themselves are
         # asserted by tests/test_thesis_features.cpp.
         add_test(NAME help_replication
             COMMAND ${EVAL_PYTHON} ${CMAKE_SOURCE_DIR}/eval/replication.py --help)
         set_tests_properties(help_replication PROPERTIES PASS_REGULAR_EXPRESSION "usage")
         add_test(NAME replication_smoke
             COMMAND ${EVAL_PYTHON} ${CMAKE_SOURCE_DIR}/eval/replication.py
-                    --binary $<TARGET_FILE:attention> --only shapes,exclusivity --no-plots
+                    --binary $<TARGET_FILE:attention> --only shapes,exclusivity,stereo-rds --no-plots
                     --out ${CMAKE_BINARY_DIR}/replication_smoke
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
         set_tests_properties(replication_smoke PROPERTIES

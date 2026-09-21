@@ -17,6 +17,15 @@ Replication track (docs/adr/0005): only dissertation components are exercised.
   colour-noise  Abb. 5.21  colour-contrast maximum stays put under added noise
   colour-thresholds Abb. 5.22 colour contrast vs cc_add / cc_mult (broad stable range)
   exclusivity   Abb. 5.34  the odd orientation / colour gains against the common one
+  stereo-distance Abb. 5.28 the depth response follows an object's disparity
+  stereo-rds    Abb. 5.29  a random-dot stereogram: depth where no monocular cue exists
+  stereo-noise  Abb. 5.30  disparity estimates under independent noise in both images
+  stereo-orientations Abb. 5.31 one vs several near-vertical Gabor orientations
+  stereo-variance Abb. 5.32 the variance threshold: high drops correct pixels, low admits wrong ones
+
+Stereo stimuli are rendered pairs with known disparity (textured surfaces, a
+random-dot stereogram); the depth response is |disparity| / search range (eq.
+5.16), so it reads back as a disparity estimate.
 
 Feature responses are read from `attention --emit-features` (16-bit maps on a
 fixed [0, 1] scale — absolute values, never stretched). Parameter sweeps on a
@@ -121,6 +130,159 @@ def monotone_fraction(values, rising=True):
     steps = np.diff(values)
     good = steps >= -1e-9 if rising else steps <= 1e-9
     return float(good.mean()) if len(steps) else 1.0
+
+
+# --- stereo ---------------------------------------------------------------------
+
+STEREO_SIZE = 256
+STEREO_RANGE = 16                      # disparity search range (px), as in configs/thesis/stereo.yaml
+FOREGROUND = (80, 64, 176, 176)        # x0, y0, x1, y1 of the near surface in the left image
+FLAT = (16, 200, 240, 244)             # a textureless band (stereo-variance)
+FAINT = (20, 20, 70, 130)              # a low-contrast surface at disparity 6 (stereo-variance)
+FAINT_DISPARITY = 6
+
+
+def dots(rng, h, w, cell=2):
+    """Random dots: no monocular structure, texture at every orientation."""
+    coarse = rng.randint(0, 2, size=(h // cell + 1, w // cell + 1)) * 255
+    return np.kron(coarse, np.ones((cell, cell)))[:h, :w].astype(np.float64)
+
+
+def stereo_pair(disparity, seed=0, flat_band=False, faint_surface=False):
+    """(left, right) grey arrays: a textured ground at disparity 0 and a textured
+    rectangle shifted left by `disparity` px in the right image (a nearer
+    surface). Optionally a textureless band in the ground, and a second surface
+    whose texture has a tenth of the contrast."""
+    rng = np.random.RandomState(1000 + seed)
+    ground, surface = dots(rng, STEREO_SIZE, STEREO_SIZE), dots(rng, STEREO_SIZE, STEREO_SIZE)
+    if flat_band:
+        x0, y0, x1, y1 = FLAT
+        ground[y0:y1, x0:x1] = 128.0
+    x0, y0, x1, y1 = FOREGROUND
+    left, right = ground.copy(), ground.copy()
+    left[y0:y1, x0:x1] = surface[y0:y1, x0:x1]
+    right[y0:y1, x0 - disparity:x1 - disparity] = surface[y0:y1, x0:x1]
+    if faint_surface:
+        x0, y0, x1, y1 = FAINT
+        faint = 128.0 + (dots(rng, STEREO_SIZE, STEREO_SIZE) - 127.5) * 0.1
+        left[y0:y1, x0:x1] = faint[y0:y1, x0:x1]
+        right[y0:y1, x0 - FAINT_DISPARITY:x1 - FAINT_DISPARITY] = faint[y0:y1, x0:x1]
+    return left, right
+
+
+def noisy(array, sigma, rng):
+    return np.clip(array + rng.normal(0.0, sigma, array.shape), 0, 255) if sigma > 0 else array
+
+
+def stereo_map(binary, left, right, params=None):
+    """The depth feature's response in [0, 1] for a (left, right) pair."""
+    with tempfile.TemporaryDirectory() as tmp:
+        paths = []
+        for name, array in (("left", left), ("right", right)):
+            paths.append(os.path.join(tmp, name + ".png"))
+            Image.fromarray(np.asarray(array).astype(np.uint8), mode="L").save(paths[-1])
+        merged = {"min_disparity": -STEREO_RANGE, "max_disparity": 0}
+        merged.update(params or {})
+        config = os.path.join(tmp, "config.yaml")
+        with open(config, "w") as fh:
+            fh.write(config_text([]) + "  stereo:\n    weight: 1.0\n    params:\n"
+                     + "".join("      %s: %s\n" % (k, v) for k, v in merged.items()))
+        out = os.path.join(tmp, "features")
+        subprocess.run([binary, "--stereo", paths[0], paths[1], "--config", config, "--emit-features", out],
+                       check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, cwd=tmp)
+        return np.asarray(Image.open(os.path.join(out, "feature_stereo.png"))).astype(np.float64) / 65535.0
+
+
+def inner(box, margin=12):
+    x0, y0, x1, y1 = box
+    return (x0 + margin, y0 + margin, x1 - margin, y1 - margin)
+
+
+def disparity_stats(depth, box, truth):
+    """Mean estimated disparity in `box` and the share of its pixels within one
+    pixel of the true disparity."""
+    x0, y0, x1, y1 = box
+    estimate = depth[y0:y1, x0:x1] * STEREO_RANGE
+    return float(estimate.mean()), float((np.abs(estimate - truth) <= 1.0).mean())
+
+
+def exp_stereo_distance(binary):
+    rows = []
+    for disparity in (0, 2, 4, 6, 8, 10, 12, 14):
+        depth = stereo_map(binary, *stereo_pair(disparity))
+        mean, correct = disparity_stats(depth, inner(FOREGROUND), disparity)
+        rows.append({"disparity": disparity, "response": mean / STEREO_RANGE, "estimated_disparity": mean,
+                     "within_1px": correct, "ground_response": region_mean(depth, (8, 8, 60, 248))})
+    return {"rows": rows, "monotone": monotone_fraction([r["response"] for r in rows], rising=True)}
+
+
+def exp_stereo_rds(binary):
+    """The pair is pure random dots; the square exists only as a disparity."""
+    left, right = stereo_pair(8, seed=7)
+    depth = stereo_map(binary, left, right)
+    mean, correct = disparity_stats(depth, inner(FOREGROUND), 8)
+    monocular = abs(float(left[FOREGROUND[1]:FOREGROUND[3], FOREGROUND[0]:FOREGROUND[2]].mean()) - float(left.mean()))
+    return {"disparity": 8, "square_response": mean / STEREO_RANGE, "square_within_1px": correct,
+            "ground_response": region_mean(depth, (8, 8, 60, 248)),
+            "monocular_mean_difference_grey_levels": monocular}
+
+
+def exp_stereo_noise(binary, seeds=5):
+    rows = []
+    for level in (0.0, 0.1, 0.2, 0.3, 0.5, 0.7):
+        means, correct, ground = [], [], []
+        for seed in range(seeds):
+            rng = np.random.RandomState(seed)
+            left, right = stereo_pair(10, seed=seed)
+            depth = stereo_map(binary, noisy(left, level * 128, rng), noisy(right, level * 128, rng))  # independent
+            mean, share = disparity_stats(depth, inner(FOREGROUND), 10)
+            means.append(mean)
+            correct.append(share)
+            ground.append(region_mean(depth, (8, 8, 60, 248)))
+        rows.append({"level": level, "estimated_disparity": float(np.mean(means)),
+                     "within_1px": float(np.mean(correct)), "ground_response": float(np.mean(ground))})
+    return {"rows": rows, "true_disparity": 10}
+
+
+def exp_stereo_orientations(binary, seeds=5):
+    """Random dots are easy for every orientation set, so the comparison is made
+    where it can show: under strong independent noise in the two images."""
+    rows = []
+    for sigma in (25.0, 90.0, 115.0):
+        for count in (1, 3, 5):
+            correct, ground = [], []
+            for seed in range(seeds):
+                rng = np.random.RandomState(seed)
+                left, right = stereo_pair(10, seed=seed)
+                depth = stereo_map(binary, noisy(left, sigma, rng), noisy(right, sigma, rng),
+                                   {"num_orientations": count})
+                correct.append(disparity_stats(depth, inner(FOREGROUND), 10)[1])
+                ground.append(float((depth[8:248, 8:60] * STEREO_RANGE > 1.0).mean()))
+            rows.append({"noise_sigma": sigma, "orientations": count, "within_1px": float(np.mean(correct)),
+                         "ground_wrong_share": float(np.mean(ground))})
+    return {"rows": rows, "note": "1 = vertical; 3 = +-30 deg added; 5 = +-15 and +-30 deg added"}
+
+
+def exp_stereo_variance(binary, seeds=3):
+    """Textured ground and surface, a second surface with a tenth of the texture
+    contrast, and a textureless band — all with a little sensor noise (sigma 3).
+    A low threshold lets the band through (wrong disparities); a high one drops
+    correct pixels, the faint surface first."""
+    rows = []
+    for threshold in (0.0, 1.0, 3.0, 5.0, 10.0, 20.0, 40.0, 80.0, 120.0, 160.0, 240.0):
+        kept, faint_kept, flat_wrong = [], [], []
+        for seed in range(seeds):
+            rng = np.random.RandomState(seed)
+            left, right = stereo_pair(10, seed=seed, flat_band=True, faint_surface=True)
+            depth = stereo_map(binary, noisy(left, 3.0, rng), noisy(right, 3.0, rng), {"variance_threshold": threshold})
+            kept.append(disparity_stats(depth, inner(FOREGROUND), 10)[1])
+            faint_kept.append(disparity_stats(depth, inner(FAINT), FAINT_DISPARITY)[1])
+            x0, y0, x1, y1 = inner(FLAT, 8)
+            flat_wrong.append(float((depth[y0:y1, x0:x1] * STEREO_RANGE > 1.0).mean()))
+        rows.append({"threshold": threshold, "surface_correct": float(np.mean(kept)),
+                     "faint_surface_correct": float(np.mean(faint_kept)),
+                     "flat_band_wrong": float(np.mean(flat_wrong))})
+    return {"rows": rows, "default": 3.0}
 
 
 # --- experiments --------------------------------------------------------------
@@ -297,6 +459,11 @@ EXPERIMENTS = {
     "colour-noise": exp_colour_noise,
     "colour-thresholds": exp_colour_thresholds,
     "exclusivity": exp_exclusivity,
+    "stereo-distance": exp_stereo_distance,
+    "stereo-rds": exp_stereo_rds,
+    "stereo-noise": exp_stereo_noise,
+    "stereo-orientations": exp_stereo_orientations,
+    "stereo-variance": exp_stereo_variance,
 }
 
 
@@ -362,6 +529,51 @@ def plot_all(results, directory):
         ax.set_title("Abb. 5.14 / 5.21: robustness to noise")
         ax.legend(frameon=False, fontsize=8)
         save(fig, "noise.png")
+    if "stereo-distance" in results:
+        rows = results["stereo-distance"]["rows"]
+        fig, ax = plt.subplots(figsize=(5.2, 3.4))
+        ax.plot([r["disparity"] for r in rows], [r["response"] for r in rows], "o-", color="#2a78d6",
+                label="depth response on the surface")
+        ax.plot([r["disparity"] for r in rows], [r["disparity"] / STEREO_RANGE for r in rows], "--", color="#2a78d6",
+                alpha=0.5, label="eq. 5.16: |d| / search range")
+        ax.plot([r["disparity"] for r in rows], [r["ground_response"] for r in rows], "s-", color="#8a8985",
+                label="ground (disparity 0)")
+        ax.set_xlabel("disparity of the surface (px) - nearer to the right")
+        ax.set_ylabel("depth response")
+        ax.set_title("Abb. 5.28: varying an object's distance")
+        ax.legend(frameon=False, fontsize=8)
+        save(fig, "stereo_distance.png")
+    if "stereo-noise" in results and "stereo-orientations" in results:
+        fig, ax = plt.subplots(figsize=(5.2, 3.4))
+        rows = results["stereo-noise"]["rows"]
+        ax.plot([r["level"] * 128 for r in rows], [r["within_1px"] for r in rows], "o-", color="#2a78d6",
+                label="3 orientations (noise sweep)")
+        for count, colour, marker in ((1, "#e34948", "s"), (3, "#2a78d6", "o"), (5, "#1baf7a", "^")):
+            sel = [r for r in results["stereo-orientations"]["rows"] if r["orientations"] == count]
+            ax.plot([r["noise_sigma"] for r in sel], [r["within_1px"] for r in sel], marker, color=colour, ms=8,
+                    mfc="none", label="%d orientation%s" % (count, "" if count == 1 else "s"))
+        ax.set_xlabel("independent noise in both images (sigma, grey levels)")
+        ax.set_ylabel("surface pixels within 1 px of the true disparity")
+        ax.set_ylim(0.6, 1.02)
+        ax.set_title("Abb. 5.30 / 5.31: noise and orientations")
+        ax.legend(frameon=False, fontsize=8)
+        save(fig, "stereo_noise_orientations.png")
+    if "stereo-variance" in results:
+        r = results["stereo-variance"]
+        x = [max(row["threshold"], 0.5) for row in r["rows"]]
+        fig, ax = plt.subplots(figsize=(5.2, 3.4))
+        ax.plot(x, [row["surface_correct"] for row in r["rows"]], "o-", color="#2a78d6", label="surface: correct")
+        ax.plot(x, [row["faint_surface_correct"] for row in r["rows"]], "^-", color="#1baf7a",
+                label="faint surface (1/10 contrast): correct")
+        ax.plot(x, [row["flat_band_wrong"] for row in r["rows"]], "s-", color="#e34948",
+                label="textureless band: wrong disparity")
+        ax.axvline(r["default"], color="#52514e", lw=0.8, ls=":")
+        ax.set_xscale("log")
+        ax.set_xlabel("variance threshold (log; dotted: the port's default)")
+        ax.set_ylabel("share of pixels")
+        ax.set_title("Abb. 5.32: the variance threshold")
+        ax.legend(frameon=False, fontsize=8)
+        save(fig, "stereo_variance.png")
     if "shapes" in results and results["shapes"].get("stimulus") is not None:
         results["shapes"]["stimulus"].save(os.path.join(directory, "shapes_stimulus.png"))
 
