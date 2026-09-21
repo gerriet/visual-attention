@@ -32,18 +32,21 @@ result first.
 thesis's own findings, then ask which of its claims survive modern scrutiny.
 The distinctive asset is the honest H1 result plus its follow-up: persistent,
 identity-keyed object memory moves object-based IOR from clearly worse to
-level with space-based IOR. The confirmatory run (2026-09-20) sharpened it:
-object-based IOR reaches new objects sooner in every regime, against a
-motion-compensated location tag too; it does not win on sustained coverage
+level with space-based IOR. The confirmatory runs (2026-09-20/21) overturned
+it: with the thesis's own stage-1 features, object-based IOR beats space-based
+IOR on latency and sustained coverage in every regime
 (`docs/DYNAMIC_IOR_STUDY.md`).
 
 Missing:
 
-0. ~~H1 at full statistics~~ — **done 2026-09-20**: 30 fresh scenes per
-   regime, thesis profile, pre-registered predictions, a strengthened spatial
-   baseline. H1 is supported for novel-object latency (conditional on held
-   identity at high speed), not for sustained coverage
-   (`docs/DYNAMIC_IOR_STUDY.md`, "The confirmatory run").
+0. ~~H1 at full statistics~~ — **done 2026-09-21**: 30 fresh scenes per
+   regime, the thesis profile with all static features ported from the
+   original, pre-registered predictions, a strengthened spatial baseline. **H1
+   is supported** — latency and sustained coverage, every regime
+   (`docs/DYNAMIC_IOR_STUDY.md`, "The re-run"). Paper B's spine changes with
+   it: not "the thesis's claim fails, and here is why", but "a faithful
+   reimplementation is what it took to see the claim hold — and the dossier is
+   how the unfaithful parts were found".
 1. **M10 replication dossier** — the thesis figures reproduced one by one,
    with a verdict per finding (replicated / partial / diverged).
 2. **M11 scanpaths vs human fixations** — behavioral evidence that the

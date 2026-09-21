@@ -128,8 +128,18 @@ where the thesis used lab imagery. Deliverable:
 v2 plot, verdict **replicated / partially / diverged** with explanation.
 Divergences are findings, not failures (document, don't chase pixel parity).
 
-**Status (2026-09-19): not started.** No dossier, no `experiments/replication/`.
-Needs no VLM, no API key and no dataset — the thesis text and the binary.
+**Status (2026-09-20): first version done** — `docs/replication/REPLICATION_DOSSIER.md`,
+one command (`eval/replication.py --all`, CPU only). Ten findings of ch. 5 (and
+Abb. 6.14 via the H1 occlusion regime): eccentricity and colour contrast — the
+two features ported from the original sources — **replicate every finding
+tested**, eccentricity on the thesis's eq. 5.6 to within 0.02; exclusivity
+replicates; the growth-threshold range partially. **Symmetry diverges**: it does
+not peak on symmetric objects but in rings around them — the original's
+absolute scale and clip offset were replaced by per-band normalization and
+relative thresholds over three scales, so one-sided responses survive. That is
+the next replication-track fix, after which the dossier, H1 and M11 re-run. Not
+attempted yet: the stereo experiments, the field dynamics of Abb. 6.10–6.13
+(need a harness that drives the field directly), the qualitative ch. 9 demos.
 
 ### M10b — Selection backends: robust multi-blob tracking without the field's tuning
 
@@ -259,7 +269,14 @@ tables so far were averaged by hand), the speed × count × occlusion sweep, the
 Abb. 6.14 scenario, DAVIS scoring of H1, and a strengthened spatial baseline
 (motion-compensated spatial IOR). Plan: `docs/HYPOTHESIS_CLOSURE_PLAN.md`.
 
-**Confirmatory run (2026-09-20): H1 supported for the quantity it names.**
+**Re-run with the ported symmetry (2026-09-21): H1 supported, fully.** After
+the replication dossier found and fixed the symmetry feature, the same study on
+fresh seeds 2000–2029: off-object fixations 0.33 → 0.00; object-based IOR beats
+space-based IOR on latency (−0.5 / −4.4 / −2.6 frames) *and* staleness in every
+regime, with the thesis's own correspondence and against the motion-compensated
+tag; three of the four (pessimistic) pre-registered predictions refuted.
+
+**First confirmatory run (2026-09-20), superseded: supported for latency only.**
 Thesis profile, 30 fresh scenes per regime, predictions written down first,
 one command (`eval/dynamic_ior.py --regime all --seeds 30 --seed0 1000`).
 Object-based IOR reaches new objects sooner than space-based IOR in every

@@ -1,6 +1,6 @@
 # Dynamic-IOR study (M12) — is object-based inhibition of return useful?
 
-*Track: **replication** (docs/adr/0005) — H1 is the thesis's own claim. **The evidence for H1 is the confirmatory run at the end of this document (2026-09-20, 30 fresh scenes per regime, thesis profile): object-based IOR reaches new objects sooner in every regime — supported for the quantity H1 names, conditional on held identity at high speed.** The sections before it are the exploration that led there, kept as history; their numbers were measured with a colour feature that was not the thesis's, a defective eccentricity, and ≤ 6 seeds.*
+*Track: **replication** (docs/adr/0005) — H1 is the thesis's own claim. **The evidence for H1 is the re-run at the end of this document (2026-09-21, 30 fresh scenes per regime, the thesis profile with all three static features ported from the original): H1 is supported — object-based IOR beats space-based IOR on latency and on sustained coverage in every regime, also against a motion-compensated location tag.** The first confirmatory run (2026-09-20) before it used a symmetry feature later found to be defective. The sections before that are the exploration that led there, kept as history; their numbers were measured with a colour feature that was not the thesis's, a defective eccentricity, and ≤ 6 seeds.*
 
 *First cut, 2026-07-12. Tests hypothesis **H1**: in multi-object dynamic scenes,
 object-based inhibition of return (IOR) beats space-based and no IOR. This is
@@ -368,6 +368,16 @@ speed — while space-based IOR collapses."*
   about a third of the object-based arms' fixations go to object files that are
   not objects, against 0–2% for a location tag.
 
+**Caveat added 2026-09-20 (replication dossier, finding A).** The symmetry
+feature — a third of this profile — responds in rings *around* objects rather
+than on them (`docs/replication/REPLICATION_DOSSIER.md`). On scenes of disks
+that adds salient clusters in empty space, and is a plausible contributor to the
+off-object third of the object-based arms' fixations (a location tag rarely
+selects them because the true objects, freed again by their own motion, outrank
+them). The latency result does not depend on it; the *staleness* comparison and
+the "what deserves an object file" reading should be re-checked after symmetry
+is ported from the original — H1 is cheap to re-run (one command, ~30 min).
+
 So the earlier reading of this document — "space-based IOR is at least as good
 as object-based, usually better" — **does not survive** the confirmatory run. It
 rested on a revisit metric that a handful of fixations decided, a few seeds,
@@ -376,6 +386,99 @@ quantity it names, under the identity condition M12 identified; and the
 remaining weakness has moved from *tracking* to *segmentation*: what deserves
 an object file. (That is also what M19 found from the other side, where
 proto-objects, not persistent identity, carried the effect.)
+
+## The re-run with the ported symmetry feature (2026-09-21) — the result that stands
+
+**Why a second confirmatory run.** The replication dossier (M10), built the day
+after the run above, found that the symmetry feature — a third of the thesis
+profile — answered in rings *around* objects instead of on them
+(`docs/replication/REPLICATION_DOSSIER.md`, finding A). It was ported from the
+original source, judged by its own criteria (a lone disk peaks at its centre; a
+single edge gives nothing; the thesis's Abb. 5.13 and 5.14), not by anything in
+this study. H1 was then re-run unchanged: same command, same arms, same
+predictions as written above, **a fresh block of scenes (seeds 2000–2029)**.
+The model did change between the two runs, and the reader should know it; the
+change was decided by a replication test that does not involve inhibition of
+return, and the first run's numbers stay above for comparison.
+
+`results/h1_confirmatory_symfix`; arm minus `spatial-ior`, paired over 30
+scenes, 95% CI; **bold** = interval excludes zero.
+
+| Regime | Arm | latency | Δ latency | staleness | Δ staleness | off-object | labels / object |
+|---|---|---|---|---|---|---|---|
+| standard | greedy | 23.58 | **+20.98** | 12.49 | **+10.16** | 0.00 | 1.4 |
+| | spatial-ior | 2.61 | | 2.33 | | 0.00 | 1.7 |
+| | spatial-ior-mc | 2.46 | **−0.15 [−0.32, −0.01]** | 2.06 | **−0.27 [−0.41, −0.15]** | 0.00 | 1.7 |
+| | object-ior (thesis) | 2.13 | **−0.47 [−0.77, −0.24]** | 1.69 | **−0.64 [−0.83, −0.47]** | 0.00 | 1.7 |
+| | object-ior+id | 2.10 | **−0.51 [−0.82, −0.24]** | 1.67 | **−0.66 [−0.86, −0.47]** | 0.00 | 1.3 |
+| fast | greedy | 17.43 | **+11.35** | 9.99 | **+5.89** | 0.00 | 4.8 |
+| | spatial-ior | 6.08 | | 4.10 | | 0.00 | 4.3 |
+| | spatial-ior-mc | 3.37 | **−2.72 [−4.13, −1.49]** | 2.78 | **−1.32 [−1.84, −0.83]** | 0.00 | 4.6 |
+| | object-ior (thesis) | 2.08 | **−4.00 [−5.28, −2.86]** | 2.10 | **−2.00 [−2.46, −1.59]** | 0.00 | 5.5 |
+| | object-ior+aids | 1.73 | **−4.36 [−5.63, −3.24]** | 1.75 | **−2.35 [−2.81, −1.94]** | 0.00 | 3.9 |
+| | object-ior+id | 1.63 | **−4.45 [−5.69, −3.36]** | 1.67 | **−2.43 [−2.89, −2.02]** | 0.00 | 1.7 |
+| occlusion | greedy | 19.64 | **+15.35** | 10.40 | **+7.79** | 0.00 | 2.2 |
+| | spatial-ior | 4.29 | | 2.61 | | 0.00 | 2.4 |
+| | spatial-ior-mc | 2.19 | **−2.10 [−2.95, −1.33]** | 1.91 | **−0.71 [−0.99, −0.48]** | 0.00 | 2.6 |
+| | object-ior (thesis) | 1.73 | **−2.56 [−3.40, −1.78]** | 1.57 | **−1.04 [−1.33, −0.81]** | 0.00 | 2.8 |
+| | object-ior+id | 1.69 | **−2.60 [−3.43, −1.83]** | 1.54 | **−1.07 [−1.34, −0.85]** | 0.00 | 1.5 |
+
+Against the strengthened baseline, `object-ior+id` minus `spatial-ior-mc`:
+latency **−0.36 / −1.73 / −0.50**, staleness **−0.39 / −1.11 / −0.36**
+(standard / fast / occlusion), every interval excluding zero.
+
+**What changed, and why.** The share of fixations on no object fell from about a
+third to **zero, in every arm**. The off-object fixations of the first run were
+the symmetry feature's rings — salient clusters in empty space beside every
+disk — not "object files that are not objects". With them gone, the object
+files are the objects, and object-based inhibition does what the thesis says.
+
+**The predictions, scored again.**
+
+1. *IOR ≫ no IOR* — **holds.**
+2. *The thesis's object-based IOR does not beat space-based IOR on staleness* —
+   **refuted.** With the thesis's own nearest-centroid correspondence it is
+   better on staleness *and* latency in all three regimes.
+3. *Better identity buys the first sweep, not the long run* — **refuted.**
+   Staleness is better in every regime, and the off-object share is 0.00, not
+   above 0.15.
+4. *Motion compensation is not what space-based IOR was missing* — **refuted.**
+   `spatial-ior-mc` beats `spatial-ior` clearly in *fast* and *occlusion*: it is
+   a genuinely stronger baseline — and object-based IOR still beats it.
+
+Three of four predictions failed, all in the same direction: they were shaped
+by development runs on the defective feature.
+
+### Verdict on H1
+
+**Supported.** In multi-object dynamic scenes object-based inhibition of return
+reaches new objects sooner *and* keeps cycling through the scene more evenly
+than space-based inhibition — in all three regimes, against a plain location tag
+and against a motion-compensated one, with 30 fresh scenes per regime and
+predictions (pessimistic ones) written down beforehand.
+
+- *"Lower novel-object latency"* — yes: −0.5 / −4.4 / −2.6 frames.
+- *"Degrades gracefully with speed, while space-based IOR collapses"* — from
+  *standard* to *fast* space-based latency goes 2.61 → 6.08 and staleness 2.33 →
+  4.10; object-based IOR goes 2.10 → 1.63 and 1.67 → 1.67. Space-based IOR
+  degrades badly; "collapses" is too strong — it still sees every object.
+- *"Higher object coverage"* — no difference: every IOR arm reaches 1.00 within
+  40 frames. On these scenes coverage is the wrong place to look.
+- *Identity still matters, but less than M12 concluded.* Persistent identity
+  brings the labels per object from 5.5 to 1.7 at high speed and adds a further
+  −0.4 frames of latency; the thesis's correspondence alone already carries most
+  of the advantage. "Only as good as its tracker" was, to a large part, "only as
+  good as its stage 1".
+
+**What this does to the project's earlier "honest negative".** M12, ADR-0004 and
+the first confirmatory run all reported that object-based IOR does not beat
+space-based IOR. Each was an honest report of what was measured; what was
+measured was a model whose colour feature was not the thesis's, whose
+eccentricity ran on a black image, and whose symmetry answered beside objects.
+The negative result was about the reimplementation, not about the thesis.
+
+Open: the speed × object-count sweep, the Abb. 6.14 scenario, real video
+(DAVIS), and whether the modern-track H7 result changes with the same stage 1.
 
 ## Artifacts
 

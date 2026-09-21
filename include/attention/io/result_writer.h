@@ -29,6 +29,16 @@ class ResultWriter
    * @throws std::runtime_error if the pipeline is unprocessed or writing fails
    */
   static void write(const pipeline::AttentionPipeline& pipeline, const std::string& json_path);
+
+  /**
+   * Write every feature map of a processed pipeline as "feature_<name>.png"
+   * into `directory` — 16-bit grayscale on a *fixed* scale ([0, 1] -> [0,
+   * 65535], values outside clipped), never stretched. For measurements that
+   * need absolute feature responses (the replication dossier's variation
+   * curves); the visualizations elsewhere are normalized for viewing.
+   * @throws std::runtime_error if the pipeline is unprocessed or writing fails
+   */
+  static void write_features(const pipeline::AttentionPipeline& pipeline, const std::string& directory);
 };
 
 } // namespace io

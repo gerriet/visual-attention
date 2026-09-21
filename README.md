@@ -27,11 +27,13 @@ tested C++ system, with a Python layer that scores it against human fixations
 and modern saliency models.
 
 How faithful, component by component: stereo, the neural fields and — since
-2026-09 — colour contrast (Munsell/MTM segmentation), eccentricity and the
-exclusivity weighting are ports of the original sources and the thesis's
+2026-09 — colour contrast (Munsell/MTM segmentation), eccentricity, symmetry
+and the exclusivity weighting are ports of the original sources and the thesis's
 equations; onset and the symbolic second stage are reconstructions from the
-thesis text, because their sources did not survive; symmetry has the thesis's
-core with additions. `configs/thesis/` holds the dissertation profiles (the
+thesis text, because their sources did not survive. The
+[replication dossier](docs/replication/REPLICATION_DOSSIER.md) re-runs the
+thesis's own feature experiments: all three static features reproduce every
+finding tested. `configs/thesis/` holds the dissertation profiles (the
 replication track — finite, to be frozen when done); everything else is the
 modern track, free to move away from the thesis
 ([ADR-0005](docs/adr/0005-two-tracks-replication-and-modern.md)).
@@ -140,13 +142,15 @@ eval/vlm_video.py --seeds 5 --count-tokens --config configs/attend_proto.yaml \
 Each study is a controlled ablation with its own document; negatives are kept
 and reported.
 
-- **Object-based inhibition of return in dynamic scenes (H1).** Confirmatory
-  run, 30 fresh scenes per regime, predictions written down beforehand:
-  object-based IOR reaches new objects sooner than space-based IOR in every
-  regime (latency −1.2 / −2.2 / −0.8 frames, also against a motion-compensated
-  location tag) — at high speed only when identity is held, which is where it
-  is "only as good as its tracker". On sustained coverage it does not win: a
-  third of its fixations go to object files that are not objects.
+- **Object-based inhibition of return in dynamic scenes (H1): supported.** 30
+  fresh scenes per regime, predictions written down beforehand (pessimistic
+  ones — three of four were refuted): object-based IOR reaches new objects
+  sooner than space-based IOR (latency −0.5 / −4.4 / −2.6 frames) *and* keeps
+  cycling through the scene more evenly, in every regime, also against a
+  motion-compensated location tag. The project's earlier "honest negative" on
+  this was about the reimplementation, not the thesis: it was measured on
+  stage-1 features that were not the thesis's — found and fixed by the
+  replication dossier.
   [DYNAMIC_IOR_STUDY.md](docs/DYNAMIC_IOR_STUDY.md)
 - **Recognition gated by attention (H2).** Detectors restricted to attended
   ROIs recover 51% of all full-frame detections at 5.8% of the pixels.
@@ -227,6 +231,7 @@ to check that everything still works.
 - [thesis_vs_modern.md](docs/thesis_vs_modern.md) — thesis model vs. modern saliency models
 - [ALTERNATIVE_FEATURES.md](docs/ALTERNATIVE_FEATURES.md) · [SELECTION_BACKENDS.md](docs/SELECTION_BACKENDS.md) — pluggable operators / trackers
 - [DYNAMIC_IOR_STUDY.md](docs/DYNAMIC_IOR_STUDY.md) · [GATED_RECOGNITION.md](docs/GATED_RECOGNITION.md) · [PRIORITY_MAP.md](docs/PRIORITY_MAP.md) · [VLM_FRONT_END.md](docs/VLM_FRONT_END.md) · [VLM_VIDEO.md](docs/VLM_VIDEO.md) — the H1, H2, H5, H6 and H7 studies
+- [REPLICATION_DOSSIER.md](docs/replication/REPLICATION_DOSSIER.md) — the dissertation's own findings, re-run: eccentricity, colour contrast, symmetry and exclusivity replicate; what was not attempted yet
 - [PAPER_READINESS.md](docs/PAPER_READINESS.md) — what could be published, and what is missing
 - [CRITICAL_REVIEW_2026-09.md](docs/CRITICAL_REVIEW_2026-09.md) · [HYPOTHESIS_CLOSURE_PLAN.md](docs/HYPOTHESIS_CLOSURE_PLAN.md) · [FEATURE_ASSESSMENT.md](docs/FEATURE_ASSESSMENT.md) — the 2026-09 review: what is solid, what is not, and the plan to close the open hypotheses
 - [PERFORMANCE.md](docs/PERFORMANCE.md) — timing and optimization notes

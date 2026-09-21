@@ -6,11 +6,12 @@
   },
   "frames": 3,
   "scanpath": [
-    {"frame": 0, "label": 3, "x": 99, "y": 99, "saliency": 0.525784, "bbox": [21, 21, 163, 158]},
-    {"frame": 1, "label": 3, "x": 89, "y": 107, "saliency": 0.461951, "bbox": [87, 89, 6, 30]},
-    {"frame": 2, "label": 3, "x": 142, "y": 100, "saliency": 0.557573, "bbox": [113, 65, 59, 71]}
+    {"frame": 0, "label": 4, "x": 99, "y": 35, "saliency": 0.896081, "bbox": [95, 31, 9, 10]},
+    {"frame": 1, "label": 15, "x": 50, "y": 100, "saliency": 0.599516, "bbox": [28, 78, 44, 45]},
+    {"frame": 2, "label": 14, "x": 150, "y": 100, "saliency": 0.596829, "bbox": [128, 77, 44, 45]}
   ],
   "objects": [
-    {"label": 3, "x": 142, "y": 100, "size": 2488, "saliency": 0.557573, "avg_saliency": 0.52572, "created_frame": 0, "last_selected_frame": 2}
+    {"label": 14, "x": 150, "y": 100, "size": 1900, "saliency": 0.596829, "avg_saliency": 0.657948, "created_frame": 0, "last_selected_frame": 2},
+    {"label": 23, "x": 119, "y": 90, "size": 23, "saliency": 0.366793, "avg_saliency": 0.366793, "created_frame": 2, "last_selected_frame": -1}
   ]
 }

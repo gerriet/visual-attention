@@ -165,26 +165,22 @@ void register_builtin_features()
   registry.add("symmetry",
                [](const YAML::Node& params)
                {
-                 // Defaults: 12 orientations, multi-scale, size-adaptive
-                 // scale schedule, wavelength 8.0 for coarser structures
-                 // (see docs/SYMMETRY_FEATURE_NOTES.md) — the feature gets
-                 // its own Gabor bank with exactly these parameters
+                 // Defaults are the thesis's (Tab. 5.1): a 256-px working
+                 // image, three scales, radii 6-15 in bands of 3
                  SymmetryFeature::Config config;
-                 config.num_orientations = 12;
-                 config.wavelength = 8.0;
-                 config.bandwidth = 1.0;
-                 config.use_multi_scale = true;
-                 config.auto_scale_schedule = true;
-                 config.scales.clear();
-
                  read_param(params, "num_orientations", config.num_orientations);
                  read_param(params, "wavelength", config.wavelength);
                  read_param(params, "bandwidth", config.bandwidth);
                  read_param(params, "use_multi_scale", config.use_multi_scale);
+                 read_param(params, "max_working_size", config.max_working_size);
+                 read_param(params, "gabor_gain", config.gabor_gain);
+                 read_param(params, "clip_offset", config.clip_offset);
+                 read_param(params, "band_bonus", config.band_bonus);
+                 read_param(params, "border_clear", config.border_clear);
 
                  if (params && params["scales"])
                  {
-                   config.auto_scale_schedule = false;
+                   config.scales.clear();
                    for (const auto& scale : params["scales"])
                    {
                      SymmetryFeature::ScaleConfig sc;
@@ -193,7 +189,7 @@ void register_builtin_features()
                      read_param(scale, "max_radius", sc.max_radius);
                      read_param(scale, "radius_step", sc.radius_step);
                      read_param(scale, "width", sc.width);
-                     read_param(scale, "threshold", sc.symmetry_threshold);
+                     read_param(scale, "clip_offset", sc.clip_offset);
                      config.scales.push_back(sc);
                    }
                  }
