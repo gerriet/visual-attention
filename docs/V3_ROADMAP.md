@@ -206,8 +206,18 @@ Deliverable: `docs/SCANPATH_VS_HUMAN.md` — metric tables + montages; the
 thesis model placed on the floor↔ceiling axis, scored as a sample of a
 distribution. Done when the comparison runs end-to-end from one command.
 
-**Status (2026-07-21): instrument built + verified end-to-end on synthetic
-data; real MIT1003 run gated on the dataset + DATA archive + scipy.** In-repo
+**Status (2026-09-21): done — real run on all 1003 MIT1003 stimuli, predictions
+written down beforehand.** H4: above random, weakly (ScanMatch +0.015 [+0.012,
++0.017]); not above the constant-centre path (−0.102); the ceiling is +0.107
+away; **no ordering benefit of stage 2 on stills** (object-file readout −0.022
+against a plain WTA readout of the same map). Methodological result: on MIT1003
+ScanMatch cannot tell "stays in the middle" (0.754) from human-vs-human
+agreement (0.759); MultiMatch's direction dimension can. The harness needed
+fixing when it met the real archive (the model's own field scanpath as an arm, a
+working object-file readout, pairing, resume). `docs/SCANPATH_VS_HUMAN.md`.
+
+*Earlier status (2026-07-21): instrument built + verified end-to-end on synthetic
+data; real MIT1003 run gated on the dataset + DATA archive + scipy.* In-repo
 MultiMatch (4 spatial dims, DTW-aligned) and ScanMatch (Needleman-Wunsch,
 signed substitution matrix) live in `eval/attention_eval/scanpath.py`; a generic
 WTA+IOR readout + a seeded stochastic sampler
@@ -283,7 +293,14 @@ tables so far were averaged by hand), the speed × count × occlusion sweep, the
 Abb. 6.14 scenario, DAVIS scoring of H1, and a strengthened spatial baseline
 (motion-compensated spatial IOR). Plan: `docs/HYPOTHESIS_CLOSURE_PLAN.md`.
 
-**Confirmatory run (2026-09-20): H1 supported for the quantity it names.**
+**Re-run with the ported symmetry (2026-09-21): H1 supported, fully.** After
+the replication dossier found and fixed the symmetry feature, the same study on
+fresh seeds 2000–2029: off-object fixations 0.33 → 0.00; object-based IOR beats
+space-based IOR on latency (−0.5 / −4.4 / −2.6 frames) *and* staleness in every
+regime, with the thesis's own correspondence and against the motion-compensated
+tag; three of the four (pessimistic) pre-registered predictions refuted.
+
+**First confirmatory run (2026-09-20), superseded: supported for latency only.**
 Thesis profile, 30 fresh scenes per regime, predictions written down first,
 one command (`eval/dynamic_ior.py --regime all --seeds 30 --seed0 1000`).
 Object-based IOR reaches new objects sooner than space-based IOR in every

@@ -160,6 +160,96 @@ stimuli excludes zero.
    "stays in the middle", and the verdict has to rest on MultiMatch's direction
    and position dimensions.
 
+### Outcome (all 1003 stimuli, 15 observers, 2026-09-21)
+
+Run with the thesis profile as it stands after the 2026-09 feature ports
+(colour contrast, eccentricity, symmetry — the symmetry port landed while this
+run was being prepared; an interrupted earlier run on the defective feature was
+discarded unread). CPU only; no learned model by decision. Ten fixations per
+model path.
+
+| Arm | ScanMatch | shape | direction | length | position |
+|---|---|---|---|---|---|
+| inter-observer (ceiling) | 0.759 | 0.952 | 0.630 | 0.927 | 0.891 |
+| **thesis-field** (the model's own scanpath) | 0.651 | 0.862 | 0.594 | 0.784 | 0.803 |
+| thesis-objfile (same map, second stage) | 0.652 | 0.867 | 0.589 | 0.790 | 0.791 |
+| thesis-wta (same map, generic readout) | 0.675 | 0.867 | 0.598 | 0.792 | 0.813 |
+| thesis-stoch-best (best of 10 samples) | 0.691 | 0.876 | 0.600 | 0.809 | 0.823 |
+| thesis-extended-wta (old five-feature default) | 0.671 | 0.862 | 0.597 | 0.783 | 0.808 |
+| spectral-residual-wta | 0.649 | 0.873 | 0.603 | 0.802 | 0.780 |
+| center-bias-wta | 0.716 | 0.892 | 0.605 | 0.840 | 0.865 |
+| center (constant path) | 0.754 | 0.953 | 0.501 | 0.907 | 0.862 |
+| random | 0.636 | 0.846 | 0.586 | 0.752 | 0.766 |
+
+Paired over the 1003 stimuli (95% CI):
+
+| Comparison | ScanMatch | direction | position |
+|---|---|---|---|
+| thesis-field − random | **+0.015 [+0.012, +0.017]** | **+0.008** | **+0.037** |
+| thesis-field − center | **−0.102 [−0.105, −0.100]** | **+0.093** | **−0.059** |
+| inter-observer − thesis-field | **+0.107 [+0.105, +0.110]** | **+0.035** | **+0.087** |
+| thesis-objfile − thesis-wta | **−0.022 [−0.025, −0.020]** | **−0.010** | **−0.021** |
+| thesis-field − thesis-wta | **−0.023 [−0.025, −0.021]** | | |
+| thesis-wta − thesis-extended-wta | **+0.004 [+0.002, +0.006]** | | |
+| thesis-wta − spectral-residual-wta | **+0.026 [+0.022, +0.029]** | | |
+| inter-observer − center | +0.005 | **+0.128** | **+0.029** |
+
+**The predictions, scored.**
+
+1. *Above random, below centre* — **holds.** The thesis model's scanpath is above
+   the random floor on every measure, by a small margin (ScanMatch +0.015), and
+   well below the constant-centre path (−0.102).
+2. *The ceiling is far* — **holds**: +0.107 ScanMatch below human-vs-human
+   agreement; the model closes about an eighth of the distance from random to
+   the ceiling.
+3. *The second stage's ordering is not separable on stills* — **refuted, in the
+   wrong direction for H4.** The object-file readout differs from the generic
+   readout of the same map — it is *worse* (−0.022), as is the model's own
+   neural-field readout (−0.023). The two thesis readouts are
+   indistinguishable from each other. On still images the second stage's
+   ordering does not help agreement with human scanpaths; a plain
+   winner-take-all over the same map is closer.
+4. *The thesis features beat the old default* — **holds, barely**: +0.004. On
+   human free-viewing data the feature ports matter far less than on the
+   target-coverage benchmarks (V\*Bench, COCO-Search18).
+5. *The instrument caveat* — **confirmed, and it is the main methodological
+   result.** On ScanMatch the constant-centre path (0.754) is indistinguishable
+   from the inter-observer ceiling (0.759): at this grid ScanMatch rewards
+   staying in the middle as much as looking where other people look, because
+   MIT1003 viewing starts at the centre and is strongly centre-biased. It cannot
+   carry a plausibility claim on this dataset. MultiMatch's **direction**
+   dimension does separate them — ceiling 0.630, centre 0.501 (the lowest of all
+   arms), thesis model 0.594, random 0.586 — and there the thesis model is above
+   random by +0.008 and nearer to the ceiling than centre is.
+
+### Verdict on H4
+
+H4: *"the two-stage model's scanpaths land measurably above random/centre
+baselines toward the inter-observer ceiling — and the ordering benefit of stage 2
+is separable from the saliency map itself."*
+
+- **Above random: supported, weakly.** Measurable on every dimension with 1003
+  stimuli; small in size.
+- **Above centre: not supported** on ScanMatch, shape, length and position;
+  supported on direction only. A model without a centre prior, a face channel or
+  a text channel does not beat "stay in the middle" on MIT1003 — nor does any
+  other bottom-up arm here (spectral residual is at the random floor).
+- **An ordering benefit of stage 2: not supported.** The second stage changes
+  the scanpath measurably, and for the worse on this measure. That is consistent
+  with what the stage is for: H1 shows its benefit in *dynamic* scenes, where
+  there is identity to keep; on a still there is none, and object files, dwell
+  and object-based inhibition only re-order a handful of static regions.
+
+The honest summary for the replication paper: the thesis never claimed to model
+human free viewing, and it does not — its scanpaths are slightly better than
+chance and far from human agreement. What it claimed was a mechanism for dynamic
+scenes, and that holds (H1).
+
+**What would change these numbers, and is cheap:** a centre prior on the
+priority map (the `top_down_map` slot takes one as it is), and the face channel
+(YuNet, weight 0 by default) — MIT1003 is full of faces and text. Both belong to
+the *modern* track (docs/adr/0005), not to the replication.
+
 ## Honest caveats (to report with the real numbers)
 
 - **I-DT assumptions.** MIT1003's `eyeData` column order and 240 Hz sample rate

@@ -19,11 +19,15 @@ cv::Mat visualize_feature_map(const core::FeatureMap& feature, const std::string
   cv::Mat vis;
   feature.data.convertTo(vis, CV_8U, 255.0);
 
-  // Display if window name provided
-  std::string win_name = window_name.empty() ? feature.name : window_name;
-  if (!win_name.empty())
+  // Display only when a window is asked for, like the other visualizers. The
+  // name used to default to the feature's, so every call opened a window —
+  // also under --no-display, where the image is only wanted for saving. On
+  // macOS one imshow is enough to turn the process into a Dock application that
+  // takes the keyboard focus, which a study launching the binary hundreds of
+  // times turns into a machine nobody can type on.
+  if (!window_name.empty())
   {
-    cv::imshow(win_name, vis);
+    cv::imshow(window_name, vis);
     if (wait_key)
     {
       cv::waitKey(0);

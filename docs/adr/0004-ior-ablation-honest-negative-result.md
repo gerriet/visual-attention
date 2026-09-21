@@ -89,3 +89,18 @@ the thesis's. Object-based IOR reaches new objects sooner in every regime
 "only as good as its tracker" stands), and does not win on sustained coverage.
 The decision recorded here held up better than the result: *report whatever the
 ablation shows* is what made the correction possible.
+
+## Update (2026-09-21): the negative result was about the reimplementation
+
+The replication dossier found the symmetry feature defective (it answered beside
+objects); after porting it, the confirmatory study on fresh seeds supports H1 in
+full — object-based IOR beats space-based IOR on latency and on sustained
+coverage in every regime, with the thesis's own correspondence
+(`docs/DYNAMIC_IOR_STUDY.md`). Together with the colour and eccentricity ports
+this means every measurement this ADR summarizes was taken on a stage 1 that was
+not the thesis's. The ADR's decision stands and is the reason the record is
+straight: the ablation design made the comparison cheap to repeat, and reporting
+the negative plainly is what kept anyone from building on a tuned positive.
+The lesson added: *an honest negative about a replication is a claim about the
+replication until its fidelity has been tested* — which is what ADR-0005's
+fidelity tests and the dossier are for.

@@ -1,7 +1,7 @@
 # Replication dossier — the dissertation's findings, re-run (M10)
 
-*Track: **replication** (docs/adr/0005). First version, 2026-09-20. Every number
-here is printed by one command:*
+*Track: **replication** (docs/adr/0005). First version 2026-09-20; symmetry
+ported and re-run 2026-09-21. Every number here is printed by one command:*
 
 ```bash
 eval/replication.py --all        # CPU only, ~10 min; figures land in docs/replication/figures
@@ -24,8 +24,9 @@ the thesis's own running example (`data/test_images/inputc.png`, the office
 scene of Abb. 5.8–5.22). Feature responses are read on an absolute [0, 1] scale
 (`attention --emit-features`), one feature at a time, with the thesis's
 parameters and without exclusivity unless the experiment is about it.
-"Divergences are findings, not failures" (roadmap M10) — two of them below
-change how other results in this repository should be read.
+"Divergences are findings, not failures" (roadmap M10): the first version of
+this dossier found that the symmetry feature diverged (finding A); it has since
+been ported from the original and the affected rows re-run.
 
 ## Summary
 
@@ -33,9 +34,9 @@ change how other results in this repository should be read.
 |---|---|---|---|
 | 1 | Abb. 5.10 | Eccentricity is 0 for round shapes and high for elongated ones | **replicated** |
 | 2a | Abb. 5.13 | Stretching an object raises its eccentricity response, monotonically | **replicated** — on the thesis's eq. 5.6 to within 0.02 |
-| 2b | Abb. 5.13 | … and lowers its symmetry response | **diverged** — the symmetry response does not fall, and is not located on the object (finding A) |
+| 2b | Abb. 5.13 | … and lowers its symmetry response | **replicated** after the symmetry port (0.67 → 0.15, monotone); *diverged* before it (finding A) |
 | 3a | Abb. 5.14 | The eccentricity maximum stays on its object under added noise | **replicated** up to σ ≈ 38 grey levels; degrades beyond |
-| 3b | Abb. 5.14 | The symmetry maximum stays on its object under added noise | **diverged** — it is not on the object without noise either (finding A) |
+| 3b | Abb. 5.14 | The symmetry maximum stays on its object under added noise | **replicated** after the port — on the object at every noise level, up to σ ≈ 115; *diverged* before it (finding A) |
 | 4 | Abb. 5.15 | Eccentricity segmentation is plausible for a growth threshold of 0.5–0.75 | **partially** — stable in 0.5–0.75 as claimed, but less flat than the thesis suggests (map correlation 0.64–0.78 with the default) |
 | 5 | Abb. 5.16 | … and for a merge threshold of 12–36 (default 20) | **replicated** — correlation ≥ 0.88 over the whole range 4–48 |
 | 6 | Abb. 5.20 | The colour-contrast response grows with the colour difference | **replicated** — monotone; saturates early |
@@ -68,13 +69,14 @@ image.)
 A reference disk on the left; on the right an object of constant area stretched
 from 1:1 to 6:1. **Eccentricity** rises monotonically and lies on
 ((a² − 1)/(a² + 1))² — the thesis's eq. 5.6 for an ellipse — to within 0.02 at
-every step. **Symmetry** should fall ("immer geringere Salienzwerte"); it goes
-0.67 → 0.50 → 0.87 → 0.82: not monotone, and higher at the end than at the
-start.
+every step. **Symmetry** falls monotonically, 0.67 → 0.62 → 0.52 → 0.37 → … →
+0.15 ("immer geringere Salienzwerte") — the two features trade places exactly as
+the thesis's figure shows. *(Before the symmetry port it went 0.67 → 0.50 →
+0.87 → 0.82: not monotone, higher at the end than at the start.)*
 
-### Finding A — the symmetry feature does not peak on symmetric objects
+### Finding A — the symmetry feature did not peak on symmetric objects (found 2026-09-20, fixed 2026-09-21)
 
-For a single bright disk on a grey ground the symmetry map has responses inside
+*What the first version of this dossier found.* For a single bright disk on a grey ground the symmetry map has responses inside
 the disk *and equally strong ones about 80 px to either side of it*, in empty
 space; its global maximum is off the object for every disk size tried (radius
 12, 24, 40), without any noise. This is the "symmetry fires in the empty space
@@ -94,13 +96,21 @@ px in the image; the thesis's Tab. 5.1 has radii 6–15 at one scale). With no
 absolute reference, a one-sided response at a coarse scale is as strong as a
 true centre, and appears as a ring around every object.
 
-**Consequences.** (1) Symmetry is a third of the thesis profile: the H1
-confirmatory run and the M11 human-scanpath run both used it. In H1 it is a
-plausible contributor to the "third of fixations on no object" of the
-object-based arms — that caveat is now attached to the H1 verdict. (2) The fix
-is the same kind as for colour and eccentricity: port the original's combination
-step (absolute scale, clip offset, the thesis's radii). It regenerates the
-thesis goldens and should be followed by re-running H1 and M11.
+*The fix.* The combination step was ported from the original
+(`feature/symmetry.C`, thesis Tab. 5.1): a working image of at most 256 px,
+quadrature Gabor energy on an absolute scale (a full-contrast step edge = 1),
+radii 6–15 in adjoining bands of 3 at the working size and its two halvings, a
+fixed clip offset of 60/255, scales combined by maximum. A lone disk now peaks
+at its centre (0.43 / 0.82 / 0.99 for radius 12 / 24 / 40), a single straight
+edge — the one-sided case — gives 0.08, and on the thesis's running example the
+map peaks on the ball. One thing the sources do not settle is the gain of the
+original Gabor implementation, which fixes what "60 of 255" means; the
+calibration chosen is documented in `symmetry_feature.h`.
+
+*Consequences.* Symmetry is a third of the thesis profile, so the H1
+confirmatory run and the M11 human-scanpath run were repeated with the ported
+feature (H1 on a fresh block of seeds); both documents say which numbers are
+which.
 
 ### 3 · Abb. 5.14 / 5.21 — noise
 
@@ -110,7 +120,8 @@ Normally distributed noise, σ = level × 128 grey levels, five seeds per level.
 The eccentricity maximum stays on the bar up to level 0.3 (σ ≈ 38) and is lost
 for half the seeds beyond; the colour-contrast maximum stays on the blob at
 every level, up to σ ≈ 115 (the blob-minus-ground contrast falls only from 1.00
-to 0.91). Symmetry: see finding A.
+to 0.91). The symmetry maximum stays on the disk at every level as well, with
+the bar in the scene or without. (The figure is from the re-run.)
 
 *A side finding:* eccentricity histogram-equalizes its input, as the original
 does. On a synthetic image with three grey levels that maps a *bright* object
@@ -200,13 +211,14 @@ the thesis's nearest-centroid correspondence, 1.7 with persistent identity**
 
 ## What the dossier says about the reimplementation
 
-- The two features ported from the original sources in 2026-09 — **eccentricity
-  and colour contrast — reproduce every thesis finding tested**, quantitatively
-  where the thesis gives an equation. Exclusivity does too.
-- **Symmetry does not** (finding A). It is the one static feature that was not
-  re-ported, and it is the next replication-track task.
+- The three static features, all ported from the original sources in 2026-09 —
+  **eccentricity, colour contrast and symmetry — reproduce every thesis finding
+  tested**, quantitatively where the thesis gives an equation. Exclusivity does
+  too.
+- The dossier earned its keep on its first run: it found that symmetry, the one
+  feature not yet re-ported, answered beside objects instead of on them.
 - Identity through occlusion holds only with the extensions, not with the
   thesis's correspondence — consistent with H1.
 
-Replication-track definition of done (ADR-0005): fix symmetry → re-run this
-dossier, H1 and M11 → the stereo experiments → tag `replication-v1`.
+Replication-track definition of done (ADR-0005): ~~fix symmetry~~ → re-run H1
+and M11 with it (in progress) → the stereo experiments → tag `replication-v1`.

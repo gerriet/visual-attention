@@ -54,7 +54,9 @@ did not depend on the defective feature.
   it is what `default.yaml` and the `attend*.yaml` study configs still run.
 - `configs/attend*.yaml` (H1, H7) still use `color`, not `color-munsell` — see
   ADR-0005, open point 1.
-- **Symmetry — now measured, and the most important open item**
+- ~~Symmetry~~ — **ported 2026-09-21** (absolute scale, clip offset, thesis
+  Tab. 5.1 radii; a lone disk peaks at its centre, a single edge gives 0.08; four
+  behavioural tests). What was wrong:
   (`docs/replication/REPLICATION_DOSSIER.md`, finding A): for a lone disk its
   maximum lies ~80 px *beside* the disk. The summation core is a faithful port;
   the combination step is not — per-band normalization and relative thresholds
@@ -372,6 +374,15 @@ there, the *ranking* across tiles is what is weak (per-tile saliency values are
 not comparable, so the merge is a plain round-robin). Better ranking — or a
 question-conditioned source to do the ranking — is where the next gain is;
 finer grids are not worth running before that.
+
+### After the symmetry port (2026-09-21)
+
+Thesis profile, same 191 items: top-3 0.13 → 0.16, top-10 0.39 → **0.42**
+(+0.21 over chance [+0.14, +0.28]); paired against the pre-port profile +0.04
+[−0.03, +0.10] — the right direction, within noise. Legibility-oracle accuracy
+of the `fovea` arm 0.12 → 0.14 (uniform 0.18). The port matters for fidelity and
+for the dynamic studies (H1's off-object fixations went from a third to zero);
+on V\*Bench's small coloured targets colour contrast still carries the effect.
 
 ### What the first (pre-port) measurement does and does not show
 
