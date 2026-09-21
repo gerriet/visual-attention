@@ -47,14 +47,25 @@ Missing:
    it: not "the thesis's claim fails, and here is why", but "a faithful
    reimplementation is what it took to see the claim hold — and the dossier is
    how the unfaithful parts were found".
-1. **M10 replication dossier** — the thesis figures reproduced one by one,
-   with a verdict per finding (replicated / partial / diverged).
-2. **M11 scanpaths vs human fixations** — behavioral evidence that the
-   scanpaths are plausible (MultiMatch/ScanMatch against generative baselines).
-3. Writing, and a venue that values negative and reproduction results
-   (ReScience-style journals, reproducibility workshops).
+1. ~~M10 replication dossier~~ — **done 2026-09-21**: 24 findings, 22
+   replicated, 2 partially (`docs/replication/REPLICATION_DOSSIER.md`); it found
+   the two infidelities of the port (symmetry, field parameters).
+2. ~~M11 scanpaths vs human fixations~~ — **done 2026-09-21**: above random
+   (+0.076 ScanMatch at matched length), not above a constant central path, no
+   stage-2 ordering benefit on stills (`docs/SCANPATH_VS_HUMAN.md`).
+3. **H1 on real video** (decided 2026-09-21: part of this paper) — DAVIS 2017
+   multi-object sequences, same arms and metrics, predictions committed first.
+4. Writing. **Skeleton: `paper/replication/`** (2026-09-21) — `main.tex`,
+   `CLAIMS.md` (every number → source → command), `README.md` (what is still
+   to run, write and decide). Constraint: the original sources cannot be
+   published (rights); the paper reports facts from them and says so.
+5. A venue; arXiv first. *Not* ReScience C — its guidelines exclude
+   replications of one's own research, and its 2020 Ten Years Reproducibility
+   Challenge (authors re-running their own old code) was a one-off
+   (`paper/replication/README.md`).
 
-Mostly running and writing rather than new research: roughly 2–4 weeks.
+The replication track is closed and tagged `replication-v1`; what remains is one
+experiment (3) and writing.
 
 ## Paper A — the attention front-end for VLMs (more interesting, not yet defensible)
 
