@@ -115,6 +115,11 @@ target_link_libraries(pipeline_test PRIVATE attention_core)
 add_executable(debug_color examples/debug_color.cpp)
 target_link_libraries(debug_color PRIVATE attention_core)
 
+# Drives the neural field with synthetic activation: the dissertation's field
+# experiments (ch. 6.2/6.3) for the replication dossier (eval/replication.py)
+add_executable(field_dynamics examples/field_dynamics.cpp)
+target_link_libraries(field_dynamics PRIVATE attention_core)
+
 # Tests
 include(CTest)
 if(BUILD_TESTING)

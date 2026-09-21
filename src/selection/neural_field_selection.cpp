@@ -31,13 +31,16 @@ NeuralFieldSelection::NeuralFieldSelection(const SelectionParams& shared, const 
   const int size = params_.kernel_size;
   const int center = size / 2;
   const float s2 = params_.kernel_s * params_.kernel_s;
+  // Inhibitory Gaussian: the Backer defaults unless a DoG is configured
+  const float k2 = params_.kernel_k2 >= 0.0f ? params_.kernel_k2 : params_.kernel_k / 3.0f;
+  const float s2_inhibitory = params_.kernel_s2 > 0.0f ? params_.kernel_s2 * params_.kernel_s2 : 10.0f * s2;
   kernel_ = cv::Mat(size, size, CV_32F);
   for (int y = 0; y < size; ++y)
   {
     for (int x = 0; x < size; ++x)
     {
-      float dist = ((x - center) * (x - center) + (y - center) * (y - center)) / s2;
-      kernel_.at<float>(y, x) = params_.kernel_k * std::exp(-dist) - params_.kernel_k / 3.0f * std::exp(-dist / 10.0f);
+      const float r2 = static_cast<float>((x - center) * (x - center) + (y - center) * (y - center));
+      kernel_.at<float>(y, x) = params_.kernel_k * std::exp(-r2 / s2) - k2 * std::exp(-r2 / s2_inhibitory);
     }
   }
 }
@@ -72,7 +75,16 @@ cv::Mat NeuralFieldSelection::make_border_suppression(const cv::Size& size) cons
   return border;
 }
 
-void NeuralFieldSelection::run_to_convergence(cv::Mat& activity, const cv::Mat& input, const cv::Mat& border) const
+int NeuralFieldSelection::relax(cv::Mat& activity, const cv::Mat& input) const
+{
+  if (activity.size() != input.size() || activity.type() != CV_32F || input.type() != CV_32F)
+  {
+    throw std::runtime_error("NeuralFieldSelection::relax: activity and input must be CV_32F of equal size");
+  }
+  return run_to_convergence(activity, input, make_border_suppression(input.size()));
+}
+
+int NeuralFieldSelection::run_to_convergence(cv::Mat& activity, const cv::Mat& input, const cv::Mat& border) const
 {
   const float pixel_count = static_cast<float>(activity.total());
   const float threshold = params_.change_thresh * pixel_count; // original: sum |du| vs 0.01 * N
@@ -84,8 +96,10 @@ void NeuralFieldSelection::run_to_convergence(cv::Mat& activity, const cv::Mat& 
 
   cv::Mat sig = sigmoid(activity);
 
+  int run = 0;
   for (int cycle = 0; cycle < cycles; ++cycle)
   {
+    ++run;
     // Lateral interaction: convolution of the sigmoid activity with the
     // kernel; zero border like the original (whose missing border inhibition
     // the border term compensates)
@@ -107,6 +121,7 @@ void NeuralFieldSelection::run_to_convergence(cv::Mat& activity, const cv::Mat& 
       break;
     }
   }
+  return run;
 }
 
 namespace

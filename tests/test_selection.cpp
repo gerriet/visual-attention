@@ -1,7 +1,9 @@
 // Selection strategy tests on synthetic saliency maps.
 
+#include "attention/selection/neural_field_selection.h"
 #include "attention/selection/selection_strategy.h"
 #include <catch2/catch_test_macros.hpp>
+#include <cmath>
 #include <opencv2/opencv.hpp>
 #include <yaml-cpp/yaml.h>
 
@@ -113,6 +115,109 @@ TEST_CASE("neural-field selection settles on blobs in salience order", "[selecti
   CHECK(cv::norm(peaks[1].location - cv::Point(150, 150)) < 15);
   // Field state persisted for stream continuation
   CHECK_FALSE(state.field_activity.empty());
+}
+
+namespace
+{
+
+// The field parameters of the dissertation system (esab2.C, single 2D field)
+selection::NeuralFieldSelection dissertation_field()
+{
+  selection::NeuralFieldSelection::Params p;
+  p.alpha = 0.33f;
+  p.global_mult = 8.0f;
+  p.resting = -0.33f;
+  p.kernel_size = 15;
+  p.kernel_s = 3.3f;
+  p.kernel_k = 0.12f;
+  p.kernel_s2 = 14.0f;
+  p.kernel_k2 = 0.03f;
+  p.max_cycles = 55;
+  p.change_thresh = 0.02f;
+  return selection::NeuralFieldSelection(selection::SelectionParams{}, p);
+}
+
+cv::Mat two_maxima(float distance)
+{
+  cv::Mat input = cv::Mat::zeros(64, 64, CV_32F);
+  for (float cx : {32.0f - distance / 2.0f, 32.0f + distance / 2.0f})
+  {
+    for (int y = 0; y < 64; ++y)
+    {
+      for (int x = 0; x < 64; ++x)
+      {
+        const float d2 = (x - cx) * (x - cx) + (y - 32.0f) * (y - 32.0f);
+        input.at<float>(y, x) += 0.8f * std::exp(-d2 / 18.0f);
+      }
+    }
+  }
+  cv::min(input, 1.0f, input);
+  return input;
+}
+
+int active_clusters(const cv::Mat& activity)
+{
+  cv::Mat labels;
+  return cv::connectedComponents(activity > 0.0f, labels, 8, CV_32S) - 1;
+}
+
+} // namespace
+
+TEST_CASE("field dynamics: relax() converges in about ten cycles (thesis Abb. 6.8)", "[neural-field][dynamics]")
+{
+  const auto field = dissertation_field();
+  cv::Mat activity = field.resting_field(cv::Size(64, 64));
+  const int cycles = field.relax(activity, two_maxima(30.0f));
+  CHECK(cycles >= 3);  // the original's minimum
+  CHECK(cycles <= 20); // "typically already 10 update cycles"
+  CHECK(active_clusters(activity) == 2);
+
+  cv::Mat wrong_size = field.resting_field(cv::Size(32, 32));
+  CHECK_THROWS(field.relax(wrong_size, two_maxima(30.0f)));
+}
+
+TEST_CASE("field dynamics: two maxima coexist when apart and merge when close (Abb. 6.5 / 6.10)",
+          "[neural-field][dynamics]")
+{
+  const auto field = dissertation_field();
+  auto clusters_at = [&](float distance)
+  {
+    cv::Mat activity = field.resting_field(cv::Size(64, 64));
+    field.relax(activity, two_maxima(distance));
+    return active_clusters(activity);
+  };
+  CHECK(clusters_at(24.0f) == 2); // beyond the interaction range: coexistence
+  CHECK(clusters_at(3.0f) == 1);  // below x_a: one cluster
+
+  // Hysteresis of the transition: approaching maxima stay two clusters at a
+  // distance where maxima that are being separated are still one
+  cv::Mat approaching = field.resting_field(cv::Size(64, 64));
+  for (float d = 30.0f; d >= 9.0f; d -= 1.0f)
+  {
+    field.relax(approaching, two_maxima(d));
+  }
+  cv::Mat separating = field.resting_field(cv::Size(64, 64));
+  for (float d = 0.0f; d <= 9.0f; d += 1.0f)
+  {
+    field.relax(separating, two_maxima(d));
+  }
+  CHECK(active_clusters(approaching) == 2);
+  CHECK(active_clusters(separating) == 1);
+}
+
+TEST_CASE("field kernel: the DoG parameters default to the Backer kernel", "[neural-field]")
+{
+  // kernel_k2 / kernel_s2 generalize the lateral kernel; left at their defaults
+  // the field must behave exactly as before (k/3 and s*sqrt(10))
+  selection::NeuralFieldSelection::Params defaults, explicit_backer;
+  explicit_backer.kernel_k2 = defaults.kernel_k / 3.0f;
+  explicit_backer.kernel_s2 = defaults.kernel_s * std::sqrt(10.0f);
+  const selection::NeuralFieldSelection a(selection::SelectionParams{}, defaults);
+  const selection::NeuralFieldSelection b(selection::SelectionParams{}, explicit_backer);
+  cv::Mat ua = a.resting_field(cv::Size(64, 64)), ub = b.resting_field(cv::Size(64, 64));
+  a.relax(ua, two_maxima(20.0f));
+  b.relax(ub, two_maxima(20.0f));
+  CHECK(cv::norm(ua, ub, cv::NORM_INF) < 1e-4);
 }
 
 TEST_CASE("neural-field selection stays quiet on an empty map", "[selection][neural-field]")
