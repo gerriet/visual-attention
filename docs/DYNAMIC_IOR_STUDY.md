@@ -566,6 +566,107 @@ range (which the thesis states). The high-speed result of the re-run above is a
 result about the segment-based variant, which the WAPCV paper names as an
 extension ("a segmentation process based on the feature computations").
 
+### Outcome (30 fresh scenes per regime, seeds 4000–4029, 2026-09-21)
+
+`results/h1_v2`; arm minus the segment-based `spatial-ior`, paired over scenes,
+95% CI; **bold** = interval excludes zero. Coverage is 1.00 for the segment-based
+arms (0.99 for `spatial-ior` in *fast*).
+
+| Regime | Arm | latency | Δ latency | staleness | Δ staleness | off-object | labels / object |
+|---|---|---|---|---|---|---|---|
+| standard | spatial-ior | 2.68 | | 2.28 | | 0.00 | 1.6 |
+| | spatial-ior-mc | 2.34 | −0.34 [−0.82, +0.01] | 2.07 | **−0.21 [−0.31, −0.11]** | 0.00 | 1.6 |
+| | object-ior (position only) | 1.88 | **−0.80 [−1.43, −0.29]** | 1.72 | **−0.56 [−0.71, −0.41]** | 0.00 | 1.7 |
+| | object-ior+7.2.3 | 1.88 | **−0.80 [−1.42, −0.29]** | 1.72 | **−0.56 [−0.71, −0.41]** | 0.00 | 1.8 |
+| | object-ior+id | 1.88 | **−0.81 [−1.43, −0.29]** | 1.70 | **−0.58 [−0.73, −0.43]** | 0.00 | 1.2 |
+| | chain:spatial-ior (field 64) | 3.40 | **+0.72 [+0.08, +1.51]** | 4.20 | **+1.93 [+1.48, +2.35]** | 0.02 | 1.3 |
+| | chain:spatial-ior-mc | 3.02 | +0.33 [−0.45, +1.23] | 4.09 | **+1.81 [+1.36, +2.28]** | 0.02 | 1.3 |
+| | chain:object-ior | 2.67 | −0.01 [−0.95, +1.04] | 3.85 | **+1.58 [+1.11, +2.04]** | 0.01 | 1.3 |
+| fast | spatial-ior | 6.66 | | 4.37 | | 0.00 | 4.2 |
+| | spatial-ior-mc | 3.12 | **−3.54 [−5.12, −2.22]** | 2.79 | **−1.58 [−2.21, −1.04]** | 0.00 | 4.6 |
+| | object-ior (position only) | 2.06 | **−4.60 [−6.08, −3.35]** | 2.07 | **−2.30 [−2.96, −1.70]** | 0.00 | 5.8 |
+| | object-ior+7.2.3 | 1.93 | **−4.72 [−6.24, −3.44]** | 1.91 | **−2.46 [−3.06, −1.93]** | 0.00 | 4.2 |
+| | object-ior+id | 1.77 | **−4.88 [−6.41, −3.59]** | 1.66 | **−2.70 [−3.34, −2.15]** | 0.00 | 1.6 |
+| | chain:spatial-ior (field 64) | 6.67 | +0.02 [−1.69, +1.70] | 4.86 | +0.49 [−0.27, +1.19] | 0.24 | 6.4 |
+| | chain:spatial-ior-mc | 7.16 | +0.50 [−1.34, +2.24] | 5.08 | +0.71 [−0.09, +1.45] | 0.26 | 6.4 |
+| | chain:object-ior | 7.47 | +0.81 [−0.70, +2.29] | 5.18 | **+0.81 [+0.15, +1.49]** | 0.27 | 6.5 |
+| occlusion | spatial-ior | 3.85 | | 2.57 | | 0.00 | 2.5 |
+| | spatial-ior-mc | 2.23 | **−1.62 [−2.31, −0.97]** | 1.83 | **−0.74 [−0.93, −0.56]** | 0.00 | 2.6 |
+| | object-ior (position only) | 1.75 | **−2.10 [−2.88, −1.35]** | 1.63 | **−0.94 [−1.12, −0.78]** | 0.00 | 2.8 |
+| | object-ior+7.2.3 | 1.82 | **−2.03 [−2.81, −1.29]** | 1.64 | **−0.93 [−1.13, −0.74]** | 0.00 | 2.7 |
+| | object-ior+id | 1.65 | **−2.20 [−2.98, −1.48]** | 1.54 | **−1.04 [−1.23, −0.86]** | 0.00 | 1.4 |
+| | chain:spatial-ior (field 64) | 5.82 | **+1.97 [+0.35, +3.69]** | 4.45 | **+1.87 [+1.37, +2.40]** | 0.06 | 3.1 |
+| | chain:spatial-ior-mc | 4.41 | +0.56 [−0.87, +1.99] | 4.13 | **+1.56 [+1.01, +2.19]** | 0.15 | 3.1 |
+| | chain:object-ior | 3.98 | +0.12 [−1.23, +1.52] | 4.24 | **+1.66 [+1.13, +2.23]** | 0.11 | 3.2 |
+
+Against the strengthened baseline, object-based minus `spatial-ior-mc`
+(standard / fast / occlusion), every interval excluding zero — latency:
+position-only −0.46 / −1.06 / −0.48, §7.2.3 −0.46 / −1.18 / −0.42, `+id` −0.47 /
+−1.34 / −0.58; staleness: −0.35 / −0.72 / −0.20, −0.35 / −0.88 / −0.19, −0.37 /
+−1.12 / −0.30. Within the chain (field 64), `chain:object-ior` minus
+`chain:spatial-ior`: staleness **−0.35 [−0.54, −0.18]** (standard), +0.32
+[−0.17, +0.80] (fast), −0.21 [−0.53, +0.09] (occlusion); latency −0.72 [−1.79,
++0.25], +0.79 [−0.23, +1.82], **−1.84 [−2.98, −0.82]**.
+
+**The predictions, scored.**
+
+1. *§7.2.3 on saliency segments changes little; H1 holds on a fourth block* —
+   **holds.** `object-ior+7.2.3` and position-only correspondence do not differ
+   on latency in any regime, nor on staleness in *standard* and *occlusion*; in
+   *fast* §7.2.3 brings the labels per object from 5.8 to 4.2 and gains a little
+   staleness (−0.16 [−0.31, −0.05], not predicted). Every object-based arm beats
+   `spatial-ior` and `spatial-ior-mc` on latency and staleness in every regime.
+2. *The chain with the dissertation system's field size loses to the
+   segment-based reference* — **holds for staleness** in *standard* and
+   *occlusion* whatever the behaviour, and in *fast* for `chain:object-ior` (the
+   two spatial chain arms there are worse too, within the interval). About a
+   quarter of the chain's fixations in *fast* land on no object: clusters the
+   field keeps alive where an object was. The detail *"within the chain
+   `object-ior` is not better than `spatial-ior`"* — **refuted, in H1's
+   favour**: inside the chain object-based inhibition has the better staleness
+   in *standard* and the better latency under *occlusion*. Coverage stayed at
+   0.98–1.00 over 40 frames; the capacity limit shows as latency and staleness,
+   not as objects never seen.
+3. *At 128 px the chain supports H1 inside the field's tracking range and fails
+   outside it* — **holds, on every count** (`results/h1_v2_field128`):
+
+   | Regime (speed in field px / frame) | chain:object-ior − chain:spatial-ior: latency | staleness | − chain:spatial-ior-mc: latency | staleness | labels / object |
+   |---|---|---|---|---|---|
+   | standard (2.4) | **−0.93 [−1.63, −0.38]** | **−0.74 [−1.06, −0.51]** | **−0.70 [−1.13, −0.34]** | **−0.55 [−0.77, −0.39]** | 3.0 |
+   | occlusion (8) | **+2.40 [+1.11, +3.74]** | **+0.50 [+0.11, +0.90]** | **+3.88 [+2.51, +5.37]** | **+0.80 [+0.39, +1.24]** | 9.0 |
+   | fast (16) | **+3.66 [+1.95, +5.34]** | **+1.56 [+1.10, +2.08]** | **+3.63 [+1.79, +5.53]** | **+1.50 [+0.97, +2.11]** | 10.3 |
+
+   In *standard* `chain:object-ior` (latency 1.62, staleness 1.68) also beats the
+   segment-based reference (−1.07 [−1.74, −0.47], −0.60 [−0.78, −0.44]) and is
+   the best arm of the whole block. In *occlusion* and *fast* the field hands the
+   second stage a new object file every few frames — nine to ten labels per
+   object — and object-based inhibition, which has nothing to hold on to, is the
+   *worst* behaviour; the spatial behaviours on the same clusters do not care
+   whose cluster it is.
+
+### Verdict on H1, refined
+
+**Supported — wherever the first stage delivers objects that can be tracked.**
+
+- With the reimplementation's segment-based first stage, object-based inhibition
+  of return beats space-based inhibition, plain and motion-compensated, on
+  latency and on staleness, at every speed tested, now on four independent
+  blocks of scenes (1000, 2000, 3000, 4000) and with position-only
+  correspondence, the correspondence of thesis §7.2.3, or persistent identity.
+- With the thesis's own first stage — the neural field — it does so **inside the
+  field's tracking range** (a few field pixels per frame), where that chain is
+  the best system measured here, and **fails outside it**, where it is the
+  worst. The thesis states the limit ("an object movement of more than 12
+  pixels"); what it does not say is that beyond it object-based inhibition is
+  not merely no better but worse than the location tag it set out to replace.
+- The field's *capacity* is a second condition: at the dissertation system's
+  field size it holds about three objects of these scenes' size, and the whole
+  chain then loses to a system without a field, whatever the behaviour.
+- The high-speed result of the earlier blocks is therefore a result about the
+  segment-based variant — the one the WAPCV paper's last sentence proposes as an
+  extension — not about the dissertation system.
+
+
 ## Artifacts
 
 - `tools/make_dynamic_scene.py` — scene + `gt.json` generator (`dynamic-scene-gt/v1`).

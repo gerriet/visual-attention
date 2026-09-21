@@ -108,9 +108,12 @@ Consequences:
   "the thesis's correspondence alone already carries most of the advantage"
   need rewording, and the plain arm becomes the ablation ("position only").
 - Dossier finding 10 (Abb. 6.14, identity through occlusion: *partially*, "holds
-  only with the extensions, not with the thesis's correspondence") attributes
-  the failure to the thesis. With feature-led revival — which is the thesis's —
-  the labels per object are 1.5, not 2.8. The verdict should be revisited.
+  only with the extensions, not with the thesis's correspondence") called
+  position-only correspondence the thesis's. *Measured since (seeds 4000–4029):*
+  §7.2.3 as written gives 2.7 labels per object under occlusion against 2.8
+  position-only and 1.4 with persistent identity — the verdict stands, now with
+  the right attribution; this note's first guess, that feature-led revival alone
+  would reach 1.5, was wrong.
 - The two implementations are not identical to §7.2.3 either (mean colour as the
   only feature; a cost sum instead of "best on both criteria"; the colour veto,
   the widening gate and the missing maximum age are additions). A faithful version is a bounded piece of
@@ -137,7 +140,17 @@ place to close the gap: it is defined on the single 2D field → clusters → ob
 files chain, and `build/field_dynamics` already drives that field on synthetic
 input with the dissertation system's parameters.
 
-## 3 · What follows
+## 3 · What was done about it (2026-09-21)
+
+All three findings were acted on the same day, on `module/replication-v2`:
+finding C → dossier finding 22 (`build/world_model`; partially replicated, the
+two-stage model's curve is the thesis's); finding D → `object_files.correspondence:
+thesis`; finding E → `attention_system.cluster_source: field` and
+`configs/thesis/attend_field*.yaml`; H1 re-measured with both on a fresh block
+(`docs/DYNAMIC_IOR_STUDY.md`, "The thesis's own chain"). The section below is the
+plan as it stood before.
+
+## 4 · What follows (as planned)
 
 Documentation (done with this note): the paper draft no longer says the claim
 was untested; `CLAIMS.md` and the paper's README carry the three findings; the

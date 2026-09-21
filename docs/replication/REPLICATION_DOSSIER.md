@@ -600,9 +600,19 @@ identity in the *object files* of the second stage, not in the field, so the
 figure is not reproduced as such; its question — does identity survive a
 temporary occlusion — is measured by the H1 study's occlusion regime (speed 20,
 10-frame occlusion, 30 scenes): **3.6 distinct labels per attended object with
-the thesis's nearest-centroid correspondence, 1.7 with persistent identity**
-(`docs/DYNAMIC_IOR_STUDY.md`). With the thesis's correspondence identity is
-*not* reliably kept; the opt-in extensions are what make it hold.
+position-only correspondence, 1.7 with persistent identity**
+(`docs/DYNAMIC_IOR_STUDY.md`, first confirmatory run).
+
+*Corrected 2026-09-21.* This entry called position-only correspondence "the
+thesis's". Thesis §7.2.3 also compares feature means and revives inactive files
+by their features (`WAPCV_2003_NOTES.md`, finding D); that rule now exists
+(`object_files.correspondence: thesis`) and was measured on a fresh block (seeds
+4000–4029, occlusion regime): **2.8 labels per object position-only, 2.7 with
+§7.2.3, 1.4 with persistent identity.** So the verdict stands, with the right
+attribution: the thesis's rule as written — feature means taken from the saliency
+feature maps, a maximum age — does not hold identity through a 10-frame
+occlusion on these scenes; what does is a colour descriptor, a gate that widens
+with the time unseen, and no expiry, none of which is the thesis's.
 
 ## Not attempted, and why
 
@@ -630,8 +640,14 @@ the thesis's nearest-centroid correspondence, 1.7 with persistent identity**
   objects instead of on them (finding A), and that the field ran on the wrong
   parameters (finding B). Both looked like properties of the 2004 model until
   they were tested against the thesis's own figures.
-- Identity through occlusion holds only with the extensions, not with the
-  thesis's correspondence — consistent with H1.
+- Identity through occlusion holds only with persistent identity, not with the
+  thesis's correspondence (§7.2.3, measured as written since 2026-09-21).
+- **The thesis's own test of its central claim (finding 22) replicates on the
+  model's side to the second decimal** — and building it found a third thing the
+  port had wrong about the field (a fixed 20 cycles per frame over a stream).
+  The thesis's chain — field → activity clusters → object files — exists since
+  then as an option, and H1 has been measured on it: supported inside the field's
+  tracking range, not outside (`docs/DYNAMIC_IOR_STUDY.md`).
 
 Replication-track definition of done (ADR-0005): ~~fix symmetry~~ → ~~re-run H1
 and M11 with it~~ → ~~the stereo experiments~~ → ~~the field dynamics~~ (Abb.

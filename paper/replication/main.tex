@@ -382,6 +382,21 @@ images instead of always ten---which matters in Section~\ref{sec:h4}.
 \todo{Figures: \texttt{field\_two\_maxima\_noise.png},
 \texttt{field\_hysteresis\_tracking.png}; choose one for the main text.}
 
+\subsection{Findings C--E: what a second source exposed}
+\label{sec:findingsCDE}
+The dossier was built from the thesis's chapters 5 and 6. Reading the last
+English-language paper from the thesis work \citep{backer2003} against the thesis
+and the code exposed three more gaps: (C) the thesis's own quantitative test of
+its central claim had been overlooked (Section~\ref{sec:worldmodel}); (D) the
+correspondence the reimplementation called ``the thesis's'' was position-only,
+weaker than \S7.2.3; (E) object files were formed from saliency segments, not
+from the field's activity clusters. All three were closed
+(Sections~\ref{sec:worldmodel} and~\ref{sec:chain}). The surviving original
+sources do not contain the second stage, so for it the thesis text and that paper
+are the only record. \todo{Lesson for the discussion: a second description of the
+same system, written for a different audience, is a cheap and effective fidelity
+check.}
+
 \subsection{Text or code?}
 \label{sec:textcode}
 \todo{A short paragraph and a compact version of the dossier's comparison table.
@@ -594,6 +609,64 @@ $-1.52$ [$-2.54$, $-0.68$] with the deployed system's; staleness likewise, every
 interval excluding zero. This block ran without the \arm{spatial-ior-mc} arm.
 \src{dossier, ``Text or code?''; results/h1\_text\_vs\_code\_attend*.log}
 
+\subsection{The thesis's own chain, and its own correspondence}
+\label{sec:chain}
+Two things separate the runs above from the dissertation system
+(Section~\ref{sec:findingsCDE}): correspondence there was position-only, where
+thesis \S7.2.3 also compares feature means and revives inactive object files by
+their features; and the object files were formed from segments of the saliency
+map, where the thesis forms them from the neural field's activity clusters. Both
+were implemented as written and measured on a fourth fresh block (seeds
+4000--4029), predictions committed first (\texttt{5325d2e}).
+
+\emph{Correspondence.} On saliency segments the rule of \S7.2.3 changes little:
+no difference to position-only correspondence in latency in any regime; at high
+speed fewer labels per object (4.2 against 5.8) and slightly better staleness
+($-0.16$ [$-0.31$, $-0.05$]). Every object-based arm again beats both spatial arms
+on latency and staleness in every regime.
+
+\emph{The chain.} With the field at the dissertation system's size (64~px) the
+first stage holds about three of the four disks at a time, and the whole chain
+loses to the segment-based spatial reference on staleness in every regime,
+whatever the behaviour ($+1.6$ to $+1.9$ frames at low speed). At twice that
+size all objects fit, and the result splits cleanly along the field's tracking
+range (Table~\ref{tab:chain}): at 2.4 field pixels per frame object-based
+inhibition on the thesis's chain beats both spatial behaviours on the same
+clusters, and is the best system of the whole block (latency 1.62, staleness
+1.68); at 8 and 16 field pixels per frame the field hands the second stage a new
+object file every few frames (nine to ten labels per object) and object-based
+inhibition becomes the \emph{worst} behaviour.
+
+\begin{table}[t]
+\caption{The thesis's chain (object files on the field's activity clusters,
+correspondence of \S7.2.3), field at 128~px: object-based minus space-based
+inhibition on the same clusters, 30 scenes per regime.}
+\label{tab:chain}
+\footnotesize
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+Regime (field px / frame) & $\Delta$ latency & $\Delta$ staleness & vs.\ \arm{-mc}: $\Delta$ latency & $\Delta$ staleness \\
+\midrule
+standard (2.4) & \sig{$-$0.93 [$-$1.63, $-$0.38]} & \sig{$-$0.74 [$-$1.06, $-$0.51]} & \sig{$-$0.70 [$-$1.13, $-$0.34]} & \sig{$-$0.55 [$-$0.77, $-$0.39]} \\
+occlusion (8)  & \sig{+2.40 [+1.11, +3.74]} & \sig{+0.50 [+0.11, +0.90]} & \sig{+3.88 [+2.51, +5.37]} & \sig{+0.80 [+0.39, +1.24]} \\
+fast (16)      & \sig{+3.66 [+1.95, +5.34]} & \sig{+1.56 [+1.10, +2.08]} & \sig{+3.63 [+1.79, +5.53]} & \sig{+1.50 [+0.97, +2.11]} \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+So the claim holds \emph{wherever the first stage delivers objects that can be
+tracked}: with a segment-based first stage at every speed tested, with the
+thesis's neural field inside the tracking range the thesis itself states (``an
+object movement of more than 12 pixels''). What the thesis does not say is that
+beyond that range object-based inhibition is not merely no better than the
+location tag it set out to replace, but worse. The high-speed result of
+Table~\ref{tab:h1} is a result about the segment-based variant---which
+\citet{backer2003} propose in their last sentence as an extension---not about
+the dissertation system. All three predictions held, except a detail of the
+second (inside the 64-px chain object-based inhibition \emph{was} better than
+space-based at low speed and under occlusion).
+
 \paragraph{What the claim's wording does not survive.} ``Higher object
 coverage'': no difference; every arm with inhibition sees every object within 40
 frames. Space-based inhibition ``collapses'' with speed: it degrades badly
@@ -788,13 +861,12 @@ model of human free viewing, and never claimed to be.}
         2D-versus-3D integration (Abb.~5.33, 5.35), systems of several fields
         (6.11, 6.12; not implemented), the 3D field's dynamics (6.13), the
         qualitative demonstrations of thesis \S9.3.
-  \item \textbf{Object files are not formed from the neural field in Study~2.}
-        In the thesis the first selection stage is the field, and object files
-        are created for its activity clusters; the reimplementation's second
-        stage segments the fused saliency map instead (a documented
-        approximation). Study~2 therefore tests object-based inhibition over
-        object files, not the thesis's complete chain. \todo{the replication of
-        \S9.2 closes this.}
+  \item \textbf{Two first stages.} The main H1 result (Table~\ref{tab:h1}) is
+        measured with object files on saliency segments; on the thesis's own
+        chain the claim holds only inside the field's tracking range and with a
+        field large enough for the scene (Section~\ref{sec:chain}). The fused
+        map that feeds the field is min--max normalised per frame, unlike the
+        original's clipped sum.
   \item \textbf{The model changed between the two confirmatory H1 runs}
         (Section~\ref{sec:threeruns}); both are reported.
   \item \textbf{No learned saliency model} in Study~3.
