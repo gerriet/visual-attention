@@ -1,0 +1,58 @@
+# Thesis track (docs/adr/0005) — the dissertation system *as it was configured*.
+#
+# configs/thesis/attend.yaml follows the thesis *text* wherever text and code
+# differ, because the text is what a reader can check. This sibling carries the
+# values the dissertation system itself set (esab2.C of the original sources):
+#   ecc->initialize(size, 0.78, 20, 4, 0.05, 30, 1.5, 4);             sal_offset default 0.2
+#   colorfeat->initialize(size, 12, 6, 10, 0.0006, 0.12, 32, 0);      sigmoid slope 4
+#   symmfeature: offset 6, step 3, 4 bands, 12 orientations           (= the text's Tab. 5.1)
+#   feature weights symmetry / eccentricity / colour / depth = 1.2 / 0.35 / 1.6 / 0.7
+#   exclusivity off (its compiled-in default; the text says 1.1 "in all experiments")
+# The field parameters are esab2.C's in both profiles. Which variant fares better
+# where: docs/replication/REPLICATION_DOSSIER.md, "Text or code?".
+#
+# Second-stage profile (use with --attend), the sibling of configs/thesis/attend.yaml.
+
+pipeline:
+  fusion: weighted-sum
+  # A cheap selection: under --attend the system segments the fused saliency
+  # itself, so the pipeline's own peak selection is unused. nms avoids the
+  # neural field's cross-frame IOR fighting the object-file tracking.
+  selection: nms
+
+features:
+  color-munsell:
+    weight: 1.6
+    params:
+      threshold: 12          # cc_add   (thesis text: 8)
+      threshold_sigma: 6     # cc_mult  (text: 5)
+      attribute_threshold: 10
+      min_segment: 0.0006
+      max_segment: 0.12      # (text / source default: 0.15)
+      max_contrast: 32
+      sigmoid_beta: 4.0      # the source's sigmoid (text: 3)
+  eccentricity:
+    weight: 0.35
+    params:
+      edge_threshold: 0.78   # share of pixels counted as area (text: 0.65)
+      merge_mean_difference: 20
+      merge_iterations: 4
+      min_area: 0.05
+      max_area: 30
+      variance_threshold: 1.5   # (text: k = 2)
+      connectivity: 4
+      saliency_offset: 0.2   # the source's default (text: none)
+  symmetry:
+    weight: 1.2
+  onset:
+    weight: 1.0
+  color:
+    enabled: false
+  intensity:
+    enabled: false
+  orientation:
+    enabled: false
+
+output:
+  output_dir: "results/"
+  display: false

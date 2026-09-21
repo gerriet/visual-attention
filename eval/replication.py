@@ -22,6 +22,8 @@ Replication track (docs/adr/0005): only dissertation components are exercised.
   stereo-noise  Abb. 5.30  disparity estimates under independent noise in both images
   stereo-orientations Abb. 5.31 one vs several near-vertical Gabor orientations
   stereo-variance Abb. 5.32 the variance threshold: high drops correct pixels, low admits wrong ones
+  text-vs-code  (no figure) the feature experiments under the thesis text's parameters and under
+                           the ones the dissertation system set (esab2.C): do both reproduce them?
   field         Abb. 6.4-6.10 the neural field driven with synthetic activation (build/field_dynamics):
                            hysteresis, bifurcation, noise, convergence, tracking, two approaching
                            maxima — under the dissertation system's field parameters and the port's
@@ -59,7 +61,21 @@ GRAY = (128, 128, 128)
 FEATURES = ("color-munsell", "eccentricity", "symmetry", "color", "intensity", "orientation")
 
 
+# Parameter values the dissertation system set where the thesis text says
+# otherwise (esab2.C; configs/thesis/thesis_esab2.yaml). Applied underneath an
+# experiment's own parameters while the text-vs-code experiment runs.
+CODE_PARAMETERS = {
+    "eccentricity": {"edge_threshold": 0.78, "variance_threshold": 1.5, "saliency_offset": 0.2},
+    "color-munsell": {"threshold": 12, "threshold_sigma": 6, "max_segment": 0.12, "sigmoid_beta": 4.0},
+}
+PARAMETER_BASE = {}
+
+
 def config_text(enabled, params=None):
+    merged = {name: dict(PARAMETER_BASE.get(name, {})) for name in enabled}
+    for name, values in (params or {}).items():
+        merged.setdefault(name, {}).update(values)
+    params = merged
     lines = ["pipeline:", "  fusion: weighted-sum", "  selection: nms", "features:"]
     for name in FEATURES:
         lines.append("  %s:" % name)
@@ -288,6 +304,42 @@ def exp_stereo_variance(binary, seeds=3):
     return {"rows": rows, "default": 3.0}
 
 
+def exp_text_vs_code(binary):
+    """The feature experiments twice: thesis-text parameters (the defaults) and
+    the dissertation system's. Plus how much the two maps differ on the thesis's
+    running example."""
+    out = {}
+    for label, base in (("text", {}), ("code", CODE_PARAMETERS)):
+        PARAMETER_BASE.clear()
+        PARAMETER_BASE.update(base)
+        try:
+            shapes = exp_shapes(binary)["values"]
+            stretch = exp_ecc_variation(binary)
+            gray = exp_gray_noise(binary, seeds=3)
+            colour = exp_colour_variation(binary)
+            colour_noise = exp_colour_noise(binary, seeds=3)
+            maps = feature_maps(binary, RUNNING_EXAMPLE, ["eccentricity", "color-munsell"])
+        finally:
+            PARAMETER_BASE.clear()
+        out[label] = {
+            "shapes": shapes,
+            "eccentricity_monotone": stretch["eccentricity_monotone"],
+            "eccentricity_at_aspect_2_and_6": [stretch["eccentricity"][3], stretch["eccentricity"][-1]],
+            "eccentricity_max_on_bar_by_noise": {str(r["level"]): r["eccentricity_on_bar"] for r in gray["levels"]},
+            "colour_variation": colour["saliency"], "colour_monotone": colour["monotone"],
+            "colour_max_on_blob_by_noise": {str(r["level"]): r["maximum_on_blob"] for r in colour_noise["levels"]},
+            "running_example": {"ball": region_mean(maps["color-munsell"], (30, 155, 75, 200)),
+                                "picture": region_mean(maps["color-munsell"], (5, 45, 75, 100))},
+            "_maps": maps,
+        }
+    out["running_example_map_correlation"] = {
+        name: correlation(out["text"]["_maps"][name], out["code"]["_maps"][name])
+        for name in ("eccentricity", "color-munsell")}
+    for label in ("text", "code"):
+        del out[label]["_maps"]
+    return out
+
+
 # --- neural field ---------------------------------------------------------------
 
 def exp_field(binary):
@@ -482,6 +534,7 @@ EXPERIMENTS = {
     "stereo-noise": exp_stereo_noise,
     "stereo-orientations": exp_stereo_orientations,
     "stereo-variance": exp_stereo_variance,
+    "text-vs-code": exp_text_vs_code,
     "field": exp_field,
 }
 
