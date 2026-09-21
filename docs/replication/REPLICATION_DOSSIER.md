@@ -432,6 +432,96 @@ Two things this comparison settles beyond the question asked:
   this resolution of measurement: down-weighting eccentricity to 0.35 and
   up-weighting colour to 1.6 changes no benchmark by more than its interval.
 
+### 22 · Thesis §9.2, Abb. 9.1–9.2 (= WAPCV 2003, Fig. 4–5) — the world-model experiment (added 2026-09-21)
+
+*The thesis's own quantitative test of its central claim. Missed by the first
+dossier (which drew on ch. 5–6); found on reading the WAPCV 2003 paper
+(`WAPCV_2003_NOTES.md`).*
+
+Two attention models explore the same simulated master map of attention — no
+features — and each has to keep a world model: which object is where. 5 × 5
+objects, ≥ 14 px apart at every moment, static or moving on a straight path by
+at most 2 px per axis and frame, uniform noise of half the object amplitude;
+1, 3, 5 static × 0–5 dynamic objects; **50 runs of 40 frames per condition.**
+Recognition is simulated: it names the object under the focus, after 3 frames
+(conventional) or 4 (two-stage: one extra, to charge for the field).
+
+- **Conventional** (after Koch & Ullman): blur, subtract the inhibition map, take
+  the maximum; the identity is bound to the place where the object was selected;
+  then an 8 × 8 area is inhibited, decaying by 20% per frame.
+- **Two-stage:** one 2D neural field of local inhibition → its activity clusters
+  → object files (the correspondence of §7.2.3) → behaviour "exploration"; the
+  identity is bound to the object file and moves with its cluster.
+
+Measures: the mean number of objects whose identity the world model holds within
+20 px of the true position, and the mean position error of those.
+`build/world_model`, wrapped by `eval/replication.py --only world-model`.
+
+**What building it found first (finding B, continued).** With the field
+parameters of `configs/thesis/thesis.yaml` the two-stage model *left clusters
+behind*: a moving object's cluster stayed where it was, self-sustained, a second
+one formed under the object, and the object file stayed with the ghost (its
+position error grew to 60 px). Two more things about the dissertation system's
+field, both in its sources and both missed by finding B:
+
+| | Port (`thesis.yaml`) | Dissertation system |
+|---|---|---|
+| Update cycles per frame | until mean \|du\| < 0.02 — on a quiet field that is 3 cycles | **a fixed 20.** Its convergence test compared the *summed* \|du\| with 0.002, which a field with noise on its input never meets; the cycle limit was 20 |
+| Input gain | 1.0 on a [0, 1] map | **0.003 on a 0–255 master map**, i.e. 0.765 |
+
+With 20 cycles per frame the field does what the thesis says: on the development
+seeds the number of activity clusters equals the number of objects in every one
+of the 18 conditions, exactly, and no cluster is left behind. (The gain matters
+little here.) The still-image profile is not affected — a still is relaxed from
+rest to convergence, which takes about 10 cycles (finding 19) — but anything that
+runs the field over a stream has to use the fixed count.
+
+**What the sources leave open**, and what was chosen — before the confirmatory
+run, on development seeds 0–9:
+
+| Choice | Taken | Why |
+|---|---|---|
+| Map size | 128 × 128, the field at that resolution | 10 objects on straight 40-frame paths at ≥ 14 px do not fit into 64 × 64 |
+| Velocities | uniform in [−2, 2] per axis, ≥ 0.5 px per frame; objects drawn at whole pixels | "at most 2 pixels in x and y direction" |
+| Noise | uniform, peak-to-peak 0.5, **zero mean** | the thesis's field experiments used zero-mean noise (finding 18); *variant:* in [0, 0.5] |
+| Conventional model: when recognition looks at the focus | **at selection** — the reading that favours the conventional model | the sources say "the identity of the selected object was returned"; *variant:* when recognition ends, by which time a moving object may have left |
+| … its blur / inhibition strength | Gaussian σ 1.5 / 1.0 | the paper: "blurring the input … finding the center of the input" |
+| Correspondence radius | 5 px | the field's local-maximum range *x_a* (finding 21) |
+
+#### Prediction, written down before the confirmatory run
+
+Seeds 1000–1049 have not been generated at the time of this commit; everything
+above was settled on seeds 0–9. A difference "holds" if its paired 95% interval
+over the 50 runs excludes zero.
+
+1. **The two-stage model reaches its optimum.** Its recognized-object count is a
+   function of the number of objects alone (0.93, 1.75, 2.48, 3.10, 3.62, 4.05,
+   4.38, 4.60, 4.72, 4.75 for 1–10 objects: every object recognized at the first
+   opportunity and never lost) to within 0.1, and lies within 0.25 of the thesis's
+   curve (read off Fig. 5) in every condition. *(Refuted if it falls short of
+   that function by more than 0.1 in any condition.)*
+2. **Without dynamic objects the conventional model is ahead** (3 and 5 static
+   objects), as the thesis says. *(Refuted if the two-stage model is ahead in a
+   static-only condition.)*
+3. **"With any dynamic object the two-stage model is ahead" will not replicate
+   as stated.** Pooled over the static counts the two-stage model is ahead from
+   3 dynamic objects on, the conventional model with 1 dynamic object, and 2 is
+   close. The reason is the baseline, not the model: the conventional model here
+   recognizes more objects than the thesis's did (4.0 against about 3.3 with five
+   static objects, where its optimum is 4.0). *(Refuted — in the thesis's favour —
+   if the two-stage model is ahead with 1 or 2 dynamic objects; refuted against
+   it if it is not ahead with 4 and 5.)*
+4. **Position error.** Two-stage below 1 px in every condition and below the
+   conventional model's wherever there is a dynamic object; the conventional
+   model's grows with the number of dynamic objects and exceeds 3 px once they
+   outnumber the static ones. The thesis's "< 0.5 px in every condition" will
+   *not* hold: 0.5–1.0 px (noise jitter of the cluster centroid, plus a lag behind
+   moving objects). *(Refuted if the two-stage error exceeds 1 px anywhere, or is
+   below 0.5 px everywhere.)*
+5. **The variants.** "Late identity" moves the crossover to 2 dynamic objects;
+   positive-mean noise lets noise clusters through (more clusters than objects)
+   and costs the two-stage model its lead except at 5 dynamic objects.
+
 ### 10 · Abb. 6.14 — tracking several objects through occlusion — partially
 
 The thesis compares variants of its neural fields. The reimplementation tracks
@@ -451,7 +541,7 @@ the thesis's nearest-centroid correspondence, 1.7 with persistent identity**
 | Abb. 6.11, 6.12 | systems of several 2D fields with global inhibition and per-feature weights | not implemented: the reimplementation has the single 2D field and the 3D field only |
 | Abb. 6.13 | the 3D field with local inhibition on a stereo scene | the 3D field is ported and tested; a dynamics experiment like the 2D ones needs the harness extended to the depth volume |
 | §9.3.2, §9.3.3 | flanker compatibility; early vs late selection | qualitative demonstrations |
-| **§9.2, Abb. 9.1–9.2** (= WAPCV 2003, Fig. 4–5) | **the thesis's own quantitative test of its central claim:** world-model quality (recognized objects, position error) of the two-stage model against a conventional inhibition-map model, 1/3/5 static × 0–5 dynamic objects, 50 runs of 40 frames | **missed when this dossier was built** (it drew on ch. 5–6); found 2026-09-21 on reading the WAPCV paper. Fully specified and CPU-only — to be replicated as finding 22. See `WAPCV_2003_NOTES.md`, which also records that the "thesis correspondence" of finding 10 is weaker than thesis §7.2.3 and that `--attend` forms object files from saliency segments, not from the field's activity clusters |
+| ~~§9.2, Abb. 9.1–9.2~~ → finding 22 | **the thesis's own quantitative test of its central claim:** world-model quality (recognized objects, position error) of the two-stage model against a conventional inhibition-map model, 1/3/5 static × 0–5 dynamic objects, 50 runs of 40 frames | **missed when this dossier was built** (it drew on ch. 5–6); found 2026-09-21 on reading the WAPCV paper. Fully specified and CPU-only — to be replicated as finding 22. See `WAPCV_2003_NOTES.md`, which also records that the "thesis correspondence" of finding 10 is weaker than thesis §7.2.3 and that `--attend` forms object files from saliency segments, not from the field's activity clusters |
 
 ## What the dossier says about the reimplementation
 

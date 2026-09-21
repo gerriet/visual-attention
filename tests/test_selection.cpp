@@ -231,3 +231,48 @@ TEST_CASE("neural-field selection stays quiet on an empty map", "[selection][neu
 
   CHECK(peaks.empty());
 }
+
+TEST_CASE("neural field: activity clusters follow their input from frame to frame", "[selection][neural-field][track]")
+{
+  // The dissertation system's single 2D field (configs/thesis/thesis.yaml), a
+  // fixed 20 cycles per frame as that system ran it
+  selection::NeuralFieldSelection::Params params;
+  params.alpha = 0.33f;
+  params.global_mult = 8.0f;
+  params.resting = -0.33f;
+  params.kernel_size = 15;
+  params.kernel_s = 3.3f;
+  params.kernel_k = 0.12f;
+  params.kernel_s2 = 14.0f;
+  params.kernel_k2 = 0.03f;
+  params.cycles_per_frame = 20;
+  params.field_max_size = 96;
+  const selection::NeuralFieldSelection field(selection::SelectionParams{}, params);
+
+  cv::Mat activity;
+  int last_x = 0;
+  for (int frame = 0; frame < 12; ++frame)
+  {
+    cv::Mat map = cv::Mat::zeros(96, 96, CV_32F);
+    map(cv::Rect(20 + 2 * frame, 40, 5, 5)) = 1.0f; // moves 2 px per frame
+    map(cv::Rect(70, 70, 5, 5)) = 1.0f;             // stays
+    const auto clusters = field.track(map, activity);
+    REQUIRE(clusters.size() == 2); // no cluster is left behind, none appears
+    for (const auto& cluster : clusters)
+    {
+      if (cluster.centroid.y < 55.0f)
+      {
+        CHECK(std::abs(cluster.centroid.x - (22.0f + 2.0f * frame)) < 3.0f);
+        last_x = static_cast<int>(cluster.centroid.x);
+      }
+      else
+      {
+        CHECK(std::abs(cluster.centroid.x - 72.0f) < 1.5f);
+        CHECK(std::abs(cluster.centroid.y - 72.0f) < 1.5f);
+      }
+      CHECK(cluster.mask.size() == map.size());
+      CHECK(cluster.size == cv::countNonZero(cluster.mask));
+    }
+  }
+  CHECK(last_x > 38); // it has travelled with its input
+}

@@ -505,3 +505,164 @@ TEST_CASE("AttentionSystem in Feature mode keeps no object files", "[system]")
   CHECK(sys.scanpath().empty());
   CHECK(sys.current_focus() == nullptr);
 }
+
+// --- replication-v2: the correspondence of thesis §7.2.3, and object files on the
+// --- neural field's activity clusters (docs/replication/WAPCV_2003_NOTES.md)
+
+namespace
+{
+system::Cluster featured(int x, int y, std::vector<float> features)
+{
+  system::Cluster c = cluster_at(x, y, 0.5f);
+  c.features = std::move(features);
+  return c;
+}
+
+system::ObjectFileStore thesis_store(double radius = 8.0, int max_age = 30)
+{
+  system::ObjectFileStore::Config config;
+  config.rule = system::ObjectFileStore::Rule::Thesis;
+  config.correspondence_radius = radius;
+  config.max_inactive_age = max_age;
+  return system::ObjectFileStore(config);
+}
+} // namespace
+
+TEST_CASE("thesis correspondence: position decides where there are no features", "[system][objectfile][thesis]")
+{
+  system::ObjectFileStore store = thesis_store();
+  store.update({cluster_at(20, 20, 0.5f), cluster_at(60, 20, 0.5f)}, 0);
+  const int left = label_near(store, {20, 20});
+  const int right = label_near(store, {60, 20});
+  REQUIRE(left != 0);
+  REQUIRE(right != 0);
+
+  // Both move a little: unambiguous within the radius
+  store.update({cluster_at(23, 21, 0.5f), cluster_at(57, 20, 0.5f)}, 1);
+  CHECK(label_near(store, {23, 21}) == left);
+  CHECK(label_near(store, {57, 20}) == right);
+
+  // A jump beyond the radius but within twice of it: still the nearest file
+  store.update({cluster_at(35, 21, 0.5f), cluster_at(57, 20, 0.5f)}, 2);
+  CHECK(label_near(store, {35, 21}) == left);
+
+  // Beyond twice the radius it is a new object; the old file goes inactive
+  store.update({cluster_at(35, 60, 0.5f), cluster_at(57, 20, 0.5f)}, 3);
+  CHECK(label_near(store, {35, 60}) != left);
+  CHECK(store.inactive_files().size() == 1);
+}
+
+TEST_CASE("thesis correspondence: a cluster gets the file that is nearest and most similar",
+          "[system][objectfile][thesis]")
+{
+  // Two objects pass each other inside the radius: every cluster is within
+  // reach of both files, so position alone is ambiguous
+  const std::vector<float> red = {0.9f, 0.1f}, blue = {0.1f, 0.9f};
+
+  SECTION("nearest and most similar agree: the files carry on")
+  {
+    system::ObjectFileStore store = thesis_store(12.0);
+    store.update({featured(20, 20, red), featured(30, 20, blue)}, 0);
+    const int a = label_near(store, {20, 20}, 2.0);
+    const int b = label_near(store, {30, 20}, 2.0);
+    store.update({featured(23, 20, red), featured(27, 20, blue)}, 1);
+    CHECK(label_near(store, {23, 20}, 1.0) == a);
+    CHECK(label_near(store, {27, 20}, 1.0) == b);
+    CHECK(store.inactive_files().empty());
+  }
+  SECTION("they disagree (the objects have swapped places): the features win, via the inactive files")
+  {
+    system::ObjectFileStore store = thesis_store(12.0);
+    store.update({featured(20, 20, red), featured(30, 20, blue)}, 0);
+    const int a = label_near(store, {20, 20}, 2.0);
+    const int b = label_near(store, {30, 20}, 2.0);
+    store.update({featured(22, 20, blue), featured(28, 20, red)}, 1);
+    CHECK(label_near(store, {22, 20}, 1.0) == b);
+    CHECK(label_near(store, {28, 20}, 1.0) == a);
+  }
+}
+
+TEST_CASE("thesis correspondence: inactive files are revived primarily by their features",
+          "[system][objectfile][thesis]")
+{
+  system::ObjectFileStore store = thesis_store();
+  store.update({featured(20, 20, {0.9f, 0.1f})}, 0);
+  const int original = label_near(store, {20, 20});
+  store.update({}, 1); // gone
+  REQUIRE(store.inactive_files().size() == 1);
+
+  SECTION("the same features, somewhere else: the same object")
+  {
+    store.update({featured(120, 90, {0.88f, 0.12f})}, 5);
+    CHECK(label_near(store, {120, 90}) == original);
+    CHECK(store.inactive_files().empty());
+  }
+  SECTION("other features at the old place: a new object")
+  {
+    store.update({featured(20, 20, {0.1f, 0.9f})}, 5);
+    CHECK(label_near(store, {20, 20}) != original);
+    CHECK(store.inactive_files().size() == 1);
+  }
+  SECTION("beyond the maximum age the file is gone")
+  {
+    store.update({}, 40);
+    CHECK(store.inactive_files().empty());
+    store.update({featured(20, 20, {0.9f, 0.1f})}, 41);
+    CHECK(label_near(store, {20, 20}) != original);
+  }
+}
+
+TEST_CASE("thesis correspondence: merged clusters are resolved by features after four frames",
+          "[system][objectfile][thesis]")
+{
+  system::ObjectFileStore store = thesis_store();
+  store.update({featured(20, 20, {0.9f, 0.1f}), featured(34, 20, {0.1f, 0.9f})}, 0);
+  const int a = label_near(store, {20, 20});
+  const int b = label_near(store, {34, 20});
+
+  // The two clusters merge into one that looks like the first
+  for (int frame = 1; frame <= 4; ++frame)
+  {
+    store.update({featured(27, 20, {0.85f, 0.15f})}, frame);
+    REQUIRE(store.active_files().size() == 1);
+    if (frame < 4)
+    {
+      CHECK(store.active_files()[0].label != a);
+      CHECK(store.active_files()[0].merged_from.size() == 2);
+    }
+  }
+  store.update({featured(27, 20, {0.85f, 0.15f})}, 5);
+  CHECK(store.active_files()[0].label == a); // it was the first all along
+  CHECK(store.active_files()[0].merged_from.empty());
+  // The other predecessor stays available for revival
+  bool b_inactive = false;
+  for (const auto& file : store.inactive_files())
+  {
+    b_inactive = b_inactive || file.label == b;
+  }
+  CHECK(b_inactive);
+}
+
+TEST_CASE("the position rule is unchanged by the new fields", "[system][objectfile]")
+{
+  system::ObjectFileStore store; // default: Rule::Position
+  store.update({featured(20, 20, {0.9f, 0.1f})}, 0);
+  const int label = label_near(store, {20, 20});
+  store.update({featured(24, 20, {0.1f, 0.9f})}, 1); // features are not consulted
+  CHECK(label_near(store, {24, 20}) == label);
+}
+
+TEST_CASE("attention_system config: cluster source and correspondence rule", "[system][config][thesis]")
+{
+  system::AttentionSystem::Config cfg;
+  CHECK(cfg.cluster_source == system::AttentionSystem::Config::ClusterSource::Saliency);
+  CHECK(cfg.object_store.rule == system::ObjectFileStore::Rule::Position);
+  system::AttentionSystem::apply_config_yaml(
+      "cluster_source: field\nobject_files:\n  correspondence: thesis\n  feature_gate: 0.2\n", cfg);
+  CHECK(cfg.cluster_source == system::AttentionSystem::Config::ClusterSource::Field);
+  CHECK(cfg.object_store.rule == system::ObjectFileStore::Rule::Thesis);
+  CHECK(cfg.object_store.feature_gate == 0.2);
+  CHECK_THROWS_AS(system::AttentionSystem::apply_config_yaml("cluster_source: fields\n", cfg), std::runtime_error);
+  CHECK_THROWS_AS(system::AttentionSystem::apply_config_yaml("object_files:\n  correspondence: nearest\n", cfg),
+                  std::runtime_error);
+}
