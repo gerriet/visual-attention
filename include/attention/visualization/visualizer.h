@@ -18,7 +18,8 @@ namespace visualization
 /**
  * Visualize a feature map as a grayscale image.
  * @param feature The feature map to visualize
- * @param window_name Optional window name (defaults to feature name)
+ * @param window_name Window to show the map in; empty (default) = no display,
+ *                    the image is only returned
  * @param wait_key If true, wait for key press after displaying
  * @return Visualization as 8-bit grayscale image
  */
