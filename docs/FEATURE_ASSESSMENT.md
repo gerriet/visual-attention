@@ -384,6 +384,34 @@ of the `fovea` arm 0.12 → 0.14 (uniform 0.18). The port matters for fidelity a
 for the dynamic studies (H1's off-object fixations went from a third to zero);
 on V\*Bench's small coloured targets colour contrast still carries the effect.
 
+### The dissertation system's field parameters (2026-09-21): fewer, better fixations
+
+The replication dossier found that the field had been running on the default
+arguments of the original's setter functions, not on what the dissertation
+system configured (dossier, finding B). With the system's parameters the thesis
+profile on the same 191 items:
+
+| Thesis profile, field parameters | fixations per image | top-1 | top-3 | top-5 | top-10 | `fovea` accuracy (K = 3, legibility oracle) |
+|---|---|---|---|---|---|---|
+| port defaults (Backer kernel, global inhibition 1) | 9.2 | 0.04 | 0.16 | 0.22 | 0.42 | 0.14 |
+| dissertation system (DoG kernel, global inhibition 8) | **3.9** | **0.06** | 0.15 | 0.16 | 0.16 | 0.15 |
+| chance (10 random fixations) | | 0.02 | 0.07 | 0.11 | 0.22 | 0.10 |
+
+The field now decides, as the thesis intends, *how many* things deserve
+attention — about four per image, one per object — and its first fixation is
+more often right (2.6 × chance instead of 1.5 ×). It simply has no tenth
+fixation to offer on a single frame, so coverage at K = 10 is capped near its
+coverage at K = 4; at the crop budget the front-end actually uses (K = 3)
+nothing is lost. More fixations are what the model's *temporal* side is for:
+inhibition of return across frames, which a single still does not exercise.
+
+For the tracks this means: `configs/thesis/thesis.yaml` follows the dissertation
+system (fidelity); `configs/modern.yaml` keeps the port's field parameters, with
+which it was measured and which give a ranking of ten candidates — useful when a
+downstream stage (a crop budget, a detector) does the final choosing. Which is
+better *per crop spent* is an open modern-track measurement (K = 1–3, where the
+two now differ in opposite directions).
+
 ### What the first (pre-port) measurement does and does not show
 
 What this does and does not show. It does not show that bottom-up saliency
