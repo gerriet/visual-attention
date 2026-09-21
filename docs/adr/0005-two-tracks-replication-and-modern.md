@@ -130,6 +130,21 @@ From here on:
   (not implemented), a dynamics experiment for the 3D field (6.13), the
   qualitative ch. 9 demonstrations.
 
+### CI state at the tag
+
+`replication-v1` was cut with the Linux CI red, noticed only after the tag
+was pushed: `scanpath_attend` had failed there since the symmetry port
+(green locally on macOS). It is a modern-track test — `--attend` under the
+compiled-in default profile — and the three frozen thesis goldens pass on both
+platforms, so the tag stands. The cause: frame 0 of `motion_seq` is pure noise,
+the first focus falls on whichever noise fragment rounding favours, the two
+platforms disagree, and the dwell carries the choice through all three frames.
+The golden pinned an arbitrary choice (and, regenerated on macOS after the port,
+one that never reached the moving patch — the Linux run did). The test now
+checks what the sequence determines (`eval/check_scanpath.py`: a focus on every
+frame; the moving patch has become an object file). Lesson for the way of
+working: look at CI after a push, not only at the local suite.
+
 ## Implemented so far
 
 - `configs/thesis/{thesis,stereo,attend}.yaml`; a test

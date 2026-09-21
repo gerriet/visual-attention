@@ -21,6 +21,9 @@ CTest picks up `eval/.venv` automatically for the Python unit tests;
 # Loose behavioral equivalence of two results (used by the golden tests)
 python3 eval/compare_scanpaths.py golden.json actual.json
 
+# Behavioural expectations instead of a golden, where the focus is left to chance
+python3 eval/check_scanpath.py scanpath.json --frames 3 --object-near 150,100
+
 # Full comparison report: reference result vs. one or more others
 eval/.venv/bin/python -m attention_eval.report \
     results/classic/result.json results/modern/result.json \
