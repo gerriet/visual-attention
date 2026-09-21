@@ -173,9 +173,9 @@ Replication track — finite; close it and freeze it:
    (`docs/replication/REPLICATION_DOSSIER.md`): eccentricity, colour contrast
    and exclusivity replicate; **symmetry diverges** (responds around objects,
    not on them).
-3a. **Port the symmetry combination step from the original** (absolute scale,
-   clip offset, the thesis's radii) — then re-run the dossier, H1 (staleness /
-   off-object share) and M11. Then the stereo experiments.
+3a. ~~Port the symmetry combination step from the original~~ — **done
+   2026-09-21**; the dossier's symmetry rows now replicate. H1 (fresh seeds
+   2000–2029) and M11 re-run with it. Then the stereo experiments.
 4. Tag `replication-v1`, freeze the thesis goldens.
 
 Modern track — optimise first, then confirm once:

@@ -54,7 +54,9 @@ did not depend on the defective feature.
   it is what `default.yaml` and the `attend*.yaml` study configs still run.
 - `configs/attend*.yaml` (H1, H7) still use `color`, not `color-munsell` — see
   ADR-0005, open point 1.
-- **Symmetry — now measured, and the most important open item**
+- ~~Symmetry~~ — **ported 2026-09-21** (absolute scale, clip offset, thesis
+  Tab. 5.1 radii; a lone disk peaks at its centre, a single edge gives 0.08; four
+  behavioural tests). What was wrong:
   (`docs/replication/REPLICATION_DOSSIER.md`, finding A): for a lone disk its
   maximum lies ~80 px *beside* the disk. The summation core is a faithful port;
   the combination step is not — per-band normalization and relative thresholds
