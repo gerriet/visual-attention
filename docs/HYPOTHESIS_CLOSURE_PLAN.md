@@ -178,7 +178,9 @@ Replication track — finite; close it and freeze it:
    not on them).
 3a. ~~Port the symmetry combination step from the original~~ — **done
    2026-09-21**; the dossier's symmetry rows now replicate. H1 (fresh seeds
-   2000–2029) and M11 re-run with it. Then the stereo experiments.
+   2000–2029) and M11 re-run with it. ~~Then the stereo experiments~~ — done
+   2026-09-21: all five stereo findings (Abb. 5.28–5.32) replicate. Left before
+   the tag: the field dynamics of Abb. 6.10–6.13, or a decision to omit them.
 4. Tag `replication-v1`, freeze the thesis goldens.
 
 Modern track — optimise first, then confirm once:

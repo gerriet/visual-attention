@@ -137,9 +137,17 @@ replicates; the growth-threshold range partially. **Symmetry diverges**: it does
 not peak on symmetric objects but in rings around them — the original's
 absolute scale and clip offset were replaced by per-band normalization and
 relative thresholds over three scales, so one-sided responses survive. That is
-the next replication-track fix, after which the dossier, H1 and M11 re-run. Not
-attempted yet: the stereo experiments, the field dynamics of Abb. 6.10–6.13
-(need a harness that drives the field directly), the qualitative ch. 9 demos.
+the next replication-track fix, after which the dossier, H1 and M11 re-run.
+
+**Update (2026-09-21):** symmetry ported — its two findings replicate. **Stereo
+experiments added (Abb. 5.28–5.32): all five replicate** — disparity recovered
+exactly across distances and in a random-dot stereogram, 10.0 → 9.9 px under
+σ ≈ 90 noise, several orientations better than one, and the variance threshold
+admitting wrong pixels when low and dropping correct ones when very high (the
+port's default, 3.0, sits in the too-low range for noisy 8-bit images — a
+calibration note, not yet changed). Not attempted yet: the field dynamics of
+Abb. 6.10–6.13 (need a harness that drives the field directly), the qualitative
+ch. 9 demos.
 
 ### M10b — Selection backends: robust multi-blob tracking without the field's tuning
 
