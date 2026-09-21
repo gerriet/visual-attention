@@ -182,9 +182,12 @@ Replication track — finite; close it and freeze it:
    2026-09-21: all five stereo findings (Abb. 5.28–5.32) replicate. ~~The field
    dynamics~~ — done 2026-09-21: Abb. 6.4–6.10 replicate with the dissertation
    system's own field parameters (the port had used the wrong ones; the thesis
-   profile now has them). Left before the tag: decide the open parameter
-   questions listed in the dossier (eccentricity and colour thresholds, feature
-   weights, stereo variance threshold: thesis text vs `esab2.C`).
+   profile now has them). ~~Decide the open parameter questions~~ — decided
+   2026-09-21: the thesis text's values are the profile, the system's
+   (`esab2.C`) a runnable sibling (`configs/thesis/*_esab2.yaml`); compared on
+   every model-free benchmark — no decisive difference, the text slightly ahead,
+   **H1 holds under both** on a third seed block. Left before the tag: the
+   stereo variance threshold (needs a real stereo pair).
 4. Tag `replication-v1`, freeze the thesis goldens.
 
 Modern track — optimise first, then confirm once:

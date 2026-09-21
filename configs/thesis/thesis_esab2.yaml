@@ -1,0 +1,84 @@
+# Thesis track (docs/adr/0005) — the dissertation system *as it was configured*.
+#
+# configs/thesis/thesis.yaml follows the thesis *text* wherever text and code
+# differ, because the text is what a reader can check. This sibling carries the
+# values the dissertation system itself set (esab2.C of the original sources):
+#   ecc->initialize(size, 0.78, 20, 4, 0.05, 30, 1.5, 4);             sal_offset default 0.2
+#   colorfeat->initialize(size, 12, 6, 10, 0.0006, 0.12, 32, 0);      sigmoid slope 4
+#   symmfeature: offset 6, step 3, 4 bands, 12 orientations           (= the text's Tab. 5.1)
+#   feature weights symmetry / eccentricity / colour / depth = 1.2 / 0.35 / 1.6 / 0.7
+#   exclusivity off (its compiled-in default; the text says 1.1 "in all experiments")
+# The field parameters are esab2.C's in both profiles. Which variant fares better
+# where: docs/replication/REPLICATION_DOSSIER.md, "Text or code?".
+
+# Selection: the 2D dynamic neural field with local inhibition (thesis §6.3),
+# ported from nf2d.h, with the cluster/Objectfile readout of ch. 6/7 in minimal
+# form. The field parameters are those the dissertation system itself set for
+# this field (esab2.C, neuralmode 2):
+#     nf2d->setparameters(0.33, 8, -0.33, 30, ...);        alpha, global, resting, beta
+#     nf2d->set_DoG_kernels(15, 15, 3.3, 0.12, 14, 0.03);  size, s, k, s2, k2
+# on a 64 x 64 field. With them the thesis's field experiments replicate (Abb.
+# 6.4-6.10: hysteresis, bifurcation, noise suppression up to amplitude 1.2,
+# merging of two maxima below distance 5; docs/replication/REPLICATION_DOSSIER.md)
+# — with the default arguments of the original's setkernels()/setparameters(),
+# which this profile used until 2026-09, they do not. The convergence criterion
+# and the cycle cutoff are the thesis text's (mean |du| < 0.02, 55 cycles).
+
+pipeline:
+  fusion: weighted-sum
+  selection: neural-field
+  selection_params:
+    alpha: 0.33
+    beta: 30.0
+    resting: -0.33
+    global_mult: 8.0
+    kernel_size: 15
+    kernel_s: 3.3
+    kernel_k: 0.12
+    kernel_s2: 14.0
+    kernel_k2: 0.03
+    field_max_size: 64
+    max_cycles: 55        # thesis: cutoff 55 cycles, ~10 typical
+    change_thresh: 0.02   # thesis: mean |du| < 0.02
+    ior_decay: 0.8        # thesis: inhibition reduced 20% per frame
+
+features:
+  color-munsell:
+    weight: 1.6
+    params:
+      threshold: 12          # cc_add   (thesis text: 8)
+      threshold_sigma: 6     # cc_mult  (text: 5)
+      attribute_threshold: 10
+      min_segment: 0.0006
+      max_segment: 0.12      # (text / source default: 0.15)
+      max_contrast: 32
+      sigmoid_beta: 4.0      # the source's sigmoid (text: 3)
+  eccentricity:
+    weight: 0.35
+    params:
+      edge_threshold: 0.78   # share of pixels counted as area (text: 0.65)
+      merge_mean_difference: 20
+      merge_iterations: 4
+      min_area: 0.05
+      max_area: 30
+      variance_threshold: 1.5   # (text: k = 2)
+      connectivity: 4
+      saliency_offset: 0.2   # the source's default (text: none)
+  symmetry:
+    weight: 1.2
+  color:
+    enabled: false
+  intensity:
+    enabled: false
+  orientation:
+    enabled: false
+
+# Note: neural-field selection reads only max_count and ior_strength (the
+# space-based IOR level); the field itself decides what is salient enough
+peaks:
+  max_count: 10
+  ior_strength: 0.8
+
+output:
+  output_dir: "results/"
+  display: false

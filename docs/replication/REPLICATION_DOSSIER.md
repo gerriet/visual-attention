@@ -355,6 +355,55 @@ Where it differs from the thesis text, the replication profile follows the
 | Feature weights (symmetry, eccentricity, colour, depth) | "identical weights ≡ 1" in the example (Abb. 5.33) | 1.2, 0.35, 1.6, 0.7 ("standard diss version": 1.25, 0.25, 1.5, 0.75) | 1.0 each |
 | Default field architecture | three variants compared | the 3D field (`neuralmode = 3`) | 2D field for stills, 3D for stereo pairs |
 
+### Text or code? — the two thesis profiles compared (2026-09-21)
+
+Decision (Gerriet, 2026-09-21): the thesis **text's** values stay the documented
+replication profile (`configs/thesis/thesis.yaml`, `attend.yaml`), because the
+text is what a reader can check; the dissertation **system's** values are kept
+runnable next to it (`thesis_esab2.yaml`, `attend_esab2.yaml`). Both use the
+system's field parameters. They differ in the eccentricity thresholds (0.65 / 2
+vs 0.78 / 1.5 and a saliency offset of 0.2), the colour thresholds (8 / 5 vs
+12 / 6, sigmoid slope 3 vs 4), exclusivity (1.1 vs off) and the feature weights
+(1 / 1 / 1 vs symmetry 1.2, eccentricity 0.35, colour 1.6).
+
+Which fares better? Every benchmark the repository can run without a model,
+each paired on identical items; "code − text", 95% CI:
+
+| Benchmark | text | code | code − text |
+|---|---|---|---|
+| **Thesis's own feature findings** (`eval/replication.py --only text-vs-code`) | all reproduced; eccentricity on eq. 5.6 (2:1 ellipse 0.35) | all reproduced qualitatively; the saliency offset takes eccentricity off eq. 5.6 (0.19); colour loses the blob at the strongest noise level | text is the closer fit |
+| V\*Bench target coverage, top 3 (191 items) | 0.152 | 0.105 | −0.047 [−0.099, +0.010] |
+| … `fovea` accuracy at K = 3, legibility oracle | 0.147 | 0.099 | |
+| COCO-Search18 bottom-up, found@10 (150 trials) | 0.37 | 0.34 | −0.027 [−0.100, +0.040] |
+| … with the category prior | 0.42 | 0.43 | +0.013 [−0.047, +0.073] |
+| H1, object-ior+id latency, standard / fast / occlusion (30 scenes each, seeds 3000–3029) | 1.73 / 1.79 / 1.92 | 1.62 / 1.77 / 1.93 | −0.12 / −0.03 / +0.01, all intervals include 0 |
+| H1, object-ior+id staleness | 1.83 / 1.63 / 1.58 | 1.81 / 1.63 / 1.57 | −0.01 / +0.01 / −0.00 |
+| MIT1003, the model's own scanpath, ScanMatch (200 images) | 0.545 | 0.529 | **−0.016 [−0.023, −0.008]** |
+| … generic readout of the map | 0.674 | 0.668 | **−0.005 [−0.009, −0.001]** |
+| … object-file readout, position agreement | 0.791 | 0.799 | **+0.008 [+0.001, +0.015]** |
+
+**Answer: neither is decisively better; where they differ, the text's values
+are ahead — slightly.** The text profile is closer to the thesis's own
+equations, a little better at putting early fixations on small targets and at
+agreeing with human scanpaths, and tied on search and on the dynamic-scene
+study. The only place the system's values lead is the object-file readout's
+position agreement on stills, by 0.008. On the running example the two colour
+maps correlate at 0.92 and the eccentricity maps at 0.59 — eccentricity is where
+the variants really differ, and it is also the feature with the smallest weight
+in the system's profile (0.35), which is probably why so little of the
+difference reaches the benchmarks.
+
+Two things this comparison settles beyond the question asked:
+
+- **H1 holds under both profiles, on a third fresh block of scenes.**
+  Object-based IOR beats space-based IOR on latency and staleness in every
+  regime under either parameter set (latency −1.2 / −4.8 / −1.4 frames with the
+  text's, −1.2 / −4.4 / −1.5 with the system's). The verdict does not depend on
+  which set of values is "the thesis".
+- **The feature weights the dissertation system used do not matter much** at
+  this resolution of measurement: down-weighting eccentricity to 0.35 and
+  up-weighting colour to 1.6 changes no benchmark by more than its interval.
+
 ### 10 · Abb. 6.14 — tracking several objects through occlusion — partially
 
 The thesis compares variants of its neural fields. The reimplementation tracks
@@ -396,5 +445,8 @@ the thesis's nearest-centroid correspondence, 1.7 with persistent identity**
 
 Replication-track definition of done (ADR-0005): ~~fix symmetry~~ → ~~re-run H1
 and M11 with it~~ → ~~the stereo experiments~~ → ~~the field dynamics~~ (Abb.
-6.4–6.10 done; 6.11–6.13 documented as not implemented / not attempted) → decide
-on the open parameter questions in the table above → tag `replication-v1`.
+6.4–6.10 done; 6.11–6.13 documented as not implemented / not attempted) →
+~~decide on the open parameter questions~~ (decided 2026-09-21: the text's values
+are the profile, the system's are a runnable sibling; compared above) → tag
+`replication-v1`. Still open and small: the stereo variance threshold (the port's
+3.0 is too low; a real stereo pair is needed to set it).
