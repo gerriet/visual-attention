@@ -480,6 +480,92 @@ The negative result was about the reimplementation, not about the thesis.
 Open: the speed × object-count sweep, the Abb. 6.14 scenario, real video
 (DAVIS), and whether the modern-track H7 result changes with the same stage 1.
 
+## The thesis's own chain, and the thesis's own correspondence (2026-09-21, replication-v2)
+
+**Why another block.** Reading the WAPCV 2003 paper against the thesis and the
+code (`docs/replication/WAPCV_2003_NOTES.md`) showed two things about the runs
+above:
+
+- **The arm called "object-ior (thesis)" is position-only correspondence** —
+  weaker than thesis §7.2.3, which also compares feature means where position is
+  ambiguous and revives inactive object files "primarily by the feature
+  properties". Wherever this document says "the thesis's (nearest-centroid)
+  correspondence", read "position-only". `+aids` and `+id` are closer to §7.2.3
+  than the word "extensions" suggests (they differ from it in using colour, a
+  summed cost, a widening gate and no maximum age).
+- **The neural field was not in the loop.** In the thesis object files are
+  created for the field's activity clusters; `--attend` segments the saliency map
+  instead. H1 above was measured on that approximation.
+
+Both now exist as options (`attention_system.cluster_source: field`,
+`object_files.correspondence: thesis`), and the field runs as the dissertation
+system ran it over a stream — a fixed 20 cycles per frame, input gain 0.765
+(dossier, finding 22). New arms:
+
+| Arm | Object files on | Correspondence |
+|---|---|---|
+| `object-ior+7.2.3` | saliency segments | thesis §7.2.3 |
+| `chain:spatial-ior`, `chain:spatial-ior-mc`, `chain:object-ior` | **the field's activity clusters** | thesis §7.2.3 |
+
+The chain is run twice: with the dissertation system's field size (64 px,
+`configs/thesis/attend_field.yaml`) and at twice that
+(`attend_field128.yaml`). The scenes, regimes, metrics and the reference arm
+(`spatial-ior` on saliency segments) are those of the runs above.
+
+```bash
+eval/dynamic_ior.py --regime all --seeds 30 --seed0 4000 --out results/h1_v2 \
+  --arms spatial-ior,spatial-ior-mc,object-ior,object-ior+7.2.3,object-ior+id,chain:spatial-ior,chain:spatial-ior-mc,chain:object-ior
+eval/dynamic_ior.py --regime all --seeds 30 --seed0 4000 --out results/h1_v2_field128 \
+  --chain-config configs/thesis/attend_field128.yaml \
+  --arms spatial-ior,chain:spatial-ior,chain:spatial-ior-mc,chain:object-ior
+```
+
+### What the development run showed (seeds 0–9)
+
+With the 64-px field the chain holds **three of the four disks** and keeps them —
+that is the first stage doing what the thesis says it does (a small number of
+items, with hysteresis), but on these scenes (disks of radius 16 px = 3 field
+pixels, global inhibition 8) the fourth object never gets a cluster, and with it
+never an object file. At 128 px all four fit. The regimes' speeds in field
+pixels per frame: *standard* 1.2 (2.4 at 128), *occlusion* 4 (8), *fast* 8 (16)
+— the thesis puts the field's tracking limit at "an object movement of more than
+12 pixels" and the dossier's tracking experiment (finding 20) agrees.
+
+### Prediction, written down before the run
+
+Seeds 4000–4029 have not been generated at the time of this commit.
+
+1. **§7.2.3 on saliency segments changes little.** `object-ior+7.2.3` does not
+   differ from `object-ior` on latency or staleness in any regime (on these
+   scenes position is rarely ambiguous); it has fewer labels per object in
+   *fast*. Both beat `spatial-ior` and `spatial-ior-mc` on staleness in every
+   regime — the result of the re-run above holds on a fourth block. *(Refuted if
+   either object-based arm fails to beat `spatial-ior-mc` on staleness in any
+   regime.)*
+2. **The chain with the dissertation system's field size loses** — to the
+   segment-based `spatial-ior` on staleness in every regime, whatever the
+   behaviour, with coverage below 1 in *standard*: the field's capacity, not
+   inhibition of return, decides. Within the chain `object-ior` is not better
+   than `spatial-ior`. *(Refuted if `chain:object-ior` beats the reference on
+   staleness in any regime.)*
+3. **At 128 px the chain supports H1 inside the field's tracking range and
+   fails outside it.** In *standard*, `chain:object-ior` beats
+   `chain:spatial-ior` and the segment-based `spatial-ior` on latency and
+   staleness. In *fast* and *occlusion* `chain:object-ior` is *worse* than
+   `chain:spatial-ior` on latency, with more than 6 labels per object: a field
+   that cannot follow an object hands the second stage a new object file every
+   few frames, and object-based inhibition has nothing to hold on to.
+   *(Refuted if `chain:object-ior` is not ahead in *standard*, or is ahead in
+   *fast*.)*
+
+If 1–3 hold, the verdict on H1 is refined, not reversed: **object-based
+inhibition of return beats space-based inhibition wherever the first stage
+delivers trackable objects** — with the reimplementation's segment-based first
+stage at every speed tested, with the thesis's neural field inside its tracking
+range (which the thesis states). The high-speed result of the re-run above is a
+result about the segment-based variant, which the WAPCV paper names as an
+extension ("a segmentation process based on the feature computations").
+
 ## Artifacts
 
 - `tools/make_dynamic_scene.py` — scene + `gt.json` generator (`dynamic-scene-gt/v1`).

@@ -157,7 +157,9 @@ class ObjectFileStore
     // Match clusters to each file's *predicted* next centroid (last + trajectory
     // velocity) instead of its last centroid. Holds object identity through fast
     // motion and short occlusions, which object-based IOR depends on (M12).
-    // Default off: the thesis's simple nearest-centroid correspondence.
+    // Default off: position-only correspondence. (Not "the thesis's": thesis
+    // §7.2.3 also compares features — Rule::Thesis. The trajectory, by contrast,
+    // the thesis stores but does not use: motion prediction is an addition.)
     bool motion_prediction = false;
     // Fold an appearance descriptor (mean colour of the region, computed from
     // features the pipeline already produced) into the correspondence cost, so
@@ -176,7 +178,9 @@ class ObjectFileStore
     // its last speed × frames gone) or a clear look-alike (colour <
     // reid_colour_gate). Inactive files never age out, and two active
     // look-alike files on one object are merged into the older one. Default
-    // off: the thesis's radius-gated revival with ageing.
+    // off: radius-gated revival with ageing. (The thesis revives "primarily by
+    // the feature properties" and has a maximum age — Rule::Thesis; persistent
+    // identity differs from it in using colour, a widening gate, and no age.)
     bool persistent_identity = false;
     double reid_colour_gate = 25.0; // colour L2 (0-255): a look-alike, revived wherever it reappears
     double reid_colour_veto = 60.0; // colour L2 (0-255): looks different — never the same object

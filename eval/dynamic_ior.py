@@ -96,6 +96,7 @@ STUDY_ARMS = {
     "chain:object-ior": ("object-ior", (), "chain"),
 }
 CHAIN_CONFIG = os.path.join(REPO, "configs", "thesis", "attend_field.yaml")
+CHAIN_OVERRIDE = [None]  # --chain-config
 REFERENCE_ARM = "spatial-ior"
 METRICS = ("coverage", "mean_latency", "staleness", "revisit_waste", "perseveration", "off_object",
            "labels_per_object")
@@ -260,7 +261,7 @@ def run_regime(binary, config, regime, seeds, seed0, out_dir, match_radius, arms
     preset = REGIMES[regime]
     id_config = identity_config(config)
     thesis_config = identity_config(config, THESIS_CORRESPONDENCE_YAML)
-    variants = {None: config, "id": id_config, "thesis": thesis_config, "chain": CHAIN_CONFIG}
+    variants = {None: config, "id": id_config, "thesis": thesis_config, "chain": CHAIN_OVERRIDE[0] or CHAIN_CONFIG}
     rows = {arm: [] for arm in arms}
     try:
         for seed in range(seed0, seed0 + seeds):
@@ -334,6 +335,8 @@ def main():
     ap.add_argument("--seeds", type=int, default=10, help="scenes per regime (study mode)")
     ap.add_argument("--seed0", type=int, default=0,
                     help="first scene seed; 0-9 are development seeds, confirmatory runs use 1000+")
+    ap.add_argument("--chain-config", default=CHAIN_CONFIG,
+                    help="profile of the chain:* arms (default: %(default)s)")
     ap.add_argument("--arms", default=",".join(STUDY_ARMS), help="study arms, comma-separated")
     ap.add_argument("--resume", action="store_true",
                     help="reuse the scanpaths already under --out (the pipeline is deterministic; "
@@ -358,6 +361,7 @@ def main():
 
     if not os.path.exists(args.binary):
         sys.exit("binary not found: %s (build first: cmake --build build)" % args.binary)
+    CHAIN_OVERRIDE[0] = os.path.abspath(args.chain_config)
     if args.regime:
         arms = [a.strip() for a in args.arms.split(",")]
         unknown = [a for a in arms if a not in STUDY_ARMS]
