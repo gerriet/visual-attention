@@ -169,7 +169,9 @@ Replication track — finite; close it and freeze it:
    feature and is superseded.
    Left for the dossier: the tracker dose–response figure (advantage vs
    ID-switch rate, with `kalman-mot`), the Abb. 6.14 scenario.
-2. **M11** as soon as MIT1003 is on disk (H4).
+2. ~~M11~~ — **done 2026-09-21** (H4, all 1003 MIT1003 stimuli): above random
+   weakly, not above centre, no stage-2 ordering benefit on stills; ScanMatch
+   shown to be uninformative on this dataset (`docs/SCANPATH_VS_HUMAN.md`).
 3. ~~M10 replication dossier~~ — **first version done 2026-09-20**
    (`docs/replication/REPLICATION_DOSSIER.md`): eccentricity, colour contrast
    and exclusivity replicate; **symmetry diverges** (responds around objects,

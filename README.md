@@ -152,6 +152,12 @@ and reported.
   stage-1 features that were not the thesis's — found and fixed by the
   replication dossier.
   [DYNAMIC_IOR_STUDY.md](docs/DYNAMIC_IOR_STUDY.md)
+- **Scanpaths vs human gaze on stills (H4).** On all 1003 MIT1003 images the
+  thesis model's scanpath is measurably above random, by little, well below
+  "stay in the middle", and far from human-vs-human agreement; the second
+  stage's ordering does not help on stills — its benefit is in dynamic scenes
+  (H1). A side result: ScanMatch cannot tell the constant-centre path from the
+  inter-observer ceiling on this dataset. [SCANPATH_VS_HUMAN.md](docs/SCANPATH_VS_HUMAN.md)
 - **Recognition gated by attention (H2).** Detectors restricted to attended
   ROIs recover 51% of all full-frame detections at 5.8% of the pixels.
   [GATED_RECOGNITION.md](docs/GATED_RECOGNITION.md)
@@ -230,7 +236,7 @@ to check that everything still works.
 - [INTERCHANGE_FORMAT.md](docs/INTERCHANGE_FORMAT.md) — the result/scanpath format every model emits
 - [thesis_vs_modern.md](docs/thesis_vs_modern.md) — thesis model vs. modern saliency models
 - [ALTERNATIVE_FEATURES.md](docs/ALTERNATIVE_FEATURES.md) · [SELECTION_BACKENDS.md](docs/SELECTION_BACKENDS.md) — pluggable operators / trackers
-- [DYNAMIC_IOR_STUDY.md](docs/DYNAMIC_IOR_STUDY.md) · [GATED_RECOGNITION.md](docs/GATED_RECOGNITION.md) · [PRIORITY_MAP.md](docs/PRIORITY_MAP.md) · [VLM_FRONT_END.md](docs/VLM_FRONT_END.md) · [VLM_VIDEO.md](docs/VLM_VIDEO.md) — the H1, H2, H5, H6 and H7 studies
+- [DYNAMIC_IOR_STUDY.md](docs/DYNAMIC_IOR_STUDY.md) · [GATED_RECOGNITION.md](docs/GATED_RECOGNITION.md) · [SCANPATH_VS_HUMAN.md](docs/SCANPATH_VS_HUMAN.md) · [PRIORITY_MAP.md](docs/PRIORITY_MAP.md) · [VLM_FRONT_END.md](docs/VLM_FRONT_END.md) · [VLM_VIDEO.md](docs/VLM_VIDEO.md) — the H1, H2, H4, H5, H6 and H7 studies
 - [REPLICATION_DOSSIER.md](docs/replication/REPLICATION_DOSSIER.md) — the dissertation's own findings, re-run: eccentricity, colour contrast, symmetry and exclusivity replicate; what was not attempted yet
 - [PAPER_READINESS.md](docs/PAPER_READINESS.md) — what could be published, and what is missing
 - [CRITICAL_REVIEW_2026-09.md](docs/CRITICAL_REVIEW_2026-09.md) · [HYPOTHESIS_CLOSURE_PLAN.md](docs/HYPOTHESIS_CLOSURE_PLAN.md) · [FEATURE_ASSESSMENT.md](docs/FEATURE_ASSESSMENT.md) — the 2026-09 review: what is solid, what is not, and the plan to close the open hypotheses

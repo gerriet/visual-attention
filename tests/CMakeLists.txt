@@ -189,6 +189,19 @@ if(Python3_Interpreter_FOUND)
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
         set_tests_properties(dynamic_ior_smoke PROPERTIES
             PASS_REGULAR_EXPRESSION "summary:" FAIL_REGULAR_EXPRESSION "Traceback")
+        # M11 scanpaths vs human: --help (imports numpy, hence the venv) + the
+        # synthetic stack check (ceiling and map-driven readout clear the
+        # floors; MultiMatch/ScanMatch/readout/ceiling exercised end to end,
+        # no dataset/scipy/binary). Gated on the exit code like vlm above.
+        add_test(NAME help_scanpath_vs_human
+            COMMAND ${EVAL_PYTHON} ${CMAKE_SOURCE_DIR}/eval/scanpath_vs_human.py --help)
+        set_tests_properties(help_scanpath_vs_human PROPERTIES PASS_REGULAR_EXPRESSION "usage")
+        add_test(NAME scanpath_vs_human_smoke
+            COMMAND ${EVAL_PYTHON} ${CMAKE_SOURCE_DIR}/eval/scanpath_vs_human.py --demo --check
+                    --out ${CMAKE_BINARY_DIR}/scanpath_smoke
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+        set_tests_properties(scanpath_vs_human_smoke PROPERTIES
+            FAIL_REGULAR_EXPRESSION "check failed;Traceback;Error")
         # Replication dossier (M10), smoke: two experiments end to end through
         # --emit-features (absolute feature maps); the values themselves are
         # asserted by tests/test_thesis_features.cpp.
