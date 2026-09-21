@@ -231,6 +231,10 @@ ScanMatch cannot tell "stays in the middle" (0.754) from human-vs-human
 agreement (0.759); MultiMatch's direction dimension can. The harness needed
 fixing when it met the real archive (the model's own field scanpath as an arm, a
 working object-file readout, pairing, resume). `docs/SCANPATH_VS_HUMAN.md`.
+*Update:* with the dissertation system's field parameters the model makes ~4
+fixations per image; at matched path length its scanpath is +0.076 ScanMatch
+above random (was +0.015), still −0.10 below centre, and no longer worse than a
+generic readout of its own map.
 
 *Earlier status (2026-07-21): instrument built + verified end-to-end on synthetic
 data; real MIT1003 run gated on the dataset + DATA archive + scipy.* In-repo

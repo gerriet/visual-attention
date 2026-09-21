@@ -250,6 +250,54 @@ priority map (the `top_down_map` slot takes one as it is), and the face channel
 (YuNet, weight 0 by default) — MIT1003 is full of faces and text. Both belong to
 the *modern* track (docs/adr/0005), not to the replication.
 
+### Update (2026-09-21): the dissertation's field parameters, and a length-matched control
+
+The replication dossier found that the neural field had been running on the
+default arguments of the original's setter functions rather than on what the
+dissertation system configured (`docs/replication/REPLICATION_DOSSIER.md`,
+finding B). The thesis profile now carries the system's parameters, and with
+them the field does what the thesis says it does: it decides *how many*
+fixations a scene deserves — **4.0 per image on average instead of 10**. Only
+the `thesis-field` arm depends on the selection stage, so only it was re-scored
+(`--resume --refresh-field`); every other row of the table above is unchanged.
+
+Scored as before — the model's path against the observers' full paths — the arm
+falls from 0.651 to **0.544 ScanMatch, below the random path (0.636)**, while
+its MultiMatch position, shape and length agreement all *rise* (+0.037, +0.019,
++0.055). That combination says the score is measuring path length: a
+four-fixation path is aligned against human paths of eight to ten, and ScanMatch
+charges for every unmatched fixation. So the comparison was repeated at matched
+length — a control added after seeing this, and labelled as such: every arm at
+the model's own length *k*, against the first *k* fixations of each observer
+(964 stimuli with k ≥ 2).
+
+| Arm, at the model's path length k | ScanMatch | shape | direction | length | position |
+|---|---|---|---|---|---|
+| inter-observer@k (ceiling) | 0.866 | 0.948 | 0.639 | 0.928 | 0.913 |
+| **thesis-field@k** | 0.749 | 0.857 | 0.515 | 0.804 | 0.800 |
+| thesis-wta@k (generic readout, same map) | 0.746 | 0.860 | 0.525 | 0.807 | 0.795 |
+| center@k | 0.850 | 0.953 | 0.485 | 0.908 | 0.898 |
+| random@k | 0.672 | 0.816 | 0.523 | 0.719 | 0.724 |
+
+Paired over stimuli: thesis-field@k − random@k **+0.076 [+0.072, +0.081]**;
+− center@k **−0.101 [−0.105, −0.098]**; − thesis-wta@k +0.003 [+0.000, +0.006];
+inter-observer@k − thesis-field@k **+0.118**.
+
+What this changes in the verdict, and what it does not:
+
+- **Above random: supported more clearly than before** — +0.076 at matched
+  length against +0.015 in the unmatched comparison. The field's few fixations
+  are better placed than the ten the port's parameters produced; on position
+  agreement the gain over random is the same size (+0.076).
+- **Not above centre** — unchanged (−0.10).
+- **The field's own readout is no longer worse than a generic readout of the
+  same map** (+0.003; it was −0.023). With the right parameters the thesis's
+  selection stage is at least as good as winner-take-all on its own map.
+- At matched length ScanMatch separates the human ceiling (0.866) from the
+  constant-centre path (0.850) — barely. The instrument caveat stands.
+- A methodological point for anyone scoring a model that chooses its own number
+  of fixations: compare at matched length, or the score is a length penalty.
+
 ## Honest caveats (to report with the real numbers)
 
 - **I-DT assumptions.** MIT1003's `eyeData` column order and 240 Hz sample rate
