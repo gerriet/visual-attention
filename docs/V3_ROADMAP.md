@@ -144,8 +144,9 @@ experiments added (Abb. 5.28–5.32): all five replicate** — disparity recover
 exactly across distances and in a random-dot stereogram, 10.0 → 9.9 px under
 σ ≈ 90 noise, several orientations better than one, and the variance threshold
 admitting wrong pixels when low and dropping correct ones when very high (the
-port's default, 3.0, sits in the too-low range for noisy 8-bit images — a
-calibration note, not yet changed). **Field dynamics added (Abb. 6.4–6.10):
+port's default, 3.0, looked too low on the synthetic scene; checked on three
+Middlebury pairs with ground truth it is right — raising it only discards
+correct disparities, 82–85% of which are within 1 px on real imagery). **Field dynamics added (Abb. 6.4–6.10):
 they replicate — with the field parameters the dissertation system actually
 used** (`esab2.C`: DoG kernel 3.3 / 0.12 / 14 / 0.03, global inhibition 8,
 resting −0.33, 64 × 64): two maxima merge below distance 5 and re-split only at

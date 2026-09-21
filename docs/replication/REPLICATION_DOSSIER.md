@@ -292,6 +292,97 @@ This is also an independent check of the thesis's summary of its depth feature �
 (on Abb. 5.25): 82–85% of all pixels with ground truth, on real pairs the
 thesis never saw, with the single-scale port.
 
+### 16–21 · Abb. 6.4–6.10 — the dynamics of the neural field (added 2026-09-21)
+
+`build/field_dynamics` drives the 2D field with synthetic activation — no image,
+no features — on a 64 × 64 field, as the thesis's experiments did, carrying the
+field state from step to step where the experiment is about history. The thesis
+does not give the shape of its input peaks; here they are Gaussian blobs (σ = 3
+px), and every distance below depends on that choice to some degree.
+
+### Finding B — the field ran on the wrong parameters
+
+The port took the field's parameters from the *default arguments* of the
+original's `setkernels()` / `setparameters()`: the "Backer" kernel k = 0.06,
+s = 5, global inhibition 1, resting level −0.25. The dissertation system itself
+(`esab2.C`, the single 2D field of thesis §6.3) configured
+
+```
+nf2d->setparameters(0.33, 8, -0.33, 30, ...);         // alpha, global inhibition, resting, beta
+nf2d->set_DoG_kernels(15, 15, 3.3, 0.12, 14, 0.03);   // size, s, k, s2, k2
+```
+
+on a 64 × 64 field: a narrower excitatory centre, a separate broad inhibitory
+surround, and eight times the global inhibition. The experiments were run under
+both.
+
+![two maxima approaching and separating; noise suppression](figures/field_two_maxima_noise.png)
+
+| Experiment | Thesis | Dissertation parameters | Port defaults |
+|---|---|---|---|
+| Two approaching maxima (6.10) | repulsion inside the interaction range, merging below distance 5, no oscillation | two clusters down to distance 6, **one from 5**; pushed apart by 3–5 px on the way in; one clean transition | **never merge**: the clusters stay ≥ 20 px apart even when the two input maxima coincide |
+| Separating them again (6.5 / 6.10) | "would be dissolved in the other direction only when the distance is exceeded" | re-split at **13** — a hysteresis of the transition, as the thesis describes | split at 19 |
+| Noise around a pulse of amplitude 1 (6.6) | only signal-caused activation up to noise 1.2, "beyond that the noise shows" | outside the pulse **0.000 up to 1.2, 0.7% at 1.4**, 5.6% at 2.4 (zero-mean noise) | 1.4% at 0.8, 5.3% at 1.0 |
+| Hysteresis of two peaks α / 1 − α (6.4) | the cluster changes place only after the formerly weaker input is clearly higher | switches at **α = 0.55** rising, holds down to **α = 0.25** falling | switches at 0.35 rising — *before* the inputs are equal |
+| Convergence from rest (6.8) | ~10 cycles (mean \|du\| < 0.02) | **10** | 8 |
+| Does a cluster outlive its input? | — | yes (57 → 37 neurons, stable) | yes (97 → 69) |
+
+The noise result is worth a second look: the thesis's sentence names an
+amplitude, 1.2, and with the dissertation system's parameters the first
+activation outside the pulse appears at the very next step after it. That is as
+close as a replication of a figure without its data can get, and it identifies
+both the parameters and the noise model (zero-mean) the thesis used. With noise
+*added on top* of the signal instead, the same field shows 1% outside at 0.8.
+
+![hysteresis loop and tracking](figures/field_hysteresis_tracking.png)
+
+**Tracking (6.9).** A target of the given amplitude crosses the field through
+Gaussian noise (σ = 0.1); the field gets a fixed number of update cycles per
+frame; tracking counts as correct while an activation cluster covers at least
+half of the target (the thesis's criterion). Smallest number of cycles (≤ 55)
+that keeps the target for the whole crossing, dissertation parameters:
+
+| amplitude \ speed (px/frame) | 1 | 2 | 4 | 6 | 8 | 10 | 12 | 14 | 16 |
+|---|---|---|---|---|---|---|---|---|---|
+| 0.5 | 5 | 10 | 30 | 40 | 40 | **55** | 10 | 10 | 8 |
+| 0.7 | 5 | 8 | 8 | 15 | 20 | 15 | 8 | 5 | 5 |
+| 1.0 | 2 | 3 | 5 | 5 | 8 | 5 | 3 | 3 | 3 |
+
+"Within these limits typically 10 update cycles already suffice" — yes, for
+amplitudes ≥ 0.7; and "the limits show at an object amplitude of 0.5, if the
+speed is high enough" — yes, up to the 55-cycle cutoff at 10 px/frame. The
+thesis's other limit, "an object movement of more than 12 pixels", shows here as
+a *change of regime* rather than a failure: from about 12 px per frame the
+target leaves its cluster's reach between two frames, and what the overlap
+criterion then measures is a fresh detection at every frame (a few cycles) —
+not tracking. With the port's defaults most targets at 8 px/frame and above are
+lost at any cycle count.
+
+**Consequences.** `configs/thesis/thesis.yaml` now carries the dissertation
+system's field parameters. On the thesis's running example the field then
+selects one fixation per object — the picture, the ball, two shelf regions —
+instead of ten fixations of which four sat on the picture's corners. What
+depends on the field was re-run: the thesis profile's target coverage on
+V\*Bench and the model's own scanpath in the human-gaze study (M11); H1 does not
+(its second stage selects among object files, not field clusters).
+`configs/modern.yaml` keeps the parameters it was measured with.
+
+### The parameters of the original system
+
+`esab2.C` also records what the dissertation system set for its features.
+Where it differs from the thesis text, the replication profile follows the
+*text* (that is what a reader can check), and the difference is listed here:
+
+| Parameter | Thesis text | Dissertation system (`esab2.C`) | `configs/thesis/` |
+|---|---|---|---|
+| Field (single 2D) | qualitative | α 0.33, global 8, resting −0.33, DoG 3.3 / 0.12 / 14 / 0.03, 15 × 15, field 64 | the system's (since 2026-09-21) |
+| Symmetry | radii 6–15, width 3, 12 orientations (Tab. 5.1) | offset 6, step 3, 4 bands, 12 orientations, k0 0.75, r 0.5 | the same |
+| Eccentricity: growth share / variance ratio | 0.65 / 2 | 0.78 / 1.5 (4 dilations, 0.05–30 %, 4-connected) | the text's |
+| Colour: cc_add / cc_mult | 8 / 5 | 12 / 6 (min 0.06 %, max 12 %, max contrast 32, no exclusivity) | the text's |
+| Stereo: variance threshold / correlation cutoff | "empirical" / not mentioned | 75 / 0.75, window 12 | 3.0 / none. The system's 75 is on its own Gabor scale and cannot be transferred; on real pairs with ground truth a low threshold is best in the port's units (calibration above) |
+| Feature weights (symmetry, eccentricity, colour, depth) | "identical weights ≡ 1" in the example (Abb. 5.33) | 1.2, 0.35, 1.6, 0.7 ("standard diss version": 1.25, 0.25, 1.5, 0.75) | 1.0 each |
+| Default field architecture | three variants compared | the 3D field (`neuralmode = 3`) | 2D field for stills, 3D for stereo pairs |
+
 ### Text or code? — the two thesis profiles compared (2026-09-21)
 
 Decision (Gerriet, 2026-09-21): the thesis **text's** values stay the documented
