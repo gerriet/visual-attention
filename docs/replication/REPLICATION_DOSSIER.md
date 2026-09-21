@@ -48,7 +48,8 @@ been ported from the original and the affected rows re-run.
 | 12 | Abb. 5.29 | Depth is found in a random-dot stereogram | **replicated** — the square exists only as a disparity and is recovered completely |
 | 13 | Abb. 5.30 | Under independent noise the disparity estimate "changes only in a very small range" | **replicated** — 10.0 → 9.9 px at σ ≈ 90 grey levels, *without* the multi-scale scheme the thesis credits for it |
 | 14 | Abb. 5.31 | Several near-vertical orientations help; beyond one, the choice matters little | **replicated** |
-| 15 | Abb. 5.32 | Only very high variance thresholds drop correct results; very low ones admit wrong pixels on structureless surfaces | **replicated**, with a calibration note: the port's default sits in the "too low" range |
+| 15 | Abb. 5.32 | Only very high variance thresholds drop correct results; very low ones admit wrong pixels on structureless surfaces | **replicated** on the synthetic scene; on real pairs (Middlebury) a low threshold is simply best — the default stays |
+| 15b | on Abb. 5.25 | "In the great majority of regions the disparity is determined correctly" | **replicated** on independent real data: 82–85% of pixels within 1 px on three Middlebury pairs |
 | 16 | Abb. 6.4 | Hysteresis: the activation cluster changes place only after the formerly weaker input is clearly stronger | **replicated** with the dissertation system's field parameters (switch at α = 0.55 rising, held down to 0.25 falling); *diverged* with the port's defaults (finding B) |
 | 17 | Abb. 6.5 | Bifurcation: from a certain distance two maxima give two clusters | **replicated** |
 | 18 | Abb. 6.6 | Noise suppression: for a pulse of amplitude 1, only signal-caused activation up to noise amplitude 1.2 | **replicated** exactly with the dissertation parameters (zero outside the pulse up to 1.2, first activation at 1.4; zero-mean noise); *diverged* with the port's defaults |
@@ -254,106 +255,42 @@ from 40 upwards correct pixels start to go, the faint surface first (88% at 40,
 to 240. Both halves of the thesis's statement hold, and there is a broad window
 between them.
 
-*Calibration note.* The port's default threshold (3.0) lies **below** that
-window for an 8-bit image with σ = 3 noise: it does not reject structureless
-regions. The thesis sets the threshold "empirically", and its scale depends on
-the gain of the original Gabor implementation, which the sources do not settle
-(the same unknown as for symmetry). On the repository's stereo golden and H3's
-planned stimuli — textured everywhere — this has no effect; on real stereo
-imagery with sky, walls or floors it would. A value near 20 is what this
-experiment supports; changing the default is a replication-track decision that
-should wait for a real stereo pair to check it against.
+*Calibration — checked on real stereo pairs (2026-09-21), and the first reading
+corrected.* On this synthetic scene the port's default threshold (3.0) lies below
+the window: it lets a band of pure sensor noise through. That suggested raising
+it (the dissertation system used 75, on its own Gabor scale). Real imagery says
+otherwise. Three Middlebury 2001 pairs with ground truth — Tsukuba, Venus,
+Sawtooth, the ones whose disparities fit the 16-px search range at the feature's
+256-px working size (`eval/replication.py --only stereo-real`) — share of pixels
+with a correct disparity (within 1 px) / a wrong one / none:
 
-### 16–21 · Abb. 6.4–6.10 — the dynamics of the neural field (added 2026-09-21)
+![correct and wrong disparities against the variance threshold, three real pairs](figures/stereo_real_threshold.png)
 
-`build/field_dynamics` drives the 2D field with synthetic activation — no image,
-no features — on a 64 × 64 field, as the thesis's experiments did, carrying the
-field state from step to step where the experiment is about history. The thesis
-does not give the shape of its input peaks; here they are Gaussian blobs (σ = 3
-px), and every distance below depends on that choice to some degree.
-
-### Finding B — the field ran on the wrong parameters
-
-The port took the field's parameters from the *default arguments* of the
-original's `setkernels()` / `setparameters()`: the "Backer" kernel k = 0.06,
-s = 5, global inhibition 1, resting level −0.25. The dissertation system itself
-(`esab2.C`, the single 2D field of thesis §6.3) configured
-
-```
-nf2d->setparameters(0.33, 8, -0.33, 30, ...);         // alpha, global inhibition, resting, beta
-nf2d->set_DoG_kernels(15, 15, 3.3, 0.12, 14, 0.03);   // size, s, k, s2, k2
-```
-
-on a 64 × 64 field: a narrower excitatory centre, a separate broad inhibitory
-surround, and eight times the global inhibition. The experiments were run under
-both.
-
-![two maxima approaching and separating; noise suppression](figures/field_two_maxima_noise.png)
-
-| Experiment | Thesis | Dissertation parameters | Port defaults |
+| Threshold | Tsukuba | Venus | Sawtooth |
 |---|---|---|---|
-| Two approaching maxima (6.10) | repulsion inside the interaction range, merging below distance 5, no oscillation | two clusters down to distance 6, **one from 5**; pushed apart by 3–5 px on the way in; one clean transition | **never merge**: the clusters stay ≥ 20 px apart even when the two input maxima coincide |
-| Separating them again (6.5 / 6.10) | "would be dissolved in the other direction only when the distance is exceeded" | re-split at **13** — a hysteresis of the transition, as the thesis describes | split at 19 |
-| Noise around a pulse of amplitude 1 (6.6) | only signal-caused activation up to noise 1.2, "beyond that the noise shows" | outside the pulse **0.000 up to 1.2, 0.7% at 1.4**, 5.6% at 2.4 (zero-mean noise) | 1.4% at 0.8, 5.3% at 1.0 |
-| Hysteresis of two peaks α / 1 − α (6.4) | the cluster changes place only after the formerly weaker input is clearly higher | switches at **α = 0.55** rising, holds down to **α = 0.25** falling | switches at 0.35 rising — *before* the inputs are equal |
-| Convergence from rest (6.8) | ~10 cycles (mean \|du\| < 0.02) | **10** | 8 |
-| Does a cluster outlive its input? | — | yes (57 → 37 neurons, stable) | yes (97 → 69) |
+| 0 | 0.86 / 0.14 / 0.00 | 0.84 / 0.10 / 0.06 | 0.83 / 0.12 / 0.06 |
+| **3 (default)** | **0.85 / 0.15 / 0.00** | **0.82 / 0.12 / 0.06** | **0.82 / 0.12 / 0.06** |
+| 10 | 0.82 / 0.16 / 0.02 | 0.74 / 0.14 / 0.12 | 0.79 / 0.15 / 0.06 |
+| 20 | 0.77 / 0.18 / 0.05 | 0.67 / 0.13 / 0.20 | 0.74 / 0.17 / 0.10 |
+| 40 | 0.70 / 0.20 / 0.10 | 0.59 / 0.14 / 0.27 | 0.64 / 0.18 / 0.19 |
+| 80 | 0.55 / 0.21 / 0.25 | 0.48 / 0.14 / 0.39 | 0.50 / 0.20 / 0.31 |
 
-The noise result is worth a second look: the thesis's sentence names an
-amplitude, 1.2, and with the dissertation system's parameters the first
-activation outside the pulse appears at the very next step after it. That is as
-close as a replication of a figure without its data can get, and it identifies
-both the parameters and the noise model (zero-mean) the thesis used. With noise
-*added on top* of the signal instead, the same field shows 1% outside at 0.8.
+Raising the threshold never buys fewer wrong pixels — their share stays at
+12–20% — it only discards correct ones. The reason is visible when the pixels
+are split by local texture: on the 40–50% of each image with little grey-value
+variation, **81–86% of the disparities are correct at threshold 0**; the spatial
+integration of eq. 5.14 carries them from their textured surroundings. The
+errors sit at occlusions and depth edges, which no variance threshold addresses.
+A band of pure noise, as in the synthetic scene, is the one case the threshold
+exists for, and real scenes here do not contain it. **The default stays at 3.0**;
+the thesis's statement about Abb. 5.32 holds as the synthetic experiment shows
+it, and the practical advice is the opposite of what that experiment alone
+suggested: keep the threshold low.
 
-![hysteresis loop and tracking](figures/field_hysteresis_tracking.png)
-
-**Tracking (6.9).** A target of the given amplitude crosses the field through
-Gaussian noise (σ = 0.1); the field gets a fixed number of update cycles per
-frame; tracking counts as correct while an activation cluster covers at least
-half of the target (the thesis's criterion). Smallest number of cycles (≤ 55)
-that keeps the target for the whole crossing, dissertation parameters:
-
-| amplitude \ speed (px/frame) | 1 | 2 | 4 | 6 | 8 | 10 | 12 | 14 | 16 |
-|---|---|---|---|---|---|---|---|---|---|
-| 0.5 | 5 | 10 | 30 | 40 | 40 | **55** | 10 | 10 | 8 |
-| 0.7 | 5 | 8 | 8 | 15 | 20 | 15 | 8 | 5 | 5 |
-| 1.0 | 2 | 3 | 5 | 5 | 8 | 5 | 3 | 3 | 3 |
-
-"Within these limits typically 10 update cycles already suffice" — yes, for
-amplitudes ≥ 0.7; and "the limits show at an object amplitude of 0.5, if the
-speed is high enough" — yes, up to the 55-cycle cutoff at 10 px/frame. The
-thesis's other limit, "an object movement of more than 12 pixels", shows here as
-a *change of regime* rather than a failure: from about 12 px per frame the
-target leaves its cluster's reach between two frames, and what the overlap
-criterion then measures is a fresh detection at every frame (a few cycles) —
-not tracking. With the port's defaults most targets at 8 px/frame and above are
-lost at any cycle count.
-
-**Consequences.** `configs/thesis/thesis.yaml` now carries the dissertation
-system's field parameters. On the thesis's running example the field then
-selects one fixation per object — the picture, the ball, two shelf regions —
-instead of ten fixations of which four sat on the picture's corners. What
-depends on the field was re-run: the thesis profile's target coverage on
-V\*Bench and the model's own scanpath in the human-gaze study (M11); H1 does not
-(its second stage selects among object files, not field clusters).
-`configs/modern.yaml` keeps the parameters it was measured with.
-
-### The parameters of the original system
-
-`esab2.C` also records what the dissertation system set for its features.
-Where it differs from the thesis text, the replication profile follows the
-*text* (that is what a reader can check), and the difference is listed here:
-
-| Parameter | Thesis text | Dissertation system (`esab2.C`) | `configs/thesis/` |
-|---|---|---|---|
-| Field (single 2D) | qualitative | α 0.33, global 8, resting −0.33, DoG 3.3 / 0.12 / 14 / 0.03, 15 × 15, field 64 | the system's (since 2026-09-21) |
-| Symmetry | radii 6–15, width 3, 12 orientations (Tab. 5.1) | offset 6, step 3, 4 bands, 12 orientations, k0 0.75, r 0.5 | the same |
-| Eccentricity: growth share / variance ratio | 0.65 / 2 | 0.78 / 1.5 (4 dilations, 0.05–30 %, 4-connected) | the text's |
-| Colour: cc_add / cc_mult | 8 / 5 | 12 / 6 (min 0.06 %, max 12 %, max contrast 32, no exclusivity) | the text's |
-| Stereo: variance threshold / correlation cutoff | "empirical" / not mentioned | 75 / 0.75, window 12 | 3.0 / none — see the calibration note above; the system's 75 is on its own Gabor scale, but it confirms that the working value is *high* |
-| Feature weights (symmetry, eccentricity, colour, depth) | "identical weights ≡ 1" in the example (Abb. 5.33) | 1.2, 0.35, 1.6, 0.7 ("standard diss version": 1.25, 0.25, 1.5, 0.75) | 1.0 each |
-| Default field architecture | three variants compared | the 3D field (`neuralmode = 3`) | 2D field for stills, 3D for stereo pairs |
+This is also an independent check of the thesis's summary of its depth feature —
+"in the great majority of regions the disparity has been determined correctly"
+(on Abb. 5.25): 82–85% of all pixels with ground truth, on real pairs the
+thesis never saw, with the single-scale port.
 
 ### Text or code? — the two thesis profiles compared (2026-09-21)
 
@@ -447,6 +384,6 @@ Replication-track definition of done (ADR-0005): ~~fix symmetry~~ → ~~re-run H
 and M11 with it~~ → ~~the stereo experiments~~ → ~~the field dynamics~~ (Abb.
 6.4–6.10 done; 6.11–6.13 documented as not implemented / not attempted) →
 ~~decide on the open parameter questions~~ (decided 2026-09-21: the text's values
-are the profile, the system's are a runnable sibling; compared above) → tag
-`replication-v1`. Still open and small: the stereo variance threshold (the port's
-3.0 is too low; a real stereo pair is needed to set it).
+are the profile, the system's are a runnable sibling; compared above) →
+~~the stereo variance threshold~~ (checked on real pairs 2026-09-21: the default
+is right) → tag `replication-v1`.
