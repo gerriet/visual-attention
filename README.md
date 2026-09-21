@@ -31,7 +31,8 @@ How faithful, component by component: stereo, the neural fields and — since
 exclusivity weighting are ports of the original sources and the thesis's
 equations; onset and the symbolic second stage are reconstructions from the
 thesis text, because their sources did not survive; symmetry has the thesis's
-core with additions. `configs/thesis/` holds the dissertation profiles (the
+summation core but a different combination step, and does not yet replicate
+the thesis's findings ([dossier](docs/replication/REPLICATION_DOSSIER.md)). `configs/thesis/` holds the dissertation profiles (the
 replication track — finite, to be frozen when done); everything else is the
 modern track, free to move away from the thesis
 ([ADR-0005](docs/adr/0005-two-tracks-replication-and-modern.md)).
@@ -227,6 +228,7 @@ to check that everything still works.
 - [thesis_vs_modern.md](docs/thesis_vs_modern.md) — thesis model vs. modern saliency models
 - [ALTERNATIVE_FEATURES.md](docs/ALTERNATIVE_FEATURES.md) · [SELECTION_BACKENDS.md](docs/SELECTION_BACKENDS.md) — pluggable operators / trackers
 - [DYNAMIC_IOR_STUDY.md](docs/DYNAMIC_IOR_STUDY.md) · [GATED_RECOGNITION.md](docs/GATED_RECOGNITION.md) · [PRIORITY_MAP.md](docs/PRIORITY_MAP.md) · [VLM_FRONT_END.md](docs/VLM_FRONT_END.md) · [VLM_VIDEO.md](docs/VLM_VIDEO.md) — the H1, H2, H5, H6 and H7 studies
+- [REPLICATION_DOSSIER.md](docs/replication/REPLICATION_DOSSIER.md) — the dissertation's own findings, re-run: what replicates (eccentricity, colour contrast, exclusivity) and what does not (symmetry)
 - [PAPER_READINESS.md](docs/PAPER_READINESS.md) — what could be published, and what is missing
 - [CRITICAL_REVIEW_2026-09.md](docs/CRITICAL_REVIEW_2026-09.md) · [HYPOTHESIS_CLOSURE_PLAN.md](docs/HYPOTHESIS_CLOSURE_PLAN.md) · [FEATURE_ASSESSMENT.md](docs/FEATURE_ASSESSMENT.md) — the 2026-09 review: what is solid, what is not, and the plan to close the open hypotheses
 - [PERFORMANCE.md](docs/PERFORMANCE.md) — timing and optimization notes

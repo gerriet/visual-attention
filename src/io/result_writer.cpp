@@ -171,5 +171,24 @@ void ResultWriter::write(const pipeline::AttentionPipeline& pipeline, const std:
   }
 }
 
+void ResultWriter::write_features(const pipeline::AttentionPipeline& pipeline, const std::string& directory)
+{
+  if (pipeline.get_features().empty())
+  {
+    throw std::runtime_error("ResultWriter: no feature maps (pipeline not processed?)");
+  }
+  fs::create_directories(directory);
+  for (const auto& feature : pipeline.get_features())
+  {
+    cv::Mat map16;
+    feature.data.convertTo(map16, CV_16U, 65535.0); // saturating: [0, 1] -> [0, 65535]
+    const fs::path path = fs::path(directory) / ("feature_" + feature.name + ".png");
+    if (!cv::imwrite(path.string(), map16))
+    {
+      throw std::runtime_error("ResultWriter: failed to write feature map: " + path.string());
+    }
+  }
+}
+
 } // namespace io
 } // namespace attention

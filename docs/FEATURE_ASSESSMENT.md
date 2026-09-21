@@ -54,8 +54,13 @@ did not depend on the defective feature.
   it is what `default.yaml` and the `attend*.yaml` study configs still run.
 - `configs/attend*.yaml` (H1, H7) still use `color`, not `color-munsell` — see
   ADR-0005, open point 1.
-- Symmetry: additions beyond the thesis (thresholds, consistency weight,
-  enlarged radii), single-phase Gabor bank, hot-path `std::cerr`, blind borders.
+- **Symmetry — now measured, and the most important open item**
+  (`docs/replication/REPLICATION_DOSSIER.md`, finding A): for a lone disk its
+  maximum lies ~80 px *beside* the disk. The summation core is a faithful port;
+  the combination step is not — per-band normalization and relative thresholds
+  over three scales replaced the original's absolute scale and clip offset (60
+  of 255), which is what removed one-sided responses. Also: single-phase Gabor
+  bank, hot-path `std::cerr`, blind borders.
 - Fusion still min-max-stretches maps that are not absolute (the Itti-style
   ones); no N(·).
 - `--batch` ignores `--config` and always runs the default feature set.
