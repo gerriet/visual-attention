@@ -162,10 +162,11 @@ No stereo-video work is planned; mark H3 and M15 *deferred* in the roadmap.
 
 Replication track — finite; close it and freeze it:
 
-1. ~~H1 confirmatory run~~ — **done 2026-09-20.** Verdict: supported for
-   novel-object latency in every regime (conditional on held identity at high
-   speed), graceful degradation with speed supported, coverage no difference,
-   sustained coverage not an object-based win (`docs/DYNAMIC_IOR_STUDY.md`).
+1. ~~H1 confirmatory run~~ — **done 2026-09-21. Verdict: supported** —
+   latency and sustained coverage, every regime, against the motion-compensated
+   baseline too; coverage no difference (`docs/DYNAMIC_IOR_STUDY.md`, "The
+   re-run"). The first run (2026-09-20) was taken with a defective symmetry
+   feature and is superseded.
    Left for the dossier: the tracker dose–response figure (advantage vs
    ID-switch rate, with `kalman-mot`), the Abb. 6.14 scenario.
 2. **M11** as soon as MIT1003 is on disk (H4).

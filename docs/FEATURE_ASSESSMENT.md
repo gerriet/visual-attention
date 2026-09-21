@@ -375,6 +375,15 @@ not comparable, so the merge is a plain round-robin). Better ranking — or a
 question-conditioned source to do the ranking — is where the next gain is;
 finer grids are not worth running before that.
 
+### After the symmetry port (2026-09-21)
+
+Thesis profile, same 191 items: top-3 0.13 → 0.16, top-10 0.39 → **0.42**
+(+0.21 over chance [+0.14, +0.28]); paired against the pre-port profile +0.04
+[−0.03, +0.10] — the right direction, within noise. Legibility-oracle accuracy
+of the `fovea` arm 0.12 → 0.14 (uniform 0.18). The port matters for fidelity and
+for the dynamic studies (H1's off-object fixations went from a third to zero);
+on V\*Bench's small coloured targets colour contrast still carries the effect.
+
 ### What the first (pre-port) measurement does and does not show
 
 What this does and does not show. It does not show that bottom-up saliency

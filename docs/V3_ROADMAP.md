@@ -269,7 +269,14 @@ tables so far were averaged by hand), the speed × count × occlusion sweep, the
 Abb. 6.14 scenario, DAVIS scoring of H1, and a strengthened spatial baseline
 (motion-compensated spatial IOR). Plan: `docs/HYPOTHESIS_CLOSURE_PLAN.md`.
 
-**Confirmatory run (2026-09-20): H1 supported for the quantity it names.**
+**Re-run with the ported symmetry (2026-09-21): H1 supported, fully.** After
+the replication dossier found and fixed the symmetry feature, the same study on
+fresh seeds 2000–2029: off-object fixations 0.33 → 0.00; object-based IOR beats
+space-based IOR on latency (−0.5 / −4.4 / −2.6 frames) *and* staleness in every
+regime, with the thesis's own correspondence and against the motion-compensated
+tag; three of the four (pessimistic) pre-registered predictions refuted.
+
+**First confirmatory run (2026-09-20), superseded: supported for latency only.**
 Thesis profile, 30 fresh scenes per regime, predictions written down first,
 one command (`eval/dynamic_ior.py --regime all --seeds 30 --seed0 1000`).
 Object-based IOR reaches new objects sooner than space-based IOR in every
