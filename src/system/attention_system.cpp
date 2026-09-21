@@ -128,7 +128,7 @@ AttentionSystem::AttentionSystem(const Config& config)
     shared.min_distance = p.peak_min_distance;
     shared.threshold = p.peak_threshold;
     shared.max_count = p.peak_max_count;
-    const bool own_params = p.effective_selection() == "neural-field" && !p.selection_params_yaml.empty();
+    const bool own_params = !p.selection_params_yaml.empty();
     field_ = selection::create_selection_strategy("neural-field", shared,
                                                   own_params ? YAML::Load(p.selection_params_yaml) : YAML::Node());
   }

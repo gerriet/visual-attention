@@ -101,9 +101,10 @@ class AttentionSystem
     //     field relaxed on the saliency map, carried from frame to frame; its
     //     activity clusters are what object files are created for, so noise
     //     suppression, hysteresis and tracking happen before correspondence.
-    //     Takes the field's parameters from pipeline.selection_params when the
-    //     pipeline's selection is "neural-field", its defaults otherwise. The
-    //     segment_* and proto_* keys below do not apply.
+    //     Takes the field's parameters from pipeline.selection_params (the
+    //     pipeline's own selection may stay "nms", so that no second field
+    //     runs), its defaults otherwise. The segment_* and proto_* keys below
+    //     do not apply.
     enum class ClusterSource
     {
       Saliency,

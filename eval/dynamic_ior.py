@@ -38,9 +38,14 @@ Arms of the study (what inhibition rides on / how identity is held):
   spatial-ior       decaying location tags
   spatial-ior-mc    location tags that drift with the velocity of the object
                     they were left on — the strengthened space-based baseline
-  object-ior        object files, the thesis's correspondence (nearest centroid)
+  object-ior        object files on saliency segments, position-only correspondence
+                    (weaker than thesis 7.2.3: an ablation, not "the thesis's")
   object-ior+aids   + motion-predicted and appearance correspondence
   object-ior+id     + persistent identity (docs/DYNAMIC_IOR_STUDY.md)
+  object-ior+7.2.3  + the correspondence of thesis 7.2.3 as written
+  chain:<behavior>  the thesis's chain: object files on the neural field's activity
+                    clusters, correspondence of 7.2.3 (configs/thesis/attend_field.yaml);
+                    greedy, spatial-ior, spatial-ior-mc, object-ior
 
 Development seeds are 0-9; confirmatory runs use fresh seeds (1000+) with the
 configuration frozen beforehand (docs/HYPOTHESIS_CLOSURE_PLAN.md).
@@ -69,18 +74,37 @@ REGIMES = {
                             "--occlude-len", "10"], "ior_radius": 18},
 }
 
-# name -> (behavior, tracking flags, persistent identity)
+# name -> (behavior, tracking flags, second-stage variant)
+#   None      the profile as given: object files on saliency segments, position-only
+#             correspondence (an ablation of thesis 7.2.3, not the thesis's rule)
+#   "id"      + persistent identity
+#   "thesis"  + the correspondence of thesis 7.2.3 (position, then feature similarity;
+#             inactive files revived by their features) — still on saliency segments
+#   "chain"   the thesis's chain: object files on the neural field's activity clusters,
+#             correspondence of 7.2.3 (configs/thesis/attend_field.yaml)
 STUDY_ARMS = {
-    "greedy": ("greedy", (), False),
-    "spatial-ior": ("spatial-ior", (), False),
-    "spatial-ior-mc": ("spatial-ior-mc", (), False),
-    "object-ior": ("object-ior", (), False),
-    "object-ior+aids": ("object-ior", ("--motion-prediction", "--appearance-matching"), False),
-    "object-ior+id": ("object-ior", ("--motion-prediction", "--appearance-matching"), True),
+    "greedy": ("greedy", (), None),
+    "spatial-ior": ("spatial-ior", (), None),
+    "spatial-ior-mc": ("spatial-ior-mc", (), None),
+    "object-ior": ("object-ior", (), None),
+    "object-ior+aids": ("object-ior", ("--motion-prediction", "--appearance-matching"), None),
+    "object-ior+id": ("object-ior", ("--motion-prediction", "--appearance-matching"), "id"),
+    "object-ior+7.2.3": ("object-ior", (), "thesis"),
+    "chain:greedy": ("greedy", (), "chain"),
+    "chain:spatial-ior": ("spatial-ior", (), "chain"),
+    "chain:spatial-ior-mc": ("spatial-ior-mc", (), "chain"),
+    "chain:object-ior": ("object-ior", (), "chain"),
 }
+CHAIN_CONFIG = os.path.join(REPO, "configs", "thesis", "attend_field.yaml")
 REFERENCE_ARM = "spatial-ior"
 METRICS = ("coverage", "mean_latency", "staleness", "revisit_waste", "perseveration", "off_object",
            "labels_per_object")
+
+THESIS_CORRESPONDENCE_YAML = """
+attention_system:
+  object_files:
+    correspondence: thesis
+"""
 
 PERSISTENT_IDENTITY_YAML = """
 attention_system:
@@ -218,14 +242,15 @@ def study(binary, scene_dir, config, out_dir, match_radius, ior_radius=None, tra
     return gt, rows
 
 
-def identity_config(config):
-    """A temp copy of `config` with persistent identity switched on."""
+def identity_config(config, overlay=None):
+    """A temp copy of `config` with a second-stage block appended (default:
+    persistent identity switched on)."""
     with open(config) as fh:
         text = fh.read()
     if "attention_system:" in text:
         sys.exit("%s already has an attention_system: block; the +id arm adds its own" % config)
     handle = tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False)
-    handle.write(text + PERSISTENT_IDENTITY_YAML)
+    handle.write(text + (overlay or PERSISTENT_IDENTITY_YAML))
     handle.close()
     return handle.name
 
@@ -234,6 +259,8 @@ def run_regime(binary, config, regime, seeds, seed0, out_dir, match_radius, arms
     """{arm: [per-scene metric dict]} over `seeds` generated scenes."""
     preset = REGIMES[regime]
     id_config = identity_config(config)
+    thesis_config = identity_config(config, THESIS_CORRESPONDENCE_YAML)
+    variants = {None: config, "id": id_config, "thesis": thesis_config, "chain": CHAIN_CONFIG}
     rows = {arm: [] for arm in arms}
     try:
         for seed in range(seed0, seed0 + seeds):
@@ -242,12 +269,13 @@ def run_regime(binary, config, regime, seeds, seed0, out_dir, match_radius, arms
                             "--seed", str(seed)] + preset["scene"], check=True, stdout=subprocess.DEVNULL)
             gt = load_json(os.path.join(scene, "gt.json"))
             for arm in arms:
-                behavior, tracking, persistent = STUDY_ARMS[arm]
-                scanpath = run_arm(binary, scene, id_config if persistent else config, behavior,
+                behavior, tracking, variant = STUDY_ARMS[arm]
+                scanpath = run_arm(binary, scene, variants[variant], behavior,
                                    os.path.join(scene, "arms", arm), preset["ior_radius"], tracking, resume)
                 rows[arm].append(score(gt, scanpath, match_radius))
     finally:
         os.unlink(id_config)
+        os.unlink(thesis_config)
     return rows
 
 
