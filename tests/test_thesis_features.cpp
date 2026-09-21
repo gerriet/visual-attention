@@ -10,6 +10,7 @@
 #include "attention/features/feature_registry.h"
 #include "attention/features/munsell_color_feature.h"
 #include "attention/features/stereo_feature.h"
+#include "attention/features/symmetry_feature.h"
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <filesystem>
@@ -22,6 +23,7 @@ using Catch::Approx;
 using features::EccentricityFeature;
 using features::Exclusivity;
 using features::MunsellColorFeature;
+using features::SymmetryFeature;
 
 namespace
 {
@@ -181,6 +183,77 @@ TEST_CASE("exclusivity makes the odd orientation pop out (Abb. 5.34)", "[eccentr
   // Five share the vertical class (/1.1^5), one holds the horizontal (/1.1)
   const float ratio = saliency_at(weighted, horizontal) / saliency_at(weighted, vertical);
   CHECK(ratio == Approx(std::pow(1.1f, 4.0f)).epsilon(0.1));
+}
+
+TEST_CASE("symmetry peaks at the centre of a symmetric object, not beside it", "[symmetry]")
+{
+  // Regression (replication dossier, finding A): with per-band normalization
+  // and relative thresholds the maximum for a lone disk lay ~80 px beside it —
+  // one-sided edge sums survived at full strength, as rings around the object.
+  for (int radius : {10, 18, 28})
+  {
+    cv::Mat image(192, 256, CV_8UC1, cv::Scalar(128));
+    const cv::Point centre(140, 90);
+    cv::circle(image, centre, radius, cv::Scalar(235), cv::FILLED);
+    const cv::Mat symmetry = SymmetryFeature().evaluate(image);
+
+    double max_value = 0.0;
+    cv::Point max_at;
+    cv::minMaxLoc(symmetry, nullptr, &max_value, nullptr, &max_at);
+    INFO("radius " << radius);
+    CHECK(cv::norm(max_at - centre) <= 6.0); // within 1.5 px of the coarsest scale (1/4), where large disks peak
+    CHECK(max_value > 0.3);
+    // Nothing of note outside the disk's own neighbourhood
+    cv::Mat outside = symmetry.clone();
+    cv::circle(outside, centre, radius + 12, cv::Scalar(0.0f), cv::FILLED);
+    double outside_max = 0.0;
+    cv::minMaxLoc(outside, nullptr, &outside_max);
+    CHECK(outside_max < 0.25 * max_value);
+  }
+}
+
+TEST_CASE("symmetry: one edge alone is not a symmetry; a blank image gives nothing", "[symmetry]")
+{
+  cv::Mat half(192, 256, CV_8UC1, cv::Scalar(128));
+  half(cv::Rect(0, 0, 128, 192)).setTo(20); // one straight full-contrast edge
+  double edge_max = 0.0;
+  cv::minMaxLoc(SymmetryFeature().evaluate(half), nullptr, &edge_max);
+  CHECK(edge_max < 0.15); // the additive sum sees it; the clip offset removes it
+
+  cv::Mat blank(192, 256, CV_8UC1, cv::Scalar(128));
+  double blank_max = 0.0;
+  cv::minMaxLoc(SymmetryFeature().evaluate(blank), nullptr, &blank_max);
+  CHECK(blank_max == 0.0); // absolute scale: nothing is stretched to 1
+}
+
+TEST_CASE("symmetry falls as an object is stretched (Abb. 5.13)", "[symmetry]")
+{
+  auto response = [](double aspect)
+  {
+    cv::Mat image(192, 256, CV_8UC1, cv::Scalar(128));
+    const double r = 22.0;
+    cv::ellipse(image, cv::Point(128, 96), cv::Size(cvRound(r * std::sqrt(aspect)), cvRound(r / std::sqrt(aspect))), 0,
+                0, 360, cv::Scalar(235), cv::FILLED);
+    double max_value = 0.0;
+    cv::minMaxLoc(SymmetryFeature().evaluate(image), nullptr, &max_value);
+    return max_value;
+  };
+  const double round = response(1.0), stretched = response(3.0), line_like = response(6.0);
+  CHECK(round > stretched);
+  CHECK(stretched > line_like);
+}
+
+TEST_CASE("symmetry through a Frame: working size, full-size absolute map", "[symmetry]")
+{
+  cv::Mat image(600, 800, CV_8UC1, cv::Scalar(128)); // larger than the 256-px working image
+  cv::circle(image, cv::Point(500, 300), 60, cv::Scalar(30), cv::FILLED);
+  core::Frame frame(image);
+  frame.compute_pyramids(4);
+  const core::FeatureMap map = SymmetryFeature().extract(frame);
+  REQUIRE(map.data.size() == image.size());
+  cv::Point max_at;
+  cv::minMaxLoc(map.data, nullptr, nullptr, nullptr, &max_at);
+  CHECK(cv::norm(max_at - cv::Point(500, 300)) < 12.0);
 }
 
 TEST_CASE("MTM transform: greys are achromatic, opponent colours lie far apart", "[color-munsell]")

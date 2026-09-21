@@ -34,7 +34,7 @@ features:
     weight: 1.0
     params:
       scales:               # a single coarse scale keeps symmetry cheap
-        - {level: 2, min_radius: 6, max_radius: 20, radius_step: 2, width: 3, threshold: 0.3}
+        - {level: 2, min_radius: 6, max_radius: 20, radius_step: 2, width: 3}
   orientation:
     enabled: false
   eccentricity:

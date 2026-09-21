@@ -368,6 +368,16 @@ speed — while space-based IOR collapses."*
   about a third of the object-based arms' fixations go to object files that are
   not objects, against 0–2% for a location tag.
 
+**Caveat added 2026-09-20 (replication dossier, finding A).** The symmetry
+feature — a third of this profile — responds in rings *around* objects rather
+than on them (`docs/replication/REPLICATION_DOSSIER.md`). On scenes of disks
+that adds salient clusters in empty space, and is a plausible contributor to the
+off-object third of the object-based arms' fixations (a location tag rarely
+selects them because the true objects, freed again by their own motion, outrank
+them). The latency result does not depend on it; the *staleness* comparison and
+the "what deserves an object file" reading should be re-checked after symmetry
+is ported from the original — H1 is cheap to re-run (one command, ~30 min).
+
 So the earlier reading of this document — "space-based IOR is at least as good
 as object-based, usually better" — **does not survive** the confirmatory run. It
 rested on a revisit metric that a handful of fixations decided, a few seeds,

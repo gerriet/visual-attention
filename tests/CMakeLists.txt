@@ -91,6 +91,7 @@ if(Python3_Interpreter_FOUND)
             eval/priority_search.py eval/coco_search.py eval/plot_priority_search.py
             eval/vlm_frontend.py eval/plot_vlm_frontend.py eval/vlm_video.py eval/vlm_video_davis.py
             eval/coverage_table.py eval/dynamic_ior.py)
+    # (eval/replication.py imports numpy: its --help runs under the eval venv, below)
         get_filename_component(script_name ${script} NAME_WE)
         add_test(NAME help_${script_name}
             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/${script} --help)
@@ -201,6 +202,19 @@ if(Python3_Interpreter_FOUND)
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
         set_tests_properties(scanpath_vs_human_smoke PROPERTIES
             FAIL_REGULAR_EXPRESSION "check failed;Traceback;Error")
+        # Replication dossier (M10), smoke: two experiments end to end through
+        # --emit-features (absolute feature maps); the values themselves are
+        # asserted by tests/test_thesis_features.cpp.
+        add_test(NAME help_replication
+            COMMAND ${EVAL_PYTHON} ${CMAKE_SOURCE_DIR}/eval/replication.py --help)
+        set_tests_properties(help_replication PROPERTIES PASS_REGULAR_EXPRESSION "usage")
+        add_test(NAME replication_smoke
+            COMMAND ${EVAL_PYTHON} ${CMAKE_SOURCE_DIR}/eval/replication.py
+                    --binary $<TARGET_FILE:attention> --only shapes,exclusivity --no-plots
+                    --out ${CMAKE_BINARY_DIR}/replication_smoke
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+        set_tests_properties(replication_smoke PROPERTIES
+            PASS_REGULAR_EXPRESSION "results:" FAIL_REGULAR_EXPRESSION "Traceback")
         add_test(NAME eval_report_smoke
             COMMAND ${EVAL_PYTHON} -m attention_eval.report
                     ${CMAKE_SOURCE_DIR}/tests/golden/inputc/result.json

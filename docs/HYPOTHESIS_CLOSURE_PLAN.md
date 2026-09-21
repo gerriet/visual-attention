@@ -169,8 +169,13 @@ Replication track — finite; close it and freeze it:
    Left for the dossier: the tracker dose–response figure (advantage vs
    ID-switch rate, with `kalman-mot`), the Abb. 6.14 scenario.
 2. **M11** as soon as MIT1003 is on disk (H4).
-3. **M10 replication dossier** — the colour and eccentricity variation curves
-   (Abb. 5.13, 5.20) are now replicable; writing-heavy, runs alongside.
+3. ~~M10 replication dossier~~ — **first version done 2026-09-20**
+   (`docs/replication/REPLICATION_DOSSIER.md`): eccentricity, colour contrast
+   and exclusivity replicate; **symmetry diverges** (responds around objects,
+   not on them).
+3a. **Port the symmetry combination step from the original** (absolute scale,
+   clip offset, the thesis's radii) — then re-run the dossier, H1 (staleness /
+   off-object share) and M11. Then the stereo experiments.
 4. Tag `replication-v1`, freeze the thesis goldens.
 
 Modern track — optimise first, then confirm once:
