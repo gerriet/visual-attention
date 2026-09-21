@@ -94,7 +94,8 @@ if(Python3_Interpreter_FOUND)
     foreach(script tools/fetch_models.py eval/gated_recognition.py eval/plot_gated_recognition.py
             eval/priority_search.py eval/coco_search.py eval/plot_priority_search.py
             eval/vlm_frontend.py eval/plot_vlm_frontend.py eval/vlm_video.py eval/vlm_video_davis.py
-            eval/coverage_table.py eval/dynamic_ior.py)
+            eval/coverage_table.py eval/dynamic_ior.py eval/check_scanpath.py
+            eval/compare_scanpath_json.py)
     # (eval/replication.py imports numpy: its --help runs under the eval venv, below)
         get_filename_component(script_name ${script} NAME_WE)
         add_test(NAME help_${script_name}
@@ -261,7 +262,12 @@ if(Python3_Interpreter_FOUND)
     set_tests_properties(scanpath_stereo PROPERTIES FIXTURES_REQUIRED stereo_json)
 
     # AttentionSystem (M6): second stage + Exploration behavior over the
-    # synthetic motion sequence, compared by focus position per frame.
+    # synthetic motion sequence, under the compiled-in default profile. Checked
+    # by behaviour, not against a golden: frame 0 is pure noise, the first focus
+    # falls on whichever noise fragment rounding favours (macOS and the Linux CI
+    # disagree), and the dwell carries that choice through all three frames. What
+    # the sequence determines: a focus on every frame, and the moving patch
+    # (at 150,100 in the last frame) has become an object file.
     add_test(NAME emit_scanpath_attend
         COMMAND attention --attend ${CMAKE_SOURCE_DIR}/data/test_images/motion_seq
                 --output ${CMAKE_BINARY_DIR}/attend
@@ -270,10 +276,9 @@ if(Python3_Interpreter_FOUND)
     set_tests_properties(emit_scanpath_attend PROPERTIES FIXTURES_SETUP attend_scanpath)
 
     add_test(NAME scanpath_attend
-        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/eval/compare_scanpath_json.py
-                ${CMAKE_SOURCE_DIR}/tests/golden/attend/scanpath.json
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/eval/check_scanpath.py
                 ${CMAKE_BINARY_DIR}/attend/scanpath.json
-                --pos-tol 20)
+                --frames 3 --object-near 150,100 --tol 25)
     set_tests_properties(scanpath_attend PROPERTIES FIXTURES_REQUIRED attend_scanpath)
 
     # The same over the thesis-track second-stage profile (the one H1 runs on:

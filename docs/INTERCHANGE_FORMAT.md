@@ -94,6 +94,8 @@ above, written by `--attend --emit-scanpath`:
   are creation-order dependent and not stable across algorithm changes.
 - **`objects`** is the final active world model (object files at stream end).
 - Compared by `eval/compare_scanpath_json.py` (focus position per frame).
+  Where a sequence leaves the focus to chance (a first frame of pure noise),
+  `eval/check_scanpath.py` checks stated expectations instead of a golden.
 
 ### Recognition extensions (M13, additive — only present when processors ran)
 
