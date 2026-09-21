@@ -12,139 +12,103 @@ namespace features
 {
 
 /**
- * SymmetryFeature detects radial symmetry using Gabor filter responses.
+ * Symmetry — the dissertation's boundary-based grey-value feature (thesis
+ * §5.2.2, after Bollmann; ported from the original `feature/symmetry.C`,
+ * single-scale `SymmetryFeature` + `SymmetryMultiFeature`).
  *
- * Based on the thesis approach: At each pyramid level, for each pixel, we test
- * multiple radii. For each radius and orientation, we sum Gabor filter values
- * within a specified width orthogonal to the radius direction. From all radii,
- * we select the maximum value and assign it to the pixel at this resolution.
+ *   1. Edge energy: magnitudes of a quadrature Gabor pair in 12 orientations,
+ *      on an *absolute* scale — a full-contrast step edge gives 1 — clipped to
+ *      [0, 1], with the image border suppressed.
+ *   2. For every point, radius band and orientation alpha: sum the energy of the
+ *      edges that lie tangentially to a circle of that radius, in two boxes on
+ *      opposite sides of the point (eq. 5.2/5.3, `symmetry_intern`); the bands
+ *      adjoin (width = radius step). Normalized by the box area and half the
+ *      orientation count.
+ *   3. Per point, the maximum over the radius bands of
+ *        band + index * bonus - clip_offset,
+ *      clipped to [0, 1]. The offset is what makes this a *symmetry* measure:
+ *      the sum is additive, so an edge on one side alone already contributes —
+ *      about a quarter of what a closed contour does. A fixed offset on an
+ *      absolute scale removes those one-sided responses; a relative threshold
+ *      cannot (see below).
+ *   4. Multi-scale (thesis Tab. 5.1): the same on the working image halved once
+ *      and twice; the results are combined by maximum, scale s weighted by
+ *      0.5 + 0.5 s.
  *
- * The algorithm:
- * 1. Use precomputed Gabor pyramids from Frame (multiple orientations and scales)
- * 2. For each pyramid level (e.g., 64x64, 128x128, 256x256):
- *    - Test multiple radii (e.g., 6, 9, 12, 15 pixels)
- *    - For each orientation and radius:
- *      * Sum Gabor responses within 'width' pixels orthogonal to the radius
- *      * Add responses from opposite sides (bilateral symmetry)
- *    - Select maximum across all radii for each pixel
- * 3. Combine results from multiple scales
+ * The output is an absolute saliency in [0, 1], not min-max stretched.
  *
- * This matches the original dissertation's radius-sampling approach.
+ * History: until 2026-09 steps 3–4 normalized every radius band to its own
+ * maximum and used relative thresholds plus a "two radii" consistency weight,
+ * over three pyramid levels with radii up to 30 px at 1/8 resolution. With no
+ * absolute reference a one-sided response was as strong as a true centre: the
+ * feature answered in rings *around* objects and its maximum for a lone disk lay
+ * beside the disk (docs/replication/REPLICATION_DOSSIER.md, finding A).
+ *
+ * What the surviving source does not settle: the gain of the original Gabor
+ * implementation ("factor = 4 + size/12", commented "Warum??????" there), which
+ * fixes what "60 of 255" means. Here the edge energy is calibrated so that a
+ * full-contrast step edge is 1 and `gabor_gain` scales it; with gain 1 a closed
+ * contour of contrast c sums to about 4c, a one-sided edge to about c.
  */
 class SymmetryFeature : public FeatureExtractor
 {
  public:
-  /**
-   * Configuration for a single scale/pyramid level.
-   */
+  /// One scale of the multi-scale schedule.
   struct ScaleConfig
   {
-    int pyramid_level;        // Which pyramid level to use (negative levels
-                              // are skipped; for size-adaptive scales use
-                              // Config::auto_scale_schedule instead)
-    int min_radius;           // Minimum radius to test (e.g., 3)
-    int max_radius;           // Maximum radius to test (e.g., 20)
-    int radius_step;          // Step between radii (1 = all radii, 2 = every other, etc.)
-    int width;                // Width of orthogonal summation box (e.g., 3)
-    float symmetry_threshold; // Minimum symmetry value to consider (suppress weak symmetry)
+    int pyramid_level; // the working image halved this many times (0 = working size)
+    int min_radius;    // radius bands min_radius, +step, ... <= max_radius (px at this scale)
+    int max_radius;
+    int radius_step;   // also the width of a band, so the bands adjoin
+    int width;         // width of the summation box across the radius
+    float clip_offset; // subtracted from every band; < 0: use Config::clip_offset
 
-    ScaleConfig(int level = -1, int min_r = 3, int max_r = 20, int r_step = 1, int w = 3, float thresh = 0.3f)
-      : pyramid_level(level),
-        min_radius(min_r),
-        max_radius(max_r),
-        radius_step(r_step),
-        width(w),
-        symmetry_threshold(thresh)
+    ScaleConfig(int level = 0, int min_r = 6, int max_r = 15, int r_step = 3, int w = 3, float offset = -1.0f)
+      : pyramid_level(level), min_radius(min_r), max_radius(max_r), radius_step(r_step), width(w), clip_offset(offset)
     {
     }
   };
 
-  /**
-   * Configuration for symmetry feature extraction.
-   */
   struct Config
   {
-    int num_orientations;             // Number of Gabor orientations to use (e.g., 12)
-    double wavelength;                // Wavelength for Gabor filters
-    double bandwidth;                 // Bandwidth parameter
-    std::vector<ScaleConfig> scales;  // Configuration for each pyramid level
-    bool use_multi_scale;             // Whether to combine multiple scales
-    bool auto_scale_schedule = false; // Ignore 'scales', derive a size-adaptive
-                                      // 3-scale schedule from the frame instead
-
-    Config() : num_orientations(12), wavelength(4.0), bandwidth(1.0), use_multi_scale(true)
-    {
-      // Default: use pyramid levels with appropriate radius ranges
-      // Level 0 (full res): small radii for local symmetry
-      scales.push_back(ScaleConfig(0, 3, 15, 1, 3));
-      // Level 2 (1/4 res): medium radii
-      scales.push_back(ScaleConfig(2, 6, 25, 1, 3));
-      // Level 4 (1/16 res): large radii for global symmetry
-      scales.push_back(ScaleConfig(4, 10, 35, 1, 3));
-    }
+    int num_orientations = 12;
+    double wavelength = 8.0; // thesis: k0 = 0.75 -> 2 pi / k0 = 8.4 px
+    double bandwidth = 1.0;
+    // Long side of the image the feature works on (the original ran on 256 x
+    // 256); the radii below are pixels at this size and its halvings.
+    int max_working_size = 256;
+    float gabor_gain = 1.0f;         // edge energy of a full-contrast step edge
+    float clip_offset = 60.0f / 255; // the original's clip_threshold
+    float band_bonus = 1.0f / 255;   // per radius step and band index (original: i * step)
+    int border_clear = 5;            // px of edge energy suppressed at the image border
+    bool use_multi_scale = true;
+    // Thesis Tab. 5.1: 256 -> radii 6, 9, 12; 128 and 64 -> 6, 9, 12, 15; width 3
+    std::vector<ScaleConfig> scales = {ScaleConfig(0, 6, 12, 3, 3), ScaleConfig(1, 6, 15, 3, 3),
+                                       ScaleConfig(2, 6, 15, 3, 3)};
   };
 
-  explicit SymmetryFeature(const Config& config = Config());
+  SymmetryFeature() : SymmetryFeature(Config{}) {}
+  explicit SymmetryFeature(const Config& config);
 
-  /**
-   * Extract symmetry feature from frame.
-   * @param frame Input frame (color or grayscale)
-   * @return Symmetry feature map with saliency values [0, 1]
-   */
   core::FeatureMap extract(const core::Frame& frame) const override;
   core::FeatureMap extract(const core::Frame& frame, DebugContext& debug) const override;
-
-  /**
-   * Get feature name.
-   * @return "symmetry"
-   */
   std::string name() const override { return "symmetry"; }
 
-  GaborRequirement gabor_requirement() const override
-  {
-    return {config_.num_orientations, config_.wavelength, config_.bandwidth};
-  }
+  /// Symmetry of an 8-bit or float [0,1] grey image at its own resolution
+  /// (all configured scales); CV_32F in [0, 1]. Exposed for tests.
+  cv::Mat evaluate(const cv::Mat& gray) const;
 
  private:
   Config config_;
+  float energy_calibration_ = 1.0f; // 1 / (quadrature response to a unit step edge)
 
-  /**
-   * Resolve the scale schedule for a frame: the configured scales, or — with
-   * auto_scale_schedule — a size-adaptive schedule starting at the first
-   * pyramid level where one side drops below 256px.
-   */
-  std::vector<ScaleConfig> resolve_scales(const core::Frame& frame) const;
-
-  /**
-   * Compute radial symmetry at a single scale using the thesis approach.
-   * For each pixel, tests multiple radii and selects the maximum response.
-   * @param gabor_responses Vector of Gabor filter responses (one per orientation)
-   * @param scale_config Configuration for this scale (radii, width, etc.)
-   * @return Symmetry map for this scale
-   */
-  cv::Mat compute_radial_symmetry_at_scale(const std::vector<cv::Mat>& gabor_responses,
-                                           const ScaleConfig& scale_config) const;
-
-  /**
-   * Compute symmetry for a single orientation and radius.
-   * Sums Gabor responses within 'width' pixels orthogonal to the radius direction.
-   * This corresponds to the symmetry_intern() function in the old code.
-   * @param gabor_orientation Single orientation's Gabor response
-   * @param orientation_angle Angle in degrees
-   * @param radius Radius to test
-   * @param width Width of orthogonal summation box
-   * @param num_orientations Total number of orientations
-   * @return Contribution to symmetry map from this orientation and radius
-   */
-  cv::Mat compute_orientation_radius_contribution(const cv::Mat& gabor_orientation, float orientation_angle, int radius,
-                                                  int width, int num_orientations) const;
-
-  // Debug helper: capture intermediate results (keeps algorithm code clean)
-  void capture_debug_data(DebugContext& debug, const core::Frame& frame, const std::vector<ScaleConfig>& scales,
-                          const std::vector<std::vector<cv::Mat>>& scale_gabor_responses,
-                          const std::vector<cv::Mat>& scale_results, const cv::Mat& result, double total_ms,
-                          double gabor_computation_ms, const std::vector<double>& scale_computation_times,
-                          double combine_ms, double resize_ms) const;
+  /// Quadrature Gabor energy per orientation, calibrated, clipped, border cleared.
+  std::vector<cv::Mat> edge_energy(const cv::Mat& gray_float) const;
+  /// Steps 2-3 at one scale.
+  cv::Mat symmetry_at_scale(const std::vector<cv::Mat>& energy, const ScaleConfig& scale) const;
+  /// The two-box summation kernel for one orientation and radius, and its
+  /// normalization (box pixel count * orientations / 2).
+  cv::Mat box_kernel(float orientation_degrees, int radius, int step, int width, float& normalization) const;
 };
 
 } // namespace features
