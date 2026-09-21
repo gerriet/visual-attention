@@ -477,4 +477,7 @@ and M11 with it~~ → ~~the stereo experiments~~ → ~~the field dynamics~~ (Abb
 ~~decide on the open parameter questions~~ (decided 2026-09-21: the text's values
 are the profile, the system's are a runnable sibling; compared above) →
 ~~the stereo variance threshold~~ (checked on real pairs 2026-09-21: the default
-is right) → tag `replication-v1`.
+is right) → **tagged `replication-v1` on 2026-09-21.** The thesis profiles, the
+components they select and their goldens are frozen from that tag
+(`docs/adr/0005-two-tracks-replication-and-modern.md`); a later change to them
+needs a replication reason and a re-run of this dossier.

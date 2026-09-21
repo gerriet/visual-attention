@@ -29,6 +29,17 @@ threads added by the 2026 positioning pass (below) turn the master saliency map
 into a full **priority map** (M17) and reframe the whole instrument as an
 attention front-end for large vision models (M18).
 
+## Status (2026-09-21): the replication track is closed
+
+Tagged **`replication-v1`**. The dissertation's model is reimplemented from its
+surviving sources and its text; 22 of 24 of its findings reproduce and 2
+partially (`docs/replication/REPLICATION_DOSSIER.md`); its central claim, H1 —
+object-based inhibition of return beats space-based in dynamic scenes — is
+supported on three independent blocks of scenes; H4 (human scanpaths) is
+answered. The thesis profiles are frozen (ADR-0005). What remains in this
+roadmap is the **modern track**: H2, H5, H6, H7 and the milestones that serve
+them, judged by usefulness.
+
 ## Positioning: sharpen, don't redirect (2026)
 
 `docs/RESEARCH_POSITIONING.md` places this work against 2025–26 attention
