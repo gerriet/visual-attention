@@ -732,6 +732,8 @@ def plot_all(results, directory):
     def save(fig, name):
         fig.tight_layout()
         fig.savefig(os.path.join(directory, name), dpi=130)
+        # A vector copy for print (the paper includes the PDF, the docs the PNG)
+        fig.savefig(os.path.join(directory, os.path.splitext(name)[0] + ".pdf"))
         plt.close(fig)
 
     if "ecc-variation" in results:

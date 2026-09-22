@@ -308,10 +308,19 @@ profiles (\texttt{configs/thesis/}) that may enable dissertation components only
 (enforced by a test), plus fidelity tests and behavioural goldens. It is frozen
 at the tag \texttt{replication-v1}; later work on a modernised system adds
 sibling components and does not edit these. \src{docs/adr/0005}
-\todo{Disclose how the code was written: the reimplementation was developed by
-the author with an AI coding assistant (Claude Code). Word this as the venue's
-policy requires; say what was checked by hand---the ports against the sources,
-every verdict in the dossier, every prediction.}
+\paragraph{How the code was written.} The reimplementation and the evaluation
+code were written by the author together with an AI coding assistant, which
+wrote most of the code and much of the measurement infrastructure. What that
+does and does not mean for this paper: the author read and checked by hand every
+port against the original sources, every parameter in Appendix~\ref{app:params},
+every verdict in the dossier against the thesis's own figures, and every
+prediction before it was committed. Two of the three infidelities this paper
+reports (Sections~\ref{sec:findingA}, \ref{sec:findingB}) were introduced by
+that process---a relative normalisation where the original thresholds
+absolutely, and parameters taken from a function's default arguments---and all
+three were caught by the replication protocol rather than by review, which is
+part of the argument of Section~\ref{sec:discussion}. \todo{adjust to the
+venue's disclosure policy.}
 
 \subsection{Sources of truth, and what cannot be shown}
 \label{sec:sources}
@@ -445,11 +454,11 @@ Section~\ref{sec:h1}.
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=.62\linewidth]{ecc_variation.png}
+\includegraphics[width=.62\linewidth]{ecc_variation}
 \caption{Thesis Abb.~5.13 rebuilt: an object of constant area is stretched from
 1:1 to 6:1. Eccentricity rises on the curve of eq.~5.6; symmetry falls. Before
 the symmetry feature was ported from the original it \emph{rose}
-(0.67~$\to$~0.82). \todo{redraw for print: vector, one column, fonts.}}
+(0.67~$\to$~0.82). \todo{fonts and panel size for one column.}}
 \label{fig:ecc}
 \end{figure}
 
@@ -575,13 +584,13 @@ field decides how many fixations a scene deserves---four on average on MIT1003
 images instead of always ten---which matters in Section~\ref{sec:h4}.
 \begin{figure}[t]
 \centering
-\includegraphics[width=\linewidth]{field_two_maxima_noise.png}
+\includegraphics[width=\linewidth]{field_two_maxima_noise}
 \caption{Two of the thesis's field experiments, under the deployed system's
 parameters and under the defaults the port first used. Left: two input maxima
 approaching and separating again (Abb.~6.10/6.5); right: activation outside a
 pulse of amplitude 1 as noise grows (Abb.~6.6). The thesis's stated values---
 merging below distance 5, noise visible beyond amplitude 1.2---are met by one
-parameter set and not by the other. \todo{redraw for print.}}
+parameter set and not by the other. \todo{fonts and panel size for one column.}}
 \label{fig:field}
 \end{figure}
 
@@ -677,10 +686,10 @@ confirmatory runs (\texttt{3edd62f}). \src{dossier, finding 22; eval/replication
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=\linewidth]{world_model.png}
+\includegraphics[width=\linewidth]{world_model}
 \caption{Thesis Abb.~9.2 / \citet[Fig.~5]{backer2003} rebuilt: recognized objects
 (left axes) and position error (right axes) for 1, 3 and 5 static objects. Dotted:
-the thesis's curves, read off the published figure. \todo{redraw for print.}}
+the thesis's curves, read off the published figure. \todo{fonts and panel size for one column.}}
 \label{fig:worldmodel}
 \end{figure}
 
