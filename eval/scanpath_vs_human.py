@@ -52,6 +52,13 @@ MM_DIMS = ("shape", "direction", "length", "position")
 
 # --- scoring ----------------------------------------------------------------
 
+# ScanMatch's gap value. Cristino et al. set it to 0 in their own experiments
+# and let the normalization by the longer sequence carry the length dependence;
+# 0.2 is this implementation's default. --scanmatch-gap sets it, so that a
+# conclusion can be checked against both (docs/SCANPATH_VS_HUMAN.md).
+SCANMATCH_GAP = [0.2]
+
+
 def score_vs_humans(path, human_paths, size):
     """Mean MultiMatch dims + ScanMatch of one model scanpath against every
     human observer's sequence."""
@@ -62,7 +69,7 @@ def score_vs_humans(path, human_paths, size):
         for d in MM_DIMS:
             if not np.isnan(m[d]):
                 mm[d].append(m[d])
-        s = scanmatch(path, human, size)
+        s = scanmatch(path, human, size, gap=SCANMATCH_GAP[0])
         if not np.isnan(s):
             sm.append(s)
     row = {d: (float(np.mean(mm[d])) if mm[d] else float("nan")) for d in MM_DIMS}
@@ -89,6 +96,20 @@ def interobserver_ceiling(human_paths, size):
 def random_path(size, n, rng):
     w, h = size
     return [(float(rng.uniform(0, w)), float(rng.uniform(0, h))) for _ in range(n)]
+
+
+def center_sampled_path(size, n, rng, sigma_frac=0.22):
+    """Fixations drawn i.i.d. from a Gaussian centred in the image — the centre
+    baseline as Schwinn et al. (2022) define it, against center_path's constant
+    one. The two differ only in determinism, which is what separates
+    "the centre is where people look" from "a repeatable path scores well"."""
+    w, h = size
+    out = []
+    for _ in range(n):
+        x = float(np.clip(rng.normal(w / 2, sigma_frac * w), 0, w - 1))
+        y = float(np.clip(rng.normal(h / 2, sigma_frac * h), 0, h - 1))
+        out.append((x, y))
+    return out
 
 
 def center_path(size, n):
@@ -258,6 +279,7 @@ def run_mit1003(args):
         rng = np.random.RandomState(args.seed + n)
         row["random"] = score_vs_humans(random_path(size, args.n, rng), humans, size)
         row["center"] = score_vs_humans(center_path(size, args.n), humans, size)
+        row["center-sampled"] = score_vs_humans(center_sampled_path(size, args.n, rng), humans, size)
         rows[stimulus.stem] = row
         if (n + 1) % 25 == 0:
             print("  %d stimuli" % (n + 1), file=sys.stderr)
@@ -358,7 +380,7 @@ def demo(args):
 
 ARM_ORDER = ["inter-observer", "thesis-field", "thesis-objfile", "thesis-wta", "thesis-stoch-best",
              "inter-observer@k", "thesis-field@k", "thesis-wta@k", "center@k", "random@k",
-             "spectral-residual-wta", "center-bias-wta", "deepgaze-iie-wta", "center", "random"]
+             "spectral-residual-wta", "center-bias-wta", "deepgaze-iie-wta", "center", "center-sampled", "random"]
 
 
 def summarize(per_arm):
@@ -416,8 +438,11 @@ def main():
     ap.add_argument("--n", type=int, default=10, help="fixations per model scanpath")
     ap.add_argument("--samples", type=int, default=10, help="stochastic samples for best-of-N")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--scanmatch-gap", type=float, default=SCANMATCH_GAP[0],
+                    help="ScanMatch gap penalty (default %(default)s; Cristino et al. use 0)")
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args()
+    SCANMATCH_GAP[0] = args.scanmatch_gap
 
     if args.mit1003:
         if not os.path.exists(args.binary):
@@ -425,6 +450,10 @@ def main():
         summary = run_mit1003(args)
     elif args.demo:
         summary = demo(args)
+        # The demo is a smoke test, not a study: never let it write its
+        # synthetic summary over a real run's output.
+        if args.out == ap.get_default("out"):
+            args.out = os.path.join(args.out, "demo")
     else:
         sys.exit("nothing to do: pass --demo or --mit1003")
 

@@ -684,7 +684,10 @@ error of those. What the sources leave open (map size, velocity distribution,
 noise mean, when the conventional model's recognition looks at the focus) was
 fixed on development seeds, the last in the conventional model's favour; two
 variants were declared in advance; predictions were committed before the 50
-confirmatory runs (\texttt{3edd62f}). \src{dossier, finding 22; eval/replication.py --only world-model}
+confirmatory runs (\texttt{3edd62f}). The run was repeated once after the
+cross-platform check found that its scenes depended on the C++ standard library
+(Section~\ref{sec:repro}); the numbers below are the repeat, and the two runs
+agree except where noted. \src{dossier, finding 22; eval/replication.py --only world-model}
 
 \begin{figure}[t]
 \centering
@@ -702,17 +705,19 @@ lost---in all 18 conditions, and its curve is the thesis's curve (within 0.25 in
 there are objects in every condition. Its position error is 0.53--0.95~px; the
 conventional model's grows with the number of moving objects to 4--7~px. Pooled
 over the static counts, two-stage minus conventional recognized objects for 0--5
-dynamic objects: $-0.18$, $-0.21$, $-0.10$, $+0.14$, $+0.28$, $+0.44$, every
-interval excluding zero. So the thesis's scaling claim and its position-error
-claim replicate in direction and size; two statements do not: ``ahead as soon as
-anything moves'' (here: from three moving objects on) and ``below 0.5~px in every
-condition''. The first is the baseline's doing: the conventional model rebuilt
+dynamic objects: $-0.18$, $-0.19$, $-0.10$, $+0.03$, $+0.30$, $+0.41$, every
+interval but the one at three moving objects excluding zero. So the thesis's
+scaling claim and its position-error claim replicate in direction and size; two
+statements do not: ``ahead as soon as anything moves'' (here: from four moving
+objects on, and from three on the first sample of scenes---that step is the size
+of the scene-to-scene variation) and ``below 0.5~px in every condition''. The first is the baseline's doing: the conventional model rebuilt
 from the description reaches its own optimum in static scenes (4.00 with five
 objects) where the thesis's reached about 3.3, so the two-stage model's extra
 frame per recognition is paid back later. Why the thesis's baseline fell short
-the sources do not say. Four of five predictions held; the one about the variants
-was half right (with recognition looking at the focus when it \emph{ends}, two
-dynamic objects are a tie and the lead from three on grows to $+0.61$).
+the sources do not say. All five predictions held in their stated refutation
+criteria; two were imprecise in a detail (the crossover sits one step later than
+guessed, and positive-mean noise costs the lead at three moving objects rather
+than at four and five).
 
 \paragraph{A third parameter finding.} Building this experiment exposed what
 Finding~B had missed: over a stream the deployed system ran its field for a
@@ -1234,6 +1239,7 @@ comparison first.
 \end{itemize}
 
 \section{Reproducibility}
+\label{sec:repro}
 Every number in this paper is printed by one of four commands, on a laptop CPU,
 with no learned model and no API key:
 \begin{center}\small
@@ -1268,9 +1274,20 @@ are drawn from a seeded generator, but through
 implementation-defined: the two standard libraries draw different sequences from
 the same seed, so the same ``seed 1000'' was a different scene on the two
 machines. A seed is not a guarantee of the same data unless the sampler is
-pinned as well. The scenes are now drawn by a portable routine and
-Section~\ref{sec:worldmodel} reports the re-run. \todo{numbers, when it
-finishes.}
+pinned as well. The scenes are now drawn by a portable routine, and the re-run
+is what Section~\ref{sec:worldmodel} reports; it moves the crossover in that
+experiment by one condition and changes nothing else.
+
+With the scenes pinned, a second difference remains, and it is worth a sentence
+because it is the thesis's own argument showing up as a reproducibility
+property. On identical scenes the two-stage model's scores agree between the two
+platforms to four decimals in all 18 conditions, and so does its number of
+activity clusters; the conventional model's differ by up to 0.35 recognized
+objects. The conventional model selects the maximum of a blurred, noisy map, so
+a difference of one unit in the last place can change which pixel wins and the
+run diverges from there. A neural field with hysteresis, integrating over space
+and time, does not flip on a marginal difference. The verdict of that experiment
+is the same on both platforms.
 
 \section*{Acknowledgements}
 The original system was built in B\"arbel Mertsching's group, and the parts of it

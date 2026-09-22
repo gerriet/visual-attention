@@ -56,7 +56,7 @@ been ported from the original and the affected rows re-run.
 | 19 | Abb. 6.8 | A stable state is reached in about 10 cycles | **replicated** — 10 cycles |
 | 20 | Abb. 6.9 | Tracking a target in noise: within limits ~10 update cycles per frame suffice; weak (0.5) and fast targets are the limit | **replicated** with the dissertation parameters; *diverged* with the port's defaults (most moving targets lost) |
 | 21 | Abb. 6.10 | Two approaching maxima: repulsion, then merging below distance 5; no oscillation | **replicated** with the dissertation parameters (merge at 5, one clean transition, re-split only at 13); *diverged* with the port's defaults (never merge) |
-| 22 | §9.2, Abb. 9.2 (WAPCV 2003, Fig. 5) | The two-stage model keeps a better world model than a conventional inhibition-map model as soon as objects move: more recognized objects, position error < 0.5 px against 0.5–5 px | **partially** — the two-stage model's curve is the thesis's, to within 0.01 of its optimum; position error 0.5–0.95 px against up to 7; but it is ahead only from three dynamic objects on, because the conventional baseline built from the description is stronger than the thesis's |
+| 22 | §9.2, Abb. 9.2 (WAPCV 2003, Fig. 5) | The two-stage model keeps a better world model than a conventional inhibition-map model as soon as objects move: more recognized objects, position error < 0.5 px against 0.5–5 px | **partially** — the two-stage model's curve is the thesis's, to within 0.01 of its optimum; position error 0.5–0.95 px against up to 7; but it is ahead only from four dynamic objects on, because the conventional baseline built from the description is stronger than the thesis's |
 | 10 | Abb. 6.14 | Object identity survives temporary occlusion when several objects are tracked | **partially** — on the thesis's chain at trackable speed, object-based inhibition keeps its advantage through a 10-frame occlusion (`occlusion-slow`, 2026-09-22), but identity is re-labelled (2.9 labels per object; §7.2.3 as written: 2.7 in the fast occlusion regime) |
 | — | Abb. 5.33, 5.35, 6.11–6.13, §9.3 | superposition, 2D vs 3D integration, multi-field systems and the 3D field, flanker and early-vs-late selection | **not attempted** (below) |
 
@@ -536,7 +536,14 @@ over the 50 runs excludes zero.
    positive-mean noise lets noise clusters through (more clusters than objects)
    and costs the two-stage model its lead except at 5 dynamic objects.
 
-#### Outcome (seeds 1000–1049, 50 runs per condition, 2026-09-21)
+#### Outcome (seeds 1000–1049, 50 runs per condition, 2026-09-21; re-run 2026-09-22)
+
+*The numbers below are the re-run with the portable scene sampler (see "The
+dossier on a second platform"). The pre-fix run is preserved in
+`results/replication_world_model_libcxx.json`; the two differ only in the scenes
+they drew, and the table notes where that matters. The two-stage column is
+identical to two decimals in all 18 conditions, because that model reaches its
+optimum on every scene either way.*
 
 ![recognized objects and position error, two-stage against conventional, with the thesis's curves](figures/world_model.png)
 
@@ -544,30 +551,35 @@ over the 50 runs excludes zero.
 runs, 95% CI; **bold** = interval excludes zero. "Optimum": every object
 recognized at the first opportunity and never lost. "Thesis": read off Fig. 5.
 
-| Static | Dynamic | Two-stage | optimum | thesis | Conventional | thesis | Δ recognized | Position error: two-stage / conventional (px) |
+| Static | Dynamic | Two-stage | optimum | thesis | Conventional | thesis | Δ recognized | Two-stage position error (px) |
 |---|---|---|---|---|---|---|---|---|
-| 1 | 0 | 0.92 | 0.93 | 0.9 | 0.95 | 0.9 | **−0.02** | 0.66 / 0.56 |
-| 1 | 1 | 1.74 | 1.75 | 1.7 | 1.81 | 1.35 | **−0.06** | 0.95 / 2.31 |
-| 1 | 2 | 2.47 | 2.48 | 2.45 | 2.55 | 1.65 | **−0.07** | 0.93 / 4.11 |
-| 1 | 3 | 3.10 | 3.10 | 3.1 | 2.90 | 2.35 | **+0.20 [+0.11, +0.29]** | 0.91 / 5.88 |
-| 1 | 4 | 3.62 | 3.62 | 3.65 | 3.26 | 2.85 | **+0.37 [+0.28, +0.46]** | 0.87 / 6.33 |
-| 1 | 5 | 4.05 | 4.05 | 4.1 | 3.46 | 3.0 | **+0.59 [+0.50, +0.70]** | 0.82 / 6.81 |
-| 3 | 0 | 2.47 | 2.48 | 1.9 | 2.62 | 2.3 | **−0.15** | 0.57 / 0.00 |
-| 3 | 1 | 3.10 | 3.10 | 3.1 | 3.29 | 2.4 | **−0.19 [−0.22, −0.15]** | 0.67 / 1.45 |
-| 3 | 2 | 3.62 | 3.62 | 3.65 | 3.75 | 2.95 | **−0.12 [−0.19, −0.05]** | 0.70 / 3.03 |
-| 3 | 3 | 4.05 | 4.05 | 4.1 | 3.93 | 3.3 | **+0.12 [+0.03, +0.22]** | 0.69 / 3.88 |
-| 3 | 4 | 4.38 | 4.38 | 4.4 | 3.99 | 3.55 | **+0.39 [+0.26, +0.52]** | 0.68 / 4.46 |
-| 3 | 5 | 4.60 | 4.60 | 4.75 | 4.04 | 3.85 | **+0.56 [+0.42, +0.69]** | 0.64 / 5.19 |
-| 5 | 0 | 3.62 | 3.62 | 3.4 | 4.00 | 3.3 | **−0.38** | 0.53 / 0.00 |
-| 5 | 1 | 4.05 | 4.05 | 4.1 | 4.44 | 3.55 | **−0.39 [−0.44, −0.33]** | 0.57 / 1.11 |
-| 5 | 2 | 4.38 | 4.38 | 4.45 | 4.47 | 3.95 | −0.10 [−0.21, +0.01] | 0.57 / 2.09 |
-| 5 | 3 | 4.60 | 4.60 | 4.75 | 4.50 | 3.85 | +0.10 [−0.01, +0.22] | 0.57 / 2.99 |
-| 5 | 4 | 4.72 | 4.72 | 4.9 | 4.64 | 4.3 | +0.09 [−0.03, +0.21] | 0.55 / 3.50 |
-| 5 | 5 | 4.75 | 4.75 | 5.0 | 4.58 | 4.05 | **+0.17 [+0.03, +0.32]** | 0.53 / 4.11 |
+| 1 | 0 | 0.92 | 0.93 | 0.9 | 0.95 | 0.9 | **−0.02** | 0.65 |
+| 1 | 1 | 1.75 | 1.75 | 1.7 | 1.82 | 1.35 | **−0.07** | 0.91 |
+| 1 | 2 | 2.47 | 2.48 | 2.45 | 2.51 | 1.65 | −0.03 [−0.07, +0.02] | 0.95 |
+| 1 | 3 | 3.10 | 3.10 | 3.1 | 3.04 | 2.35 | **+0.06 [+0.00, +0.12]** | 0.91 |
+| 1 | 4 | 3.62 | 3.62 | 3.65 | 3.28 | 2.85 | **+0.35 [+0.25, +0.45]** | 0.87 |
+| 1 | 5 | 4.05 | 4.05 | 4.1 | 3.41 | 3.0 | **+0.64 [+0.54, +0.73]** | 0.83 |
+| 3 | 0 | 2.47 | 2.48 | 1.9 | 2.62 | 2.3 | **−0.15** | 0.59 |
+| 3 | 1 | 3.10 | 3.10 | 3.1 | 3.27 | 2.4 | **−0.17 [−0.20, −0.12]** | 0.68 |
+| 3 | 2 | 3.62 | 3.62 | 3.65 | 3.74 | 2.95 | **−0.12 [−0.20, −0.02]** | 0.71 |
+| 3 | 3 | 4.05 | 4.05 | 4.1 | 3.90 | 3.3 | **+0.15 [+0.05, +0.26]** | 0.69 |
+| 3 | 4 | 4.38 | 4.38 | 4.4 | 3.98 | 3.55 | **+0.39 [+0.27, +0.52]** | 0.67 |
+| 3 | 5 | 4.60 | 4.60 | 4.75 | 4.13 | 3.85 | **+0.47 [+0.33, +0.61]** | 0.65 |
+| 5 | 0 | 3.62 | 3.62 | 3.4 | 4.00 | 3.3 | **−0.37** | 0.52 |
+| 5 | 1 | 4.05 | 4.05 | 4.1 | 4.39 | 3.55 | **−0.35 [−0.41, −0.27]** | 0.57 |
+| 5 | 2 | 4.38 | 4.38 | 4.45 | 4.53 | 3.95 | **−0.16 [−0.26, −0.04]** | 0.56 |
+| 5 | 3 | 4.60 | 4.60 | 4.75 | 4.73 | 3.85 | **−0.13 [−0.24, −0.02]** | 0.56 |
+| 5 | 4 | 4.72 | 4.72 | 4.9 | 4.56 | 4.3 | **+0.16 [+0.03, +0.29]** | 0.55 |
+| 5 | 5 | 4.75 | 4.75 | 5.0 | 4.61 | 4.05 | +0.14 [−0.00, +0.28] | 0.52 |
 
 Pooled over the static counts, by number of dynamic objects (0–5): **−0.18,
-−0.21, −0.10, +0.14, +0.28, +0.44**, every interval excluding zero. The number of
-activity clusters equals the number of objects in every condition, exactly.
+−0.19, −0.10**, +0.03 [−0.03, +0.09], **+0.30, +0.41** — every interval but the
+one at three dynamic objects excluding zero. (Pre-fix, on the other scenes:
+−0.18, −0.21, −0.10, **+0.14**, +0.28, +0.44; the crossover sat one step earlier.
+Everything else agrees.) The number of activity clusters equals the number of
+objects in every condition, exactly. The conventional model's position error
+grows from 0.0 to 6.8 px with the number of moving objects; the two-stage
+model's stays between 0.52 and 0.95 px.
 
 **The predictions, scored.**
 
@@ -577,20 +589,22 @@ activity clusters equals the number of objects in every condition, exactly.
    the thesis's own value for three objects in the neighbouring panel (2.45).
 2. *Without dynamic objects the conventional model is ahead* — **holds.**
 3. *"Ahead with any dynamic object" does not replicate as stated* — **holds**:
-   the two-stage model is ahead from three dynamic objects on, the conventional
-   model with one and (not predicted that clearly) with two. With five static
-   objects the lead is within the interval until there are five dynamic ones.
+   the two-stage model is ahead from **four** dynamic objects on, tied at three,
+   and behind with one or two. The prediction's refutation criteria (ahead with
+   one or two; not ahead with four and five) are both untouched; only the
+   crossover sits one step later than the prediction guessed. On the pre-fix
+   scenes it sat at three, which is the size of the scene-sampling difference.
 4. *Position error* — **holds**: two-stage 0.53–0.95 px everywhere, below the
    conventional model's wherever anything moves; the conventional model's grows
    to 4–7 px and passes 3 px once the dynamic objects outnumber the static ones.
    The thesis's "< 0.5 px in every condition" is not met.
-5. *The variants* — **partly.** With the conventional model's recognition looking
-   at the focus when it *ends*, two dynamic objects are a tie (+0.04 [−0.02,
-   +0.11]) and the lead from three on grows (+0.29, +0.43, +0.61) — a tie, not the
-   predicted crossover. Positive-mean noise does let noise clusters through (7–18
-   clusters for 1–6 objects) and raises the two-stage position error to 1.7 px,
-   but the lead survives at four and five dynamic objects (+0.17, +0.35), not only
-   at five.
+5. *The variants* — **holds for the first, partly for the second.** With the
+   conventional model's recognition looking at the focus when it *ends*, the
+   crossover moves to two dynamic objects (+0.07) exactly as predicted, and the
+   lead grows from there (+0.17, +0.43, +0.59). Positive-mean noise does let
+   noise clusters through (7–18 clusters for 1–6 objects) and raises the
+   two-stage position error to 1.7 px, but the lead survives at four and five
+   dynamic objects (+0.17, +0.29), not only at five.
 
 **Verdict: partially replicated — and the part that does not is the baseline's.**
 The two-stage model behaves as the thesis reports, quantitatively: its curve is
@@ -601,7 +615,7 @@ objects, as claimed. What does not replicate is "ahead as soon as anything
 moves": the conventional model built here from the thesis's description
 recognizes more than the thesis's did — it reaches its own optimum in static
 scenes (4.00 of 4.0 with five objects; the thesis's reached about 3.3) — so the
-two-stage model's extra frame per recognition is only paid back from three
+two-stage model's extra frame per recognition is only paid back from four
 moving objects on. Why the thesis's baseline fell short of its optimum the
 sources do not say. The position-error claim holds in direction and size of the
 gap, not at the stated 0.5 px.
@@ -659,6 +673,20 @@ two platforms. The scenes are now sampled by a portable routine
 the same predictions; both sets of numbers are reported there. The practical
 lesson for anyone re-running an old experiment: a seed is not a guarantee of the
 same data unless the sampler is fixed too.
+
+**After the fix the two models behave differently across platforms, and the
+difference is informative.** On identical scenes (10 runs per condition, both
+platforms), the two-stage model's recognized-object counts agree **exactly** —
+to four decimals in all 18 conditions — and so does the number of activity
+clusters. The conventional model's differ by up to **0.35** objects. The likely
+reason is in its selection step: it takes the maximum of a blurred, noisy map,
+so a difference of one unit in the last place can change which pixel wins, after
+which the two runs visit different objects and diverge. The neural field
+integrates over space and time and has hysteresis, and does not flip on a
+marginal difference — which is what the thesis claims for it (findings 16–18).
+The verdict is unaffected: on both platforms the pooled difference is negative
+for 0–2 dynamic objects, indistinguishable from zero at 3, and positive at 4 and
+5.
 
 ## What the dossier says about the reimplementation
 
