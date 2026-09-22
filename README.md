@@ -33,9 +33,12 @@ equations; onset and the symbolic second stage are reconstructions from the
 thesis text, because their sources did not survive. The
 [replication dossier](docs/replication/REPLICATION_DOSSIER.md) re-runs the
 thesis's own experiments — features, depth, and the dynamics of the neural
-field: 22 of 24 findings reproduce and 2 partially, the field's with the parameters the
-dissertation system actually used. That state is tagged **`replication-v1`** and
-frozen; work since then is on the modern system. `configs/thesis/` holds the dissertation profiles (the
+field, and the thesis's own test of its central claim: 22 of 25 findings reproduce
+and 3 partially, the field's with the parameters the dissertation system actually
+used. Tagged **`replication-v1`** (2026-09-21) and, after the second stage was
+brought to the thesis's own chain — object files on the neural field's activity
+clusters — **`replication-v2`** (2026-09-22); frozen since. Work beyond that is
+on the modern system. `configs/thesis/` holds the dissertation profiles (the
 replication track — finite, to be frozen when done); everything else is the
 modern track, free to move away from the thesis
 ([ADR-0005](docs/adr/0005-two-tracks-replication-and-modern.md)).
