@@ -184,7 +184,22 @@ def scanmatch(path_a, path_b, size, grid=8, gap=0.2):
     the same cell and falls *through zero to -1* at opposite corners, so distant
     substitutions are penalized and a gap can be preferable (the standard signed
     ScanMatch substitution matrix). Normalized so identical scanpaths score 1.0,
-    a maximally-distant alignment 0.0."""
+    a maximally-distant alignment 0.0.
+
+    Two things about `gap` and length, because both are easy to get wrong:
+
+    - Cristino et al. set the gap value to **0** in their own experiments,
+      relying on the signed substitution matrix alone; 0.2 here is this
+      implementation's choice. `eval/scanpath_vs_human.py --scanmatch-gap`
+      exists so that a conclusion can be checked against both.
+    - The score's dependence on path length comes mainly from the
+      normalization below, not from the gap: dividing by the *longer* sequence
+      caps a k-fixation path scored against an m-fixation one at roughly k/m,
+      however well its k fixations match. Comparing paths of different lengths
+      under a string-edit measure therefore confounds similarity with length
+      (Jarodzka, Holmqvist & Nystrom, ETRA 2010) — see the matched-length
+      control in docs/SCANPATH_VS_HUMAN.md.
+    """
     seq_a = grid_string(path_a, size, grid)
     seq_b = grid_string(path_b, size, grid)
     if not seq_a or not seq_b:
@@ -208,9 +223,9 @@ def scanmatch(path_a, path_b, size, grid=8, gap=0.2):
             dp[i][j] = max(dp[i - 1][j - 1] + sub(seq_a[i - 1], seq_b[j - 1]),
                            dp[i - 1][j] - gap,
                            dp[i][j - 1] - gap)
-    # Normalize by the *longer* sequence (Cristino's convention): a short path
-    # that gaps past most of a long human sequence is penalized for the gaps,
-    # not flattered by dividing out its own length. Per-element score in
-    # [-1, 1], mapped to [0, 1].
+    # Normalize by the *longer* sequence (Cristino's convention), which is what
+    # makes the score length-dependent: a short path cannot reach 1 against a
+    # long one however well it matches. Per-element score in [-1, 1], mapped to
+    # [0, 1].
     per_element = dp[m][n] / max(m, n)
     return max(0.0, min(1.0, (per_element + 1.0) / 2.0))

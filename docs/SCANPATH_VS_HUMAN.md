@@ -24,7 +24,7 @@ the deterministic path is one draw among a stochastic peer's samples.
 | Piece | What it is |
 |---|---|
 | MultiMatch (4 spatial dims) | Dewhurst et al. (2012): shape, direction, length, position over DTW-aligned saccade-vector sequences. Duration is omitted — model scanpaths carry none (standard for saliency-model eval). Each dim ∈ [0, 1]. |
-| ScanMatch | Cristino et al. (2010): grid-quantize, then Needleman-Wunsch with a **signed** substitution matrix (+1 same cell → −1 opposite corner, so distant substitutions are penalized and a gap can win). Normalized to [0, 1]. |
+| ScanMatch | Cristino et al. (2010): grid-quantize, then Needleman-Wunsch with a **signed** substitution matrix (+1 same cell → −1 opposite corner, so distant substitutions are penalized and a gap can win), normalized by the **longer** sequence into [0, 1] — which is where its length dependence comes from. Gap value 0.2 here, 0 in Cristino et al.'s own experiments; `--scanmatch-gap` switches (see "Determinism, not centrality"). |
 | Generic WTA+IOR readout | Turns *any* saliency map into a scanpath (repeated argmax + Gaussian inhibition of return). Makes every saliency operator a fair scanpath peer. |
 | Stochastic readout | Samples fixations ∝ saliency (with the same IOR), seeded — the generative variability peer; the deterministic path is scored as one draw (best-of-N). |
 | MIT1003 sequences | Per-observer ordered fixations recovered from the raw DATA/ eye-tracking archive by an I-DT fixation filter (`datasets/mit1003.py`). |
@@ -297,6 +297,64 @@ What this changes in the verdict, and what it does not:
   constant-centre path (0.850) — barely. The instrument caveat stands.
 - A methodological point for anyone scoring a model that chooses its own number
   of fixations: compare at matched length, or the score is a length penalty.
+
+## Determinism, not centrality (2026-09-22)
+
+*Prompted by a literature check: [Schwinn et al. 2022](https://arxiv.org/abs/2204.09093)
+ran a centre baseline on MIT1003 under a string-edit scanpath score and found it
+"did not perform much better than Random" — the opposite of the result above.
+Their centre baseline samples each fixation i.i.d. from a central Gaussian; ours
+returns the same path every time. Only the second is in this harness, so the two
+results were not comparable.*
+
+`center-sampled` was added (i.i.d. draws from a Gaussian at the image centre,
+σ = 0.22 of each dimension) and both arms were run on the same 200-image seeded
+sample, at this implementation's ScanMatch gap (0.2) and at the value
+[Cristino et al.](https://doi.org/10.3758/BRM.42.3.692) use in their own
+experiments (0, `--scanmatch-gap 0`):
+
+| Arm | ScanMatch, gap 0.2 | − ceiling | ScanMatch, gap 0 | − ceiling |
+|---|---|---|---|---|
+| inter-observer (ceiling) | 0.757 | | 0.782 | |
+| **constant centre** | **0.752** | −0.005 [−0.010, +0.001] | **0.773** | −0.009 [−0.014, −0.004] |
+| **sampled centre** | **0.688** | −0.069 [−0.074, −0.064] | **0.718** | −0.065 [−0.069, −0.061] |
+| centre-prior map, WTA | 0.715 | | 0.740 | |
+| random | 0.638 | | 0.674 | |
+
+Constant minus sampled: **+0.064 [+0.060, +0.068]** at gap 0.2, **+0.055
+[+0.051, +0.060]** at gap 0. Both baselines look at the middle; only the
+deterministic one approaches the ceiling.
+
+**So the finding is about determinism, not about the centre.** A repeatable path
+is rewarded whatever it repeats — the empirical form of the argument
+[Kümmerer & Bethge (2021)](https://arxiv.org/abs/2102.12239) make on synthetic
+data. It also reconciles this study with Schwinn et al.: their sampled baseline
+*should* be near random, and ours *should* be near the ceiling. Two consequences
+for anyone scoring scanpaths on a centre-biased dataset: the baseline to beat is
+a trivial constant path, and a stochastic centre baseline understates how easy
+the metric is to satisfy.
+
+**The gap value.** This implementation uses 0.2 where Cristino et al. use 0.
+Every conclusion above and in the sections before holds at both (the table
+shows the pair that matters; the arm ordering is unchanged throughout).
+
+**On the length finding, credit where it is due.** That a string-edit measure
+confounds similarity with path length is not new:
+[Jarodzka, Holmqvist & Nyström (ETRA 2010)](https://doi.org/10.1145/1743666.1743718)
+state it — "a long scanpath is per default dissimilar to a short one, even though
+the shorter is a substring of the longer" — and
+[Mathôt et al. (2012)](https://doi.org/10.16910/jemr.5.1.4) call normalisation
+for sequence length "inherently problematic". The mechanism is the
+normalisation by the *longer* sequence, not the gap penalty, which this
+document previously got wrong. What is this study's own is the case above: a
+model that chooses its *own* number of fixations can be made to score below
+random by *improving* its parameters, while its position, shape and length
+agreement all rise.
+
+**Still to read** before any novelty claim: Fahimi & Bruce (2021), *On metrics
+for measuring scanpath similarity*, Behav. Res. Methods 53(2):609–628
+([doi](https://doi.org/10.3758/s13428-020-01441-0)) — paywalled, not obtained;
+and the axiomatic section of Anderson et al. (2015).
 
 ## Honest caveats (to report with the real numbers)
 

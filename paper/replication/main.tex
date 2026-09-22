@@ -1082,27 +1082,75 @@ random@$k$ & 0.672 & 0.523 & 0.724 \\
 \end{itemize}
 
 \subsection{Two findings about the instrument}
-\paragraph{ScanMatch cannot carry a plausibility claim on MIT1003.} The constant
-central path (0.754) is indistinguishable from inter-observer agreement (0.759).
-Viewing starts at the centre and is centre-biased; at this grid the score rewards
-staying in the middle as much as looking where other people look. MultiMatch's
-direction dimension separates them (0.630 vs.\ 0.501, the lowest of all arms).
-This is an empirical instance of an argument \citet{kummerer2021} make on
-synthetic data: under ScanMatch and MultiMatch a wrong but deterministic model
-can outscore the process that generated the data, because one path can be more
-similar to the observers on average than the observers are to each other. A
-first search (not a review) found no prior report of the centre-path result on
-MIT1003 itself; see also \citet{anderson2015}. \todo{read Anderson et al.\ and
-Fahimi \& Bruce (2021, Behav.\ Res.\ Methods 53:609--628) in full; a 2026
-preprint (arXiv:2602.14834) reportedly shows a centre baseline scoring high under
-ScanMatch on another dataset---read and cite if it holds. Claim no novelty beyond
-what that reading supports.}
+\label{sec:instrument}
 
-\paragraph{A model that chooses its own number of fixations must be scored at
-matched length.} With the right field parameters the model made four fixations
-instead of ten; its unmatched ScanMatch fell \emph{below random} (0.544 vs.\
-0.636) while position, shape and length agreement all rose. The score was
-charging for unmatched fixations.
+\paragraph{What a constant path is worth.} On MIT1003 the constant central path
+scores 0.754 ScanMatch against an inter-observer ceiling of 0.759. That looked
+like a statement about centre bias, and centre bias is real---viewing starts in
+the middle and MIT1003 is strongly centre-biased \citep{tatler2007}. But
+\citet{schwinn2022} report the opposite on the same dataset under a string-edit
+scanpath score: their centre baseline ``did not perform much better than
+Random''. The difference between the two baselines is not centrality. Theirs
+draws each fixation independently from a central Gaussian; ours returns the same
+path every time. Running both on the same 200 images settles it
+(Table~\ref{tab:centre}): the constant path sits within 0.01 of the ceiling,
+while the sampled one is 0.07 below it and only 0.05 above random. The gain is
+\emph{determinism}, not location---a repeatable path is rewarded, whatever it
+repeats.
+
+\begin{table}[t]
+\caption{Two centre baselines on the same 200 MIT1003 images, at this
+implementation's gap value and at the one \citet{cristino2010} use. Both
+baselines look at the middle; only the constant one approaches the ceiling.
+Paired differences over images, 95\% interval.}
+\label{tab:centre}
+\small
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+ & \multicolumn{2}{c}{gap $=0.2$ (here)} & \multicolumn{2}{c}{gap $=0$ \citep{cristino2010}} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+Arm & ScanMatch & $-$ ceiling & ScanMatch & $-$ ceiling \\
+\midrule
+inter-observer (ceiling) & 0.757 & & 0.782 & \\
+constant centre          & 0.752 & $-$0.005 [$-$0.010, +0.001] & 0.773 & $-$0.009 [$-$0.014, $-$0.004] \\
+sampled centre           & 0.688 & $-$0.069 [$-$0.074, $-$0.064] & 0.718 & $-$0.065 [$-$0.069, $-$0.061] \\
+random                   & 0.638 & & 0.674 & \\
+\midrule
+constant $-$ sampled     & \multicolumn{2}{l}{+0.064 [+0.060, +0.068]} & \multicolumn{2}{l}{+0.055 [+0.051, +0.060]} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+This is \citet{kummerer2021}'s argument---that under these metrics a wrong but
+deterministic model can outscore the process that generated the data---appearing
+on real data and at the size that matters for a benchmark. The practical
+consequence for anyone scoring scanpaths on a centre-biased dataset is that a
+trivial constant path is the baseline to beat, and that a stochastic baseline
+will understate how easy the metric is to satisfy. MultiMatch's direction
+dimension is the one measure here that separates the constant path from the
+observers (0.501 against a ceiling of 0.630, the lowest of all arms).
+
+\paragraph{Path length.} That a string-edit measure confounds similarity with
+length is known: \citet{jarodzka2010} state it plainly---``a long scanpath is per
+default dissimilar to a short one, even though the shorter is a substring of the
+longer''---and \citet{mathot2012} call normalisation for sequence length
+``inherently problematic''. The mechanism in ScanMatch is the normalisation by
+the \emph{longer} of the two sequences, which caps a $k$-fixation path scored
+against an $m$-fixation one at about $k/m$ however well its $k$ fixations match;
+the gap value is a second-order effect (Table~\ref{tab:centre} shows the
+conclusions are the same at both). What this study adds is the case where it
+bites hardest and is least expected: a model that chooses its \emph{own} number
+of fixations. With the deployed system's field parameters the model made four
+fixations instead of ten, and its unmatched ScanMatch fell \emph{below random}
+(0.544 against 0.636) while its position, shape and length agreement all
+\emph{rose} (+0.037, +0.019, +0.055). A model can thus be made to look worse
+than chance by giving it better parameters. Everyone in this literature seems to
+match length silently---by truncating to a fixed number of fixations---and
+nobody states it as a requirement; on this evidence it should be one whenever
+the compared paths are not the same length by construction.
+\todo{\citet{fahimi2021} could not be obtained (paywall); read it before any
+novelty claim about either finding, together with \citet{anderson2015}'s
+axiomatic section.}
 
 % ---------------------------------------------------------------------------
 \section{Discussion}
