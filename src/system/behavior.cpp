@@ -259,6 +259,14 @@ void IorBehavior::reset()
   object_inhib_.clear();
 }
 
+void IorBehavior::displace(const cv::Point2f& shift)
+{
+  for (auto& spot : spatial_)
+  {
+    spot.loc += shift;
+  }
+}
+
 std::unique_ptr<Behavior> create_behavior(const std::string& name, const IorBehavior::Params& ior_params,
                                           const Identification::Params& identification_params)
 {

@@ -112,6 +112,17 @@ class AttentionSystem
     };
     ClusterSource cluster_source = ClusterSource::Saliency;
 
+    // Camera-motion compensation (thesis §7.2.2: "the coordinate systems are
+    // adjusted by the camera movement"). The global shift between consecutive
+    // frames is estimated by phase correlation of the grey images, and every
+    // image coordinate the second stage keeps — object files, the field's
+    // activity, a behavior's location tags, the location history — is moved by
+    // it before the frame is processed. Off (default): a moving camera moves
+    // the scene under the stored coordinates, which handicaps every arm that
+    // remembers positions.
+    bool camera_compensation = false;
+    float camera_max_shift = 0.25f; // shifts above this fraction of the frame are a cut: ignored
+
     // Saliency segmentation into candidate clusters:
     float segment_fraction = 0.35f; // threshold as a fraction of the map's max
     float segment_min = 0.1f;       // absolute threshold floor
@@ -154,7 +165,7 @@ class AttentionSystem
   /**
    * Apply a config file's `attention_system:` section (raw YAML, as kept by
    * ConfigLoader) to `config`. Keys: segment_fraction, segment_min,
-   * cluster_source (saliency | field),
+   * cluster_source (saliency | field), camera_compensation, camera_max_shift,
    * min_cluster_size, segment_close, max_cluster_fraction, proto_objects,
    * proto_min_contrast, proto_tolerance, proto_window, and
    * object_files: { correspondence (position | thesis), feature_tolerance,
@@ -215,6 +226,8 @@ class AttentionSystem
   const Focus* current_focus() const { return has_focus_ ? &current_focus_ : nullptr; }
 
   int frame_index() const { return frame_index_; }
+  // The camera shift applied on the most recent frame (zero when compensation is off).
+  const cv::Point2f& last_camera_shift() const { return last_camera_shift_; }
   const Config& config() const { return config_; }
 
   // Segment a fused saliency (priority) map into candidate object clusters —
@@ -238,6 +251,9 @@ class AttentionSystem
 
   // Run the second stage for the current pipeline frame.
   void process_second_stage();
+  // Config::camera_compensation: estimate this frame's global shift and move
+  // every stored image coordinate by it.
+  void compensate_camera();
 
   // Run the configured processors for this frame, honoring the cadence:
   // gated on the focus ROI, or over the whole frame (FullFrame baseline).
@@ -252,6 +268,8 @@ class AttentionSystem
   std::unique_ptr<Behavior> behavior_;
   std::vector<std::unique_ptr<Processor>> processors_;
   fusion::HistoryChannels history_;                     // M17 selection-history / value channels
+  cv::Mat previous_gray_;                               // camera compensation
+  cv::Point2f last_camera_shift_ = cv::Point2f(0, 0);
   std::unique_ptr<selection::SelectionStrategy> field_; // ClusterSource::Field only
   cv::Mat field_activity_;                              //   its state across frames
 

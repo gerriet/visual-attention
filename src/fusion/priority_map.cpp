@@ -158,6 +158,18 @@ cv::Mat TopDownChannel::apply(const cv::Mat& bottom_up, const cv::Mat& frame_bgr
 
 HistoryChannels::HistoryChannels(const PriorityConfig& config) : config_(config) {}
 
+void HistoryChannels::displace(const cv::Point2f& shift)
+{
+  if (location_.empty())
+  {
+    return;
+  }
+  const cv::Mat warp = (cv::Mat_<double>(2, 3) << 1, 0, shift.x, 0, 1, shift.y);
+  cv::Mat moved;
+  cv::warpAffine(location_, moved, warp, location_.size(), cv::INTER_LINEAR, cv::BORDER_CONSTANT, cv::Scalar(0));
+  location_ = moved;
+}
+
 void HistoryChannels::reset()
 {
   location_.release();

@@ -52,7 +52,7 @@ void AttentionSystem::apply_config_yaml(const std::string& yaml, Config& cfg)
   }
   reject_unknown_keys(
       node,
-      {"cluster_source", "segment_fraction", "segment_min", "min_cluster_size", "segment_close", "max_cluster_fraction",
+      {"cluster_source", "camera_compensation", "camera_max_shift", "segment_fraction", "segment_min", "min_cluster_size", "segment_close", "max_cluster_fraction",
        "proto_objects", "proto_min_contrast", "proto_tolerance", "proto_window", "object_files"},
       "attention_system");
   if (node["cluster_source"])
@@ -64,6 +64,8 @@ void AttentionSystem::apply_config_yaml(const std::string& yaml, Config& cfg)
     }
     cfg.cluster_source = source == "field" ? Config::ClusterSource::Field : Config::ClusterSource::Saliency;
   }
+  read_param(node, "camera_compensation", cfg.camera_compensation);
+  read_param(node, "camera_max_shift", cfg.camera_max_shift);
   read_param(node, "segment_fraction", cfg.segment_fraction);
   read_param(node, "segment_min", cfg.segment_min);
   read_param(node, "min_cluster_size", cfg.min_cluster_size);
@@ -416,6 +418,7 @@ void AttentionSystem::process_second_stage()
   // M17: the map the second stage sees is the priority map — the pipeline's
   // (already top-down-adjusted) saliency plus the history/value channels.
   // With inactive channels this is the pipeline map untouched.
+  compensate_camera();
   const cv::Mat priority = history_.apply(pipeline_.get_saliency_map().map, object_store_.active_files());
   std::vector<Cluster> clusters =
       config_.cluster_source == Config::ClusterSource::Field ? field_clusters(priority) : segment(priority);
@@ -439,6 +442,64 @@ void AttentionSystem::process_second_stage()
   history_.decay_and_record(has_focus_ ? current_focus_.location : cv::Point(), priority.size(), has_focus_);
 
   run_processors();
+}
+
+void AttentionSystem::compensate_camera()
+{
+  last_camera_shift_ = cv::Point2f(0, 0);
+  if (!config_.camera_compensation)
+  {
+    return;
+  }
+  const cv::Mat& image = pipeline_.get_frame().image;
+  if (image.empty())
+  {
+    return;
+  }
+  // Phase correlation at a reduced size gives the frame's global translation
+  cv::Mat gray;
+  if (image.channels() == 3)
+  {
+    cv::cvtColor(image, gray, cv::COLOR_BGR2GRAY);
+  }
+  else
+  {
+    gray = image;
+  }
+  const double factor = std::min(1.0, 256.0 / std::max(gray.cols, gray.rows));
+  cv::Mat small;
+  cv::resize(gray, small, cv::Size(), factor, factor, cv::INTER_AREA);
+  small.convertTo(small, CV_32F);
+  if (!previous_gray_.empty() && previous_gray_.size() == small.size())
+  {
+    cv::Mat window;
+    cv::createHanningWindow(window, small.size(), CV_32F);
+    // A scene point at p in the previous frame is at p + shift in this one
+    const cv::Point2d shift = cv::phaseCorrelate(previous_gray_, small, window);
+    const cv::Point2f in_image(static_cast<float>(shift.x / factor), static_cast<float>(shift.y / factor));
+    const float limit = config_.camera_max_shift * std::max(image.cols, image.rows);
+    if (std::abs(in_image.x) < limit && std::abs(in_image.y) < limit)
+    {
+      last_camera_shift_ = in_image;
+      object_store_.displace(in_image);
+      behavior_->displace(in_image);
+      history_.displace(in_image);
+      if (!field_activity_.empty())
+      {
+        // The field is at its own resolution (the thesis's displacefield())
+        const double field_factor =
+            static_cast<double>(field_activity_.cols) / pipeline_.get_saliency_map().map.cols;
+        const cv::Mat warp =
+            (cv::Mat_<double>(2, 3) << 1, 0, in_image.x * field_factor, 0, 1, in_image.y * field_factor);
+        cv::Mat moved;
+        const cv::Scalar resting(field_activity_.at<float>(0, 0));
+        cv::warpAffine(field_activity_, moved, warp, field_activity_.size(), cv::INTER_LINEAR, cv::BORDER_CONSTANT,
+                       resting);
+        field_activity_ = moved;
+      }
+    }
+  }
+  previous_gray_ = small;
 }
 
 void AttentionSystem::run_processors()
@@ -546,6 +607,8 @@ void AttentionSystem::reset_stage2()
   frames_since_processed_ = 0;
   history_.reset();
   field_activity_ = cv::Mat();
+  previous_gray_ = cv::Mat();
+  last_camera_shift_ = cv::Point2f(0, 0);
 }
 
 void AttentionSystem::reset()

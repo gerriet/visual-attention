@@ -758,6 +758,33 @@ ObjectFile* ObjectFileStore::find_active(int label)
   return nullptr;
 }
 
+void ObjectFileStore::displace(const cv::Point2f& shift)
+{
+  const cv::Point delta(static_cast<int>(std::lround(shift.x)), static_cast<int>(std::lround(shift.y)));
+  auto move = [&](ObjectFile& file)
+  {
+    file.centroid += delta;
+    file.bbox.x += delta.x;
+    file.bbox.y += delta.y;
+    if (file.centroid_exact.x >= 0.0f)
+    {
+      file.centroid_exact += shift;
+    }
+    for (auto& point : file.trajectory)
+    {
+      point += delta;
+    }
+  };
+  for (auto& file : active_)
+  {
+    move(file);
+  }
+  for (auto& file : inactive_)
+  {
+    move(file);
+  }
+}
+
 void ObjectFileStore::reset()
 {
   active_.clear();

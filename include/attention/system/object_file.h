@@ -221,6 +221,11 @@ class ObjectFileStore
 
   void reset();
 
+  /// The camera moved by `shift` (image px): every stored position — centroid,
+  /// box, trajectory, of active and inactive files — moves with it, so the
+  /// files stay on their objects (thesis §7.2.2).
+  void displace(const cv::Point2f& shift);
+
  private:
   ObjectFile make_file(const Cluster& cluster, int frame);
   void update_file(ObjectFile& file, const Cluster& cluster, int frame);
