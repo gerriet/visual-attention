@@ -36,7 +36,7 @@ been ported from the original and the affected rows re-run.
 | 1 | Abb. 5.10 | Eccentricity is 0 for round shapes and high for elongated ones | **replicated** |
 | 2a | Abb. 5.13 | Stretching an object raises its eccentricity response, monotonically | **replicated** — on the thesis's eq. 5.6 to within 0.02 |
 | 2b | Abb. 5.13 | … and lowers its symmetry response | **replicated** after the symmetry port (0.67 → 0.15, monotone); *diverged* before it (finding A) |
-| 3a | Abb. 5.14 | The eccentricity maximum stays on its object under added noise | **replicated** up to σ ≈ 38 grey levels; degrades beyond |
+| 3a | Abb. 5.14 | The eccentricity maximum stays on its object under added noise | **replicated** up to σ ≈ 38 grey levels (19 of 20 seeds); degrades beyond |
 | 3b | Abb. 5.14 | The symmetry maximum stays on its object under added noise | **replicated** after the port — on the object at every noise level, up to σ ≈ 115; *diverged* before it (finding A) |
 | 4 | Abb. 5.15 | Eccentricity segmentation is plausible for a growth threshold of 0.5–0.75 | **partially** — stable in 0.5–0.75 as claimed, but less flat than the thesis suggests (map correlation 0.64–0.78 with the default) |
 | 5 | Abb. 5.16 | … and for a merge threshold of 12–36 (default 20) | **replicated** — correlation ≥ 0.88 over the whole range 4–48 |
@@ -98,8 +98,20 @@ between the disks" that the video study met (`docs/VLM_VIDEO.md`) — here
 isolated.
 
 The cause is not the summation core, which is a line-for-line port of the
-original `symmetry_intern` (the sum over the two opposite boxes is *additive*, so
-an edge on one side alone already contributes about half of a true symmetry).
+original `symmetry_intern`. That core is *additive* over the two opposite boxes,
+so an edge on one side alone already scores — measured on a lone disk against a
+lone straight edge of the same contrast, with the per-band bonus off and at two
+gains that agree to five decimals (`--only symmetry-sides`):
+
+| disk radius (px) | 12 | 24 | 40 |
+|---|---|---|---|
+| lone edge / disk centre, raw sum | **0.78** | **0.40** | **0.32** |
+| … with the thesis's clip offset (radius 24) | | **0.09** | |
+
+The share is not a fixed fraction: it depends on how the object's size matches
+the radius bands (6–15 px at the working size), and it is largest for the
+smallest objects. That is precisely why a *relative* threshold cannot remove
+one-sided responses and an absolute offset can.
 It is what happens afterwards. The original works on an absolute scale — Gabor
 magnitudes clipped at 255, then a fixed offset of 60 subtracted from each radius
 band — which removes exactly those one-sided half-responses. The
@@ -130,12 +142,13 @@ which.
 
 ![share of noise seeds for which a feature's maximum stays on its object](figures/noise.png)
 
-Normally distributed noise, σ = level × 128 grey levels, five seeds per level.
-The eccentricity maximum stays on the bar up to level 0.3 (σ ≈ 38) and is lost
-for half the seeds beyond; the colour-contrast maximum stays on the blob at
-every level, up to σ ≈ 115 (the blob-minus-ground contrast falls only from 1.00
-to 0.91). The symmetry maximum stays on the disk at every level as well, with
-the bar in the scene or without. (The figure is from the re-run.)
+Normally distributed noise, σ = level × 128 grey levels, **twenty seeds per
+level** (five until 2026-09-22; the thesis gives no count). The eccentricity
+maximum stays on the bar for 20 of 20 seeds up to σ ≈ 26, 19 of 20 at σ ≈ 38,
+14 of 20 at σ ≈ 64 and 5 of 20 beyond. The colour-contrast maximum stays on the
+blob for every seed at every level, up to σ ≈ 115 (the blob-minus-ground
+contrast falls only from 1.00 to 0.93). The symmetry maximum stays on the disk
+for every seed at every level as well, with the bar in the scene or without.
 
 *A side finding:* eccentricity histogram-equalizes its input, as the original
 does. On a synthetic image with three grey levels that maps a *bright* object

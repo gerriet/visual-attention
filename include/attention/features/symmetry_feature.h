@@ -27,10 +27,14 @@ namespace features
  *   3. Per point, the maximum over the radius bands of
  *        band + index * bonus - clip_offset,
  *      clipped to [0, 1]. The offset is what makes this a *symmetry* measure:
- *      the sum is additive, so an edge on one side alone already contributes —
- *      about a quarter of what a closed contour does. A fixed offset on an
- *      absolute scale removes those one-sided responses; a relative threshold
- *      cannot (see below).
+ *      the sum is additive, so an edge on one side alone already scores. How
+ *      much depends on how the object's size matches the radius bands —
+ *      measured on a lone disk against a lone straight edge of the same
+ *      contrast, 0.78 / 0.40 / 0.32 of the disk's centre response for radius
+ *      12 / 24 / 40 px (`eval/replication.py --only symmetry-sides`). Because
+ *      it is not a fixed fraction, a *relative* threshold cannot remove those
+ *      responses; a fixed offset on an absolute scale can, and does: with the
+ *      thesis's 60/255 the lone edge falls to 0.09 of the disk.
  *   4. Multi-scale (thesis Tab. 5.1): the same on the working image halved once
  *      and twice; the results are combined by maximum, scale s weighted by
  *      0.5 + 0.5 s.
@@ -47,8 +51,7 @@ namespace features
  * What the surviving source does not settle: the gain of the original Gabor
  * implementation ("factor = 4 + size/12", commented "Warum??????" there), which
  * fixes what "60 of 255" means. Here the edge energy is calibrated so that a
- * full-contrast step edge is 1 and `gabor_gain` scales it; with gain 1 a closed
- * contour of contrast c sums to about 4c, a one-sided edge to about c.
+ * full-contrast step edge is 1 and `gabor_gain` scales it.
  */
 class SymmetryFeature : public FeatureExtractor
 {
