@@ -164,11 +164,17 @@ were not formed from the neural field's activity clusters. What changed:
   fixed 20 cycles per frame with input gain 0.765 (dossier, finding 22). The new
   field profiles use that; `thesis.yaml` (stills, relaxed from rest to
   convergence) is unchanged.
-- **Open, deliberately:** which second-stage profile is "the" thesis profile.
-  `attend.yaml` (segments, position-only) is what replication-v1 measured and
-  what H1's main tables rest on; `attend_field*.yaml` is closer to the thesis and
-  supports H1 only inside the field's tracking range. Both stay; documents say
-  which one a number comes from.
+- **Decided (Gerriet, 2026-09-22):** the replication claim for H1 rests on the
+  thesis's own chain, `configs/thesis/attend_field128.yaml` — object files on the
+  neural field's activity clusters, correspondence of §7.2.3 — because that is
+  the dissertation system; the claim holds on it inside the tracking range the
+  thesis states and fails outside. `attend.yaml` (saliency segments, position-only
+  correspondence) stays as the *extension* arm — the segmentation-based first
+  stage the WAPCV 2003 paper proposes in its last sentence — on which the claim
+  holds at every speed tested. Both are reported, and every number says which
+  profile it comes from. The field size 128 is a choice the thesis does not fix
+  (the deployed 64-px field holds about three objects of the H1 scenes' size);
+  the dependence is stated wherever the chain's numbers are.
 
 The dossier then has 25 findings: 22 replicated, 3 partially.
 

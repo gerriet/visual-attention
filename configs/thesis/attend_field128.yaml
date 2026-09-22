@@ -10,6 +10,9 @@
 #     local-maximum range x_a, feature similarity where position is ambiguous,
 #     inactive files revived primarily by their features, a maximum age.
 #
+# THE PROFILE THE H1 REPLICATION CLAIM RESTS ON (ADR-0005, 2026-09-22): the
+# dissertation system's chain. configs/thesis/attend.yaml is the extension arm.
+#
 # This variant runs the field at twice the dissertation system's resolution (128
 # instead of 64 px on the long side): with 64 the field holds about three objects of
 # the H1 scenes' size at once (docs/DYNAMIC_IOR_STUDY.md, "The thesis's own chain").

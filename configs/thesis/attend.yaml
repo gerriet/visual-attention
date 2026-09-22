@@ -1,6 +1,10 @@
 # Thesis track (docs/adr/0005): only components that implement the dissertation.
-# This is the profile the replication-track studies run on — H1 (object- vs
-# space-based inhibition of return, eval/dynamic_ior.py) and the M10 dossier.
+# The second stage as the reimplementation had it until replication-v2: object
+# files on segments of the saliency map, position-only correspondence — the
+# segmentation-based first stage the WAPCV 2003 paper proposes as an extension,
+# not the dissertation system's chain (that is configs/thesis/attend_field128.yaml,
+# on which the H1 replication claim rests; ADR-0005). H1's main tables were
+# measured on this profile, and it is kept as the extension arm.
 # The modern-track second-stage profile is configs/attend.yaml.
 #
 # AttentionSystem profile (roadmap M6): the dissertation's feature set feeding
