@@ -93,6 +93,17 @@ constexpr double kSpacing = 14.0;    // minimal centre distance at every moment
 constexpr int kMargin = 14;          // objects stay this far from the map's border (field border term: 9)
 constexpr double kRecognized = 20.0; // px: beyond this the object does not count as recognized
 
+// std::uniform_real_distribution is implementation-defined: libc++ and
+// libstdc++ draw different sequences from the same seeded engine, so the same
+// seed gave different scenes on macOS and Linux (found by the cross-platform
+// check, .github/workflows/replication.yml). This sampler is portable.
+double uniform(std::mt19937& rng, double lo, double hi)
+{
+  const double u = (rng() - std::mt19937::min()) /
+                   (static_cast<double>(std::mt19937::max()) - std::mt19937::min() + 1.0);
+  return lo + u * (hi - lo);
+}
+
 struct SceneObject
 {
   cv::Point2d start;
@@ -110,8 +121,8 @@ struct SceneObject
 // map and keep their distance from every object placed before, for the whole run.
 std::vector<SceneObject> make_scene(int n_static, int n_dynamic, const Options& opt, std::mt19937& rng)
 {
-  std::uniform_real_distribution<double> position(kMargin, opt.size - kMargin);
-  std::uniform_real_distribution<double> step(-2.0, 2.0);
+  auto position = [&](std::mt19937& rng) { return uniform(rng, kMargin, opt.size - kMargin); };
+  auto step = [&](std::mt19937& rng) { return uniform(rng, -2.0, 2.0); };
   auto fits = [&](const SceneObject& candidate, const std::vector<SceneObject>& placed)
   {
     for (int t = 0; t < opt.frames; ++t)
@@ -178,14 +189,13 @@ cv::Rect object_rect(const cv::Point2d& centre)
 cv::Mat render(const std::vector<SceneObject>& objects, int frame, const Options& opt, std::mt19937& rng)
 {
   cv::Mat map(opt.size, opt.size, CV_32F);
-  const float low = opt.zero_mean ? -0.5f * opt.noise : 0.0f;
-  std::uniform_real_distribution<float> noise(low, low + opt.noise);
+  const double low = opt.zero_mean ? -0.5 * opt.noise : 0.0;
   for (int y = 0; y < map.rows; ++y)
   {
     float* row = map.ptr<float>(y);
     for (int x = 0; x < map.cols; ++x)
     {
-      row[x] = noise(rng);
+      row[x] = static_cast<float>(uniform(rng, low, low + opt.noise));
     }
   }
   for (const auto& object : objects)

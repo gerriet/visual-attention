@@ -9,7 +9,7 @@ Walks both documents in parallel and reports every numeric leaf whose absolute
 difference exceeds --tol, every boolean that differs, and every key present on
 one side only. Exit 1 if anything differs beyond the tolerance, 0 otherwise.
 
-Usage: compare_replication.py A.json B.json [--tol 0.02] [--top N]
+Usage: compare_replication.py A.json B.json [--tol 0.02] [--top N] [--exclude PREFIX]
 """
 import argparse
 import json
@@ -34,6 +34,8 @@ def main():
     ap.add_argument("b")
     ap.add_argument("--tol", type=float, default=0.02, help="absolute difference that counts (default: %(default)s)")
     ap.add_argument("--top", type=int, default=25, help="how many differences to print (default: %(default)s)")
+    ap.add_argument("--exclude", action="append", default=[], metavar="PREFIX",
+                    help="skip keys starting with this (repeatable)")
     args = ap.parse_args()
 
     with open(args.a) as fh:
@@ -41,6 +43,9 @@ def main():
     with open(args.b) as fh:
         b = walk(json.load(fh), [], {})
 
+    if args.exclude:
+        a = {k: v for k, v in a.items() if not any(k.startswith(p) for p in args.exclude)}
+        b = {k: v for k, v in b.items() if not any(k.startswith(p) for p in args.exclude)}
     only_a = sorted(set(a) - set(b))
     only_b = sorted(set(b) - set(a))
     differences = []
