@@ -56,6 +56,7 @@ Source: `docs/DYNAMIC_IOR_STUDY.md`. Profile `configs/thesis/attend.yaml`.
 | 2.14 | Fourth block (seeds 4000–4029): every object-based arm beats `spatial-ior` and `spatial-ior-mc` on latency and staleness in every regime; §7.2.3 ≈ position-only (fast: labels 4.2 vs 5.8, staleness −0.16 [−0.31, −0.05]) | `docs/DYNAMIC_IOR_STUDY.md`, "The thesis's own chain"; `results/h1_v2`, `results/h1_v2_pairs.txt` | command in that section; predictions commit `5325d2e` | ok |
 | 2.15 | Chain at 64 px loses to the segment-based reference on staleness (+1.6…+1.9 standard / occlusion); chain at 128 px: Table 5 of the paper; `chain:object-ior` best arm in *standard* (1.62 / 1.68), worst in *fast* and *occlusion* with 9–10 labels per object | same; `results/h1_v2_field128`, `results/h1_v2_field128_pairs.txt` | same | ok |
 | 2.16 | Identity under occlusion: 2.8 labels per object position-only, 2.7 with §7.2.3, 1.4 persistent identity | same block | same | ok — supersedes 2.6's attribution |
+| 2.17 | occlusion-slow (speed 6, 10-frame occlusion), chain at 128: chain:object-ior − chain:spatial-ior −1.09 [−1.95, −0.42] / −0.73 [−1.09, −0.46]; − chain:spatial-ior-mc −0.82 / −0.55; − segment spatial-ior −1.11 / −0.49; labels 2.9 | `docs/DYNAMIC_IOR_STUDY.md`; `results/h1_v2_field128/occlusion-slow`, `results/h1_v2_occlusion_slow_pairs.txt` | prediction `8045e29` | ok |
 | 2.9 | **Real video (DAVIS 2017)** | — | not built | **open** — see README, "Still to run" |
 
 ## Study 3 — H4

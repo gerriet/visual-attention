@@ -661,6 +661,18 @@ commit; chain at 128 px.
    may not exclude zero. *(Refuted if `chain:object-ior` is worse than
    `chain:spatial-ior` on staleness.)*
 
+**Outcome (seeds 4000–4029, `results/h1_v2_field128/occlusion-slow`).**
+**Holds — more clearly than predicted.** `chain:object-ior` (latency 1.62,
+staleness 1.63, 2.9 labels per object, off-object 0.02) beats `chain:spatial-ior`
+by **−1.09 [−1.95, −0.42]** latency and **−0.73 [−1.09, −0.46]** staleness, and
+`chain:spatial-ior-mc` by **−0.82 [−1.43, −0.35]** and **−0.55 [−0.78, −0.37]**;
+the latency interval excludes zero, which the prediction had doubted. It is again
+the best arm of the regime, ahead of the segment-based `spatial-ior` (−1.11 /
+−0.49, both excluding zero) and level with segment-based `object-ior` (−0.42
+[−1.04, +0.02], −0.16 [−0.36, +0.01]). Thesis Abb. 6.14's question — identity
+through occlusion at trackable speed — is answered on the thesis's own chain:
+object-based inhibition keeps its advantage through a 10-frame occlusion.
+
 ### Verdict on H1, refined
 
 **Supported — wherever the first stage delivers objects that can be tracked.**
@@ -671,9 +683,9 @@ commit; chain at 128 px.
   blocks of scenes (1000, 2000, 3000, 4000) and with position-only
   correspondence, the correspondence of thesis §7.2.3, or persistent identity.
 - With the thesis's own first stage — the neural field — it does so **inside the
-  field's tracking range** (a few field pixels per frame), where that chain is
-  the best system measured here, and **fails outside it**, where it is the
-  worst. The thesis states the limit ("an object movement of more than 12
+  field's tracking range** (a few field pixels per frame), with and without a
+  10-frame occlusion, where that chain is the best system measured here, and
+  **fails outside it**, where it is the worst. The thesis states the limit ("an object movement of more than 12
   pixels"); what it does not say is that beyond it object-based inhibition is
   not merely no better but worse than the location tag it set out to replace.
 - The field's *capacity* is a second condition: at the dissertation system's
