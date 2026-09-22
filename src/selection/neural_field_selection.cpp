@@ -124,6 +124,68 @@ int NeuralFieldSelection::run_to_convergence(cv::Mat& activity, const cv::Mat& i
   return run;
 }
 
+std::vector<NeuralFieldSelection::ActivityCluster> NeuralFieldSelection::track(const cv::Mat& saliency,
+                                                                               cv::Mat& activity) const
+{
+  std::vector<ActivityCluster> clusters;
+  if (saliency.empty())
+  {
+    return clusters;
+  }
+  float scale = 1.0f;
+  const int max_side = std::max(saliency.cols, saliency.rows);
+  if (max_side > params_.field_max_size)
+  {
+    scale = static_cast<float>(params_.field_max_size) / max_side;
+  }
+  cv::Mat input;
+  if (scale < 1.0f)
+  {
+    cv::resize(saliency, input, cv::Size(), scale, scale, cv::INTER_AREA);
+  }
+  else
+  {
+    input = saliency;
+  }
+  if (activity.size() != input.size() || activity.type() != CV_32F)
+  {
+    activity = resting_field(input.size());
+  }
+  run_to_convergence(activity, input, make_border_suppression(input.size()));
+
+  cv::Mat labels, stats, centroids;
+  const cv::Mat active = activity > 0.0f;
+  const int num_labels = cv::connectedComponentsWithStats(active, labels, stats, centroids, 8, CV_32S);
+  for (int label = 1; label < num_labels; ++label) // 0 = background
+  {
+    if (stats.at<int>(label, cv::CC_STAT_AREA) < params_.min_cluster_size)
+    {
+      continue;
+    }
+    ActivityCluster cluster;
+    cv::Mat mask = (labels == label);
+    cluster.mean_input = static_cast<float>(cv::mean(input, mask)[0]);
+    if (scale < 1.0f)
+    {
+      // Back to the saliency map's coordinates; the centroid is taken from the
+      // field (activity-weighted positions would not be more exact than this)
+      cv::resize(mask, mask, saliency.size(), 0, 0, cv::INTER_NEAREST);
+      cluster.centroid = cv::Point2f(static_cast<float>((centroids.at<double>(label, 0) + 0.5) / scale - 0.5),
+                                     static_cast<float>((centroids.at<double>(label, 1) + 0.5) / scale - 0.5));
+    }
+    else
+    {
+      cluster.centroid = cv::Point2f(static_cast<float>(centroids.at<double>(label, 0)),
+                                     static_cast<float>(centroids.at<double>(label, 1)));
+    }
+    cluster.bbox = cv::boundingRect(mask);
+    cluster.size = cv::countNonZero(mask);
+    cluster.mask = mask;
+    clusters.push_back(cluster);
+  }
+  return clusters;
+}
+
 namespace
 {
 

@@ -23,6 +23,11 @@ struct Cluster
   int size = 0; // pixel count
   float mean_saliency = 0.0f;
   cv::Vec3f appearance = cv::Vec3f(0, 0, 0); // mean colour (BGR, 0-255) over the region
+  // Mean of each feature map over the region, in the pipeline's feature order
+  // (thesis §7.2.2: "extracted from the feature maps over the known area of
+  // the activity cluster"). Empty when there are no feature maps.
+  std::vector<float> features;
+  cv::Point2f centroid_exact = cv::Point2f(-1.0f, -1.0f); // sub-pixel centroid where the source has one
 };
 
 /**
@@ -84,8 +89,16 @@ struct ObjectFile
 
   std::deque<cv::Point> trajectory;          // recent centroids (most recent last)
   cv::Vec3f appearance = cv::Vec3f(0, 0, 0); // leaky-integrated mean colour (BGR)
-  LabelMemory labels;                        // accumulated semantic identity (M13)
-  float value = 0.0f;                        // selection-history / reward value (M17); decays
+  // Thesis §7.2.2 / Abb. 7.1: current feature means, and their leaky-integrated
+  // history (what correspondence compares against).
+  std::vector<float> features;
+  std::vector<float> avg_features;
+  cv::Point2f centroid_exact = cv::Point2f(-1.0f, -1.0f); // as in Cluster
+  // Thesis §7.2.3: a file created for two merged activity clusters points at
+  // both predecessors until their features decide which of them it is.
+  std::vector<int> merged_from;
+  LabelMemory labels; // accumulated semantic identity (M13)
+  float value = 0.0f; // selection-history / reward value (M17); decays
 
   bool ever_selected() const { return last_selected_frame >= 0; }
 };
@@ -101,8 +114,39 @@ struct ObjectFile
 class ObjectFileStore
 {
  public:
+  /// How clusters are corresponded to files.
+  enum class Rule
+  {
+    // Position only, greedy nearest-first, radius-gated revival — what this
+    // store did before 2026-09 and still does by default; the opt-ins below
+    // (motion prediction, appearance, persistent identity) build on it.
+    Position,
+    // Thesis §7.2.3 for a single field of local inhibition, as written:
+    //   1. a cluster and a file within the radius of each other, and of nobody
+    //      else, correspond;
+    //   2. of the rest, a cluster gets the file that is nearest *and* most
+    //      similar in its feature means (within 2x the radius);
+    //   3. a cluster that swallowed two files gets a new file pointing at both,
+    //      resolved by feature comparison after merge_resolve_frames;
+    //   4. before a new file is created the inactive files are searched,
+    //      "primarily by the feature properties";
+    //   5. inactive files are dropped after max_inactive_age.
+    // Reconstructed where the text is silent: the tolerance within which two
+    // feature distances count as equal, and the gate for (4). With no feature
+    // means at all (a bare saliency map) the feature criteria are vacuous and
+    // position decides. Ignores the three opt-ins below.
+    Thesis
+  };
+
   struct Config
   {
+    Rule rule = Rule::Position;
+    // Thesis rule: feature distances (L2 over feature means, each in [0, 1])
+    // closer than this count as equal; an inactive file is a candidate for
+    // revival below feature_gate.
+    double feature_tolerance = 0.05;
+    double feature_gate = 0.15;
+    int merge_resolve_frames = 4; // thesis: "in the experiments carried out it was 4"
     // Correspondence threshold (px): a cluster within this distance of a file's
     // centroid is the same object; beyond 2× a new file is created. Derived in
     // the thesis from the typical activation-cluster radius / local-max window.
@@ -113,7 +157,9 @@ class ObjectFileStore
     // Match clusters to each file's *predicted* next centroid (last + trajectory
     // velocity) instead of its last centroid. Holds object identity through fast
     // motion and short occlusions, which object-based IOR depends on (M12).
-    // Default off: the thesis's simple nearest-centroid correspondence.
+    // Default off: position-only correspondence. (Not "the thesis's": thesis
+    // §7.2.3 also compares features — Rule::Thesis. The trajectory, by contrast,
+    // the thesis stores but does not use: motion prediction is an addition.)
     bool motion_prediction = false;
     // Fold an appearance descriptor (mean colour of the region, computed from
     // features the pipeline already produced) into the correspondence cost, so
@@ -132,7 +178,9 @@ class ObjectFileStore
     // its last speed × frames gone) or a clear look-alike (colour <
     // reid_colour_gate). Inactive files never age out, and two active
     // look-alike files on one object are merged into the older one. Default
-    // off: the thesis's radius-gated revival with ageing.
+    // off: radius-gated revival with ageing. (The thesis revives "primarily by
+    // the feature properties" and has a maximum age — Rule::Thesis; persistent
+    // identity differs from it in using colour, a widening gate, and no age.)
     bool persistent_identity = false;
     double reid_colour_gate = 25.0; // colour L2 (0-255): a look-alike, revived wherever it reappears
     double reid_colour_veto = 60.0; // colour L2 (0-255): looks different — never the same object
@@ -176,6 +224,10 @@ class ObjectFileStore
  private:
   ObjectFile make_file(const Cluster& cluster, int frame);
   void update_file(ObjectFile& file, const Cluster& cluster, int frame);
+  // Rule::Thesis (see there); update() dispatches to it.
+  void update_thesis(const std::vector<Cluster>& clusters, int frame);
+  void resolve_merges(int frame);
+  int thesis_inactive(const Cluster& cluster) const;
   // Which inactive file an unmatched cluster revives (-1 = none): the thesis's
   // nearest-within-radius rule, or the persistent-identity rule (see Config).
   int nearest_inactive(const Cluster& cluster, int frame) const;

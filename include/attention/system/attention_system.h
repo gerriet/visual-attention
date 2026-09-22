@@ -94,6 +94,24 @@ class AttentionSystem
     Identification::Params identification_params; // params for "identification" (M13)
     ActionMode action_mode = ActionMode::Scanpath;
 
+    // Where the candidate clusters come from.
+    //   Saliency (default): threshold and label the fused saliency map — this
+    //     system's approximation since M6.
+    //   Field: the thesis's first selection stage (ch. 6, §7.2.2) — a neural
+    //     field relaxed on the saliency map, carried from frame to frame; its
+    //     activity clusters are what object files are created for, so noise
+    //     suppression, hysteresis and tracking happen before correspondence.
+    //     Takes the field's parameters from pipeline.selection_params (the
+    //     pipeline's own selection may stay "nms", so that no second field
+    //     runs), its defaults otherwise. The segment_* and proto_* keys below
+    //     do not apply.
+    enum class ClusterSource
+    {
+      Saliency,
+      Field
+    };
+    ClusterSource cluster_source = ClusterSource::Saliency;
+
     // Saliency segmentation into candidate clusters:
     float segment_fraction = 0.35f; // threshold as a fraction of the map's max
     float segment_min = 0.1f;       // absolute threshold floor
@@ -136,9 +154,11 @@ class AttentionSystem
   /**
    * Apply a config file's `attention_system:` section (raw YAML, as kept by
    * ConfigLoader) to `config`. Keys: segment_fraction, segment_min,
+   * cluster_source (saliency | field),
    * min_cluster_size, segment_close, max_cluster_fraction, proto_objects,
    * proto_min_contrast, proto_tolerance, proto_window, and
-   * object_files: { correspondence_radius,
+   * object_files: { correspondence (position | thesis), feature_tolerance,
+   * feature_gate, merge_resolve_frames, correspondence_radius,
    * max_inactive_age, motion_prediction, appearance_matching,
    * appearance_weight, persistent_identity, reid_colour_gate,
    * reid_colour_veto, gate_growth }. Absent keys keep their defaults; an
@@ -203,7 +223,14 @@ class AttentionSystem
   std::vector<Cluster> segment(const cv::Mat& saliency) const;
   std::vector<Cluster> segment(const cv::Mat& saliency, const cv::Mat& image) const;
 
+  // Config::ClusterSource::Field: relax the field on this frame's map and
+  // return its activity clusters (stateful: the field's activity persists).
+  std::vector<Cluster> field_clusters(const cv::Mat& saliency);
+
  private:
+  // Mean of every pipeline feature map over a region (Cluster::features).
+  std::vector<float> feature_means(const cv::Mat& region) const;
+
   // The proto-object(s) under one salient cluster (see Config::proto_objects);
   // empty = background.
   std::vector<Cluster> proto_objects(const cv::Mat& region, const cv::Mat& image, const Cluster& cluster,
@@ -224,7 +251,9 @@ class AttentionSystem
   ObjectFileStore object_store_;
   std::unique_ptr<Behavior> behavior_;
   std::vector<std::unique_ptr<Processor>> processors_;
-  fusion::HistoryChannels history_; // M17 selection-history / value channels
+  fusion::HistoryChannels history_;                     // M17 selection-history / value channels
+  std::unique_ptr<selection::SelectionStrategy> field_; // ClusterSource::Field only
+  cv::Mat field_activity_;                              //   its state across frames
 
   std::vector<Focus> scanpath_;
   Focus current_focus_;

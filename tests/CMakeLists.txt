@@ -26,7 +26,12 @@ add_test(NAME characterization COMMAND characterization_tests)
 add_test(NAME field_dynamics_smoke COMMAND field_dynamics --params esab2 convergence memory)
 set_tests_properties(field_dynamics_smoke PROPERTIES PASS_REGULAR_EXPRESSION "cycles_to_stable")
 
-foreach(bin attention pipeline_test debug_color field_dynamics)
+# The dissertation's world-model experiment (dossier finding 22): one tiny
+# condition, both models, valid JSON with both scores
+add_test(NAME world_model_smoke COMMAND world_model --runs 2 --static 1 --dynamic 1 --frames 12)
+set_tests_properties(world_model_smoke PROPERTIES PASS_REGULAR_EXPRESSION "\"two_stage\": \\[")
+
+foreach(bin attention pipeline_test debug_color field_dynamics world_model)
     add_test(NAME help_${bin} COMMAND ${bin} --help)
     set_tests_properties(help_${bin} PROPERTIES PASS_REGULAR_EXPRESSION "Usage")
 endforeach()

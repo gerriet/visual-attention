@@ -29,6 +29,9 @@ Replication track (docs/adr/0005): only dissertation components are exercised.
   field         Abb. 6.4-6.10 the neural field driven with synthetic activation (build/field_dynamics):
                            hysteresis, bifurcation, noise, convergence, tracking, two approaching
                            maxima — under the dissertation system's field parameters and the port's
+  world-model   thesis 9.2, Abb. 9.2 (= WAPCV 2003, Fig. 5): the two-stage model against a conventional
+                           inhibition-map model on simulated master maps — recognized objects and
+                           position error, 50 runs per condition (build/world_model)
 
 Stereo stimuli are rendered pairs with known disparity (textured surfaces, a
 random-dot stereogram); the depth response is |disparity| / search range (eq.
@@ -412,6 +415,74 @@ def exp_field(binary):
     return out
 
 
+# --- the world-model experiment (thesis 9.2, WAPCV 2003 Fig. 5) -----------------
+
+# Confirmatory block: seeds 1000-1049, 50 runs per condition as in the thesis.
+# Development used seeds 0-9 (docs/replication/REPLICATION_DOSSIER.md, finding 22).
+WORLD_MODEL = {"seed0": 1000, "runs": 50}
+
+# Read off the published figure (WAPCV 2003, Fig. 5), to about +-0.1: mean
+# recognized objects for 0..5 dynamic objects, and the conventional model's
+# position error in px (the two-stage model's is below 0.5 throughout).
+THESIS_FIG5 = {
+    1: {"two_stage": [0.9, 1.7, 2.45, 3.1, 3.65, 4.1], "conventional": [0.9, 1.35, 1.65, 2.35, 2.85, 3.0],
+        "conventional_error": [0.6, 2.1, 3.5, 3.7, 4.2, 4.7]},
+    3: {"two_stage": [1.9, 3.1, 3.65, 4.1, 4.4, 4.75], "conventional": [2.3, 2.4, 2.95, 3.3, 3.55, 3.85],
+        "conventional_error": [0.6, 1.4, 2.5, 2.8, 3.1, 3.4]},
+    5: {"two_stage": [3.4, 4.1, 4.45, 4.75, 4.9, 5.0], "conventional": [3.3, 3.55, 3.95, 3.85, 4.3, 4.05],
+        "conventional_error": [0.5, 1.3, 1.7, 2.2, 2.4, 2.8]},
+}
+
+
+def exp_world_model(binary):
+    """examples/world_model.cpp runs both attention models on the same simulated
+    master maps; here: means, and paired bootstrap intervals over runs."""
+    from study_common import paired_bootstrap
+    harness = os.path.join(os.path.dirname(os.path.abspath(binary)), "world_model")
+    if not os.path.exists(harness):
+        sys.exit("world-model harness not found: %s (build first: cmake --build build)" % harness)
+    base = [harness, "--runs", str(WORLD_MODEL["runs"]), "--seed0", str(WORLD_MODEL["seed0"])]
+    out = summarize_world_model(json.loads(subprocess.run(base, check=True, capture_output=True, text=True).stdout),
+                                paired_bootstrap)
+    # Two choices the sources leave open, declared before the confirmatory run
+    # (dossier, finding 22): when the conventional model's recognition looks at
+    # the focus, and whether the noise has zero mean.
+    out["variants"] = {}
+    for name, flags in (("late-identity", ["--late-identity"]), ("positive-noise", ["--positive-noise"])):
+        raw = json.loads(subprocess.run(base + flags, check=True, capture_output=True, text=True).stdout)
+        out["variants"][name] = summarize_world_model(raw, paired_bootstrap)
+    out["thesis_fig5"] = THESIS_FIG5
+    return out
+
+
+def summarize_world_model(raw, paired_bootstrap):
+    settings = {k: v for k, v in raw.items() if k != "conditions"}
+    rows = []
+    for condition in raw["conditions"]:
+        runs = condition["runs"]
+        two = [r["two_stage"][0] for r in runs]
+        conventional = [r["conventional"][0] for r in runs]
+        two_error = [r["two_stage"][1] for r in runs]
+        conventional_error = [r["conventional"][1] for r in runs]
+        rows.append({
+            "static": condition["static"], "dynamic": condition["dynamic"],
+            "two_stage": float(np.mean(two)), "conventional": float(np.mean(conventional)),
+            "difference": paired_bootstrap(two, conventional),  # (mean, lo, hi), two-stage minus conventional
+            "two_stage_error": float(np.mean(two_error)), "conventional_error": float(np.mean(conventional_error)),
+            "error_difference": paired_bootstrap(two_error, conventional_error),
+            "clusters": float(np.mean([r["clusters"] for r in runs])),
+        })
+    # Pooled over the static counts, per number of dynamic objects: run i of each
+    # block is an independent scene, so the pooled unit is still the run
+    pooled = []
+    for dynamic in sorted({c["dynamic"] for c in raw["conditions"]}):
+        blocks = [c["runs"] for c in raw["conditions"] if c["dynamic"] == dynamic]
+        two = [r["two_stage"][0] for block in blocks for r in block]
+        conventional = [r["conventional"][0] for block in blocks for r in block]
+        pooled.append({"dynamic": dynamic, "difference": paired_bootstrap(two, conventional)})
+    return {"settings": settings, "rows": rows, "pooled": pooled}
+
+
 # --- experiments --------------------------------------------------------------
 
 def exp_shapes(binary):
@@ -594,6 +665,7 @@ EXPERIMENTS = {
     "stereo-real": exp_stereo_real,
     "text-vs-code": exp_text_vs_code,
     "field": exp_field,
+    "world-model": exp_world_model,
 }
 
 
@@ -745,6 +817,35 @@ def plot_all(results, directory):
         axes[1].set_title("Abb. 6.9: tracking (dissertation parameters)")
         axes[1].legend(frameon=False, fontsize=7, ncol=2)
         save(fig, "field_hysteresis_tracking.png")
+    if "world-model" in results:
+        r = results["world-model"]
+        statics = sorted({row["static"] for row in r["rows"]})
+        fig, axes = plt.subplots(1, len(statics), figsize=(4.0 * len(statics), 3.6), squeeze=False)
+        for ax, n_static in zip(axes[0], statics):
+            rows = [row for row in r["rows"] if row["static"] == n_static]
+            x = [row["dynamic"] for row in rows]
+            ax.plot(x, [row["two_stage"] for row in rows], "o-", color="#d1343a", label="two-stage: objects")
+            ax.plot(x, [row["conventional"] for row in rows], "s-", color="#1baf7a", label="conventional: objects")
+            thesis = r["thesis_fig5"].get(n_static) or r["thesis_fig5"].get(str(n_static))
+            if thesis and len(thesis["two_stage"]) == len(x):
+                ax.plot(x, thesis["two_stage"], ":", color="#d1343a", lw=1, label="thesis (read off Fig. 5)")
+                ax.plot(x, thesis["conventional"], ":", color="#1baf7a", lw=1)
+            ax.set_ylim(0, 6.5)
+            ax.set_xlabel("dynamic objects")
+            ax.set_ylabel("recognized objects (mean over frames)")
+            ax.set_title("static objects: %d" % n_static)
+            right = ax.twinx()
+            right.plot(x, [row["two_stage_error"] for row in rows], "o--", ms=3, color="#2a78d6",
+                       label="two-stage: position error")
+            right.plot(x, [row["conventional_error"] for row in rows], "s--", ms=3, color="#b04ad1",
+                       label="conventional: position error")
+            right.set_ylim(0, 14)
+            right.set_ylabel("position error (px)")
+            if ax is axes[0][0]:
+                handles = ax.get_legend_handles_labels()
+                more = right.get_legend_handles_labels()
+                ax.legend(handles[0] + more[0], handles[1] + more[1], frameon=False, fontsize=6.5, loc="upper left")
+        save(fig, "world_model.png")
     if "stereo-real" in results:
         r = results["stereo-real"]
         fig, ax = plt.subplots(figsize=(5.4, 3.5))
@@ -775,7 +876,13 @@ def main():
     ap.add_argument("--figures", default=os.path.join(REPO, "docs", "replication", "figures"))
     ap.add_argument("--no-plots", action="store_true")
     ap.add_argument("--json", action="store_true")
+    ap.add_argument("--world-model-seed0", type=int, default=WORLD_MODEL["seed0"],
+                    help="world-model: first seed (default: the confirmatory block, %(default)s)")
+    ap.add_argument("--world-model-runs", type=int, default=WORLD_MODEL["runs"],
+                    help="world-model: runs per condition (default %(default)s, as in the thesis)")
     args = ap.parse_args()
+    WORLD_MODEL["seed0"] = args.world_model_seed0
+    WORLD_MODEL["runs"] = args.world_model_runs
 
     names = list(EXPERIMENTS) if args.all else [n.strip() for n in args.only.split(",") if n.strip()]
     if not names:

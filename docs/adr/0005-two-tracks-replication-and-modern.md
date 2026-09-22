@@ -145,6 +145,39 @@ checks what the sequence determines (`eval/check_scanpath.py`: a focus on every
 frame; the moving patch has become an object file). Lesson for the way of
 working: look at CI after a push, not only at the local suite.
 
+## Reopened once, with a replication reason: `replication-v2` (2026-09-21)
+
+The freeze allows changes "with a stated replication reason and a re-run of the
+dossier". The WAPCV 2003 paper, read against thesis and code
+(`docs/replication/WAPCV_2003_NOTES.md`), gave three: the thesis's own
+quantitative test of its central claim was missing from the dossier; the
+correspondence called "the thesis's" was weaker than thesis §7.2.3; object files
+were not formed from the neural field's activity clusters. What changed:
+
+- **Added, as siblings — nothing frozen was edited:** `build/world_model` and
+  dossier finding 22; `object_files.correspondence: thesis`;
+  `attention_system.cluster_source: field`; `NeuralFieldSelection::track`;
+  `configs/thesis/attend_field.yaml`, `attend_field128.yaml`; H1 arms
+  `object-ior+7.2.3` and `chain:*`. Defaults, `configs/thesis/{thesis,attend,
+  stereo}.yaml` and the three thesis goldens are as tagged.
+- **Found on the way:** over a stream the dissertation system ran its field a
+  fixed 20 cycles per frame with input gain 0.765 (dossier, finding 22). The new
+  field profiles use that; `thesis.yaml` (stills, relaxed from rest to
+  convergence) is unchanged.
+- **Decided (Gerriet, 2026-09-22):** the replication claim for H1 rests on the
+  thesis's own chain, `configs/thesis/attend_field128.yaml` — object files on the
+  neural field's activity clusters, correspondence of §7.2.3 — because that is
+  the dissertation system; the claim holds on it inside the tracking range the
+  thesis states and fails outside. `attend.yaml` (saliency segments, position-only
+  correspondence) stays as the *extension* arm — the segmentation-based first
+  stage the WAPCV 2003 paper proposes in its last sentence — on which the claim
+  holds at every speed tested. Both are reported, and every number says which
+  profile it comes from. The field size 128 is a choice the thesis does not fix
+  (the deployed 64-px field holds about three objects of the H1 scenes' size);
+  the dependence is stated wherever the chain's numbers are.
+
+The dossier then has 25 findings: 22 replicated, 3 partially.
+
 ## Implemented so far
 
 - `configs/thesis/{thesis,stereo,attend}.yaml`; a test

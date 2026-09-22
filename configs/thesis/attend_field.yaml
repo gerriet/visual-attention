@@ -1,0 +1,73 @@
+# Thesis track (docs/adr/0005): only components that implement the dissertation.
+#
+# The second stage as the thesis has it (added for replication-v2; see
+# docs/replication/WAPCV_2003_NOTES.md, findings D and E):
+#
+#   - object files are created for the *activity clusters of the neural field*
+#     (thesis ch. 6, §7.2.2), not for segments of the saliency map — so noise
+#     suppression, hysteresis and tracking happen before correspondence;
+#   - correspondence follows thesis §7.2.3: position within the field's
+#     local-maximum range x_a, feature similarity where position is ambiguous,
+#     inactive files revived primarily by their features, a maximum age.
+#
+# configs/thesis/attend.yaml is the same first stage with the reimplementation's
+# earlier second stage (saliency segments, position-only correspondence); it is
+# kept as it was measured for replication-v1.
+#
+#   ./attention --attend <dir|video> --config configs/thesis/attend_field.yaml \
+#       --emit-scanpath results/scanpath.json
+
+pipeline:
+  fusion: weighted-sum
+  # The pipeline's own peak selection is unused under --attend; nms is cheap.
+  # The parameters below are read by the second stage's field
+  # (attention_system.cluster_source: field).
+  selection: nms
+  selection_params:
+    # The dissertation system's single 2D field (esab2.C; dossier, finding B)
+    alpha: 0.33
+    beta: 30.0
+    resting: -0.33
+    global_mult: 8.0
+    kernel_size: 15
+    kernel_s: 3.3
+    kernel_k: 0.12
+    kernel_s2: 14.0
+    kernel_k2: 0.03
+    field_max_size: 64
+    # Over a stream that system ran a fixed 20 update cycles per frame, with an
+    # input gain of 0.003 on its 0-255 master map (dossier, finding 22)
+    cycles_per_frame: 20
+    input_mult: 0.765
+
+attention_system:
+  cluster_source: field
+  object_files:
+    correspondence: thesis
+    # x_a, the field's local-maximum range: 5 field pixels (dossier, finding 21),
+    # in image pixels for a 320-px frame on a 64-px field
+    correspondence_radius: 25
+
+features:
+  color-munsell:
+    weight: 1.0
+    params:
+      exclusivity: 1.1
+  eccentricity:
+    weight: 1.0
+    params:
+      exclusivity: 1.1
+  symmetry:
+    weight: 1.0
+  onset:
+    weight: 1.0
+  color:
+    enabled: false
+  intensity:
+    enabled: false
+  orientation:
+    enabled: false
+
+output:
+  output_dir: "results/"
+  display: false

@@ -120,6 +120,10 @@ target_link_libraries(debug_color PRIVATE attention_core)
 add_executable(field_dynamics examples/field_dynamics.cpp)
 target_link_libraries(field_dynamics PRIVATE attention_core)
 
+# The dissertation's world-model experiment (thesis 9.2; dossier finding 22)
+add_executable(world_model examples/world_model.cpp)
+target_link_libraries(world_model PRIVATE attention_core)
+
 # Tests
 include(CTest)
 if(BUILD_TESTING)

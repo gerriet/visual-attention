@@ -80,7 +80,9 @@ class TestStaleness(unittest.TestCase):
 
     def test_regimes_and_arms_are_consistent(self):
         self.assertIn(dio.REFERENCE_ARM, dio.STUDY_ARMS)
-        self.assertEqual(set(dio.REGIMES), {"standard", "fast", "occlusion"})
+        self.assertEqual(set(dio.REGIMES), {"standard", "fast", "occlusion", "occlusion-slow"})
+        for arm, (behavior, tracking, variant) in dio.STUDY_ARMS.items():
+            self.assertIn(variant, (None, "id", "thesis", "chain"), arm)
 
 
 if __name__ == "__main__":

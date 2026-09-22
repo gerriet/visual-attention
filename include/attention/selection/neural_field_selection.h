@@ -62,6 +62,17 @@ namespace selection
 class NeuralFieldSelection : public SelectionStrategy
 {
  public:
+  /// One connected region of positive field activity, in the coordinates of the
+  /// map that was handed in (not of the reduced field).
+  struct ActivityCluster
+  {
+    cv::Point2f centroid; // sub-pixel: the world-model experiment measures position error
+    cv::Rect bbox;
+    int size = 0;            // pixels, in input-map coordinates
+    float mean_input = 0.0f; // mean of the input under the cluster
+    cv::Mat mask;            // CV_8U, input-map size: the cluster's pixels
+  };
+
   struct Params
   {
     float alpha = 0.5f;
@@ -108,6 +119,18 @@ class NeuralFieldSelection : public SelectionStrategy
    * 6.2/6.3) can drive the field with synthetic input (tools/field_dynamics).
    */
   int relax(cv::Mat& activity, const cv::Mat& input) const;
+
+  /**
+   * The first selection stage as the thesis has it (ch. 6, §7.2.2): relax the
+   * field on this frame's saliency, carrying `activity` over from the previous
+   * frame (empty = start from rest), and return the activity clusters — the
+   * things object files are created for. Unlike select() there is no
+   * space-based inhibition map and no limit on the count: inhibition of return
+   * is the second stage's business, on object files. The field runs at reduced
+   * resolution (field_max_size) like select(); clusters come back in the
+   * saliency map's coordinates.
+   */
+  std::vector<ActivityCluster> track(const cv::Mat& saliency, cv::Mat& activity) const;
 
   /// A field at its resting level, the state select() starts a stream from.
   cv::Mat resting_field(const cv::Size& size) const { return cv::Mat(size, CV_32F, cv::Scalar(params_.resting)); }

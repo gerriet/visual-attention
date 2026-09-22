@@ -1,5 +1,6 @@
 #include "attention/system/attention_system.h"
 #include "attention/config/yaml_reader.h"
+#include "attention/selection/neural_field_selection.h"
 #include <algorithm>
 #include <limits>
 #include <set>
@@ -49,10 +50,20 @@ void AttentionSystem::apply_config_yaml(const std::string& yaml, Config& cfg)
   {
     return;
   }
-  reject_unknown_keys(node,
-                      {"segment_fraction", "segment_min", "min_cluster_size", "segment_close", "max_cluster_fraction",
-                       "proto_objects", "proto_min_contrast", "proto_tolerance", "proto_window", "object_files"},
-                      "attention_system");
+  reject_unknown_keys(
+      node,
+      {"cluster_source", "segment_fraction", "segment_min", "min_cluster_size", "segment_close", "max_cluster_fraction",
+       "proto_objects", "proto_min_contrast", "proto_tolerance", "proto_window", "object_files"},
+      "attention_system");
+  if (node["cluster_source"])
+  {
+    const std::string source = node["cluster_source"].as<std::string>();
+    if (source != "saliency" && source != "field")
+    {
+      throw std::runtime_error("attention_system.cluster_source: '" + source + "' (known: saliency, field)");
+    }
+    cfg.cluster_source = source == "field" ? Config::ClusterSource::Field : Config::ClusterSource::Saliency;
+  }
   read_param(node, "segment_fraction", cfg.segment_fraction);
   read_param(node, "segment_min", cfg.segment_min);
   read_param(node, "min_cluster_size", cfg.min_cluster_size);
@@ -70,10 +81,24 @@ void AttentionSystem::apply_config_yaml(const std::string& yaml, Config& cfg)
   }
   reject_unknown_keys(
       files,
-      {"correspondence_radius", "max_inactive_age", "motion_prediction", "appearance_matching", "appearance_weight",
-       "persistent_identity", "reid_colour_gate", "reid_colour_veto", "gate_growth"},
+      {"correspondence", "feature_tolerance", "feature_gate", "merge_resolve_frames", "correspondence_radius",
+       "max_inactive_age", "motion_prediction", "appearance_matching", "appearance_weight", "persistent_identity",
+       "reid_colour_gate", "reid_colour_veto", "gate_growth"},
       "attention_system.object_files");
   ObjectFileStore::Config& store = cfg.object_store;
+  if (files["correspondence"])
+  {
+    const std::string rule = files["correspondence"].as<std::string>();
+    if (rule != "position" && rule != "thesis")
+    {
+      throw std::runtime_error("attention_system.object_files.correspondence: '" + rule +
+                               "' (known: position, thesis)");
+    }
+    store.rule = rule == "thesis" ? ObjectFileStore::Rule::Thesis : ObjectFileStore::Rule::Position;
+  }
+  read_param(files, "feature_tolerance", store.feature_tolerance);
+  read_param(files, "feature_gate", store.feature_gate);
+  read_param(files, "merge_resolve_frames", store.merge_resolve_frames);
   read_param(files, "correspondence_radius", store.correspondence_radius);
   read_param(files, "max_inactive_age", store.max_inactive_age);
   read_param(files, "motion_prediction", store.motion_prediction);
@@ -95,6 +120,17 @@ AttentionSystem::AttentionSystem(const Config& config)
   for (const auto& name : config_.processors)
   {
     processors_.push_back(create_processor(name));
+  }
+  if (config_.cluster_source == Config::ClusterSource::Field)
+  {
+    const pipeline::PipelineConfig& p = config_.pipeline;
+    selection::SelectionParams shared;
+    shared.min_distance = p.peak_min_distance;
+    shared.threshold = p.peak_threshold;
+    shared.max_count = p.peak_max_count;
+    const bool own_params = !p.selection_params_yaml.empty();
+    field_ = selection::create_selection_strategy("neural-field", shared,
+                                                  own_params ? YAML::Load(p.selection_params_yaml) : YAML::Node());
   }
 }
 
@@ -215,6 +251,55 @@ std::vector<Cluster> AttentionSystem::proto_objects(const cv::Mat& region, const
   return objects;
 }
 
+std::vector<float> AttentionSystem::feature_means(const cv::Mat& region) const
+{
+  std::vector<float> means;
+  for (const auto& feature : pipeline_.get_features())
+  {
+    if (feature.data.empty())
+    {
+      means.push_back(0.0f);
+      continue;
+    }
+    cv::Mat mask = region;
+    if (mask.size() != feature.data.size())
+    {
+      cv::resize(region, mask, feature.data.size(), 0, 0, cv::INTER_NEAREST);
+    }
+    means.push_back(static_cast<float>(cv::mean(feature.data, mask)[0]));
+  }
+  return means;
+}
+
+std::vector<Cluster> AttentionSystem::field_clusters(const cv::Mat& saliency)
+{
+  std::vector<Cluster> clusters;
+  const auto* field = dynamic_cast<const selection::NeuralFieldSelection*>(field_.get());
+  if (field == nullptr || saliency.empty())
+  {
+    return clusters;
+  }
+  const cv::Mat& image = pipeline_.get_frame().image;
+  const bool have_image = !image.empty() && image.size() == saliency.size();
+  for (const auto& active : field->track(saliency, field_activity_))
+  {
+    Cluster cluster;
+    cluster.centroid =
+        cv::Point(static_cast<int>(active.centroid.x + 0.5f), static_cast<int>(active.centroid.y + 0.5f));
+    cluster.centroid_exact = active.centroid;
+    cluster.bbox = active.bbox;
+    cluster.size = active.size;
+    cluster.mean_saliency = static_cast<float>(cv::mean(saliency, active.mask)[0]);
+    if (have_image)
+    {
+      cluster.appearance = mean_colour(image, active.mask);
+    }
+    cluster.features = feature_means(active.mask);
+    clusters.push_back(cluster);
+  }
+  return clusters;
+}
+
 std::vector<Cluster> AttentionSystem::segment(const cv::Mat& saliency) const
 {
   return segment(saliency, pipeline_.get_frame().image);
@@ -276,6 +361,7 @@ std::vector<Cluster> AttentionSystem::segment(const cv::Mat& saliency, const cv:
     {
       cluster.appearance = mean_colour(image, region);
     }
+    cluster.features = feature_means(region);
     if (proto)
     {
       for (const auto& object : proto_objects(region, image, cluster, ground))
@@ -331,7 +417,8 @@ void AttentionSystem::process_second_stage()
   // (already top-down-adjusted) saliency plus the history/value channels.
   // With inactive channels this is the pipeline map untouched.
   const cv::Mat priority = history_.apply(pipeline_.get_saliency_map().map, object_store_.active_files());
-  std::vector<Cluster> clusters = segment(priority);
+  std::vector<Cluster> clusters =
+      config_.cluster_source == Config::ClusterSource::Field ? field_clusters(priority) : segment(priority);
   object_store_.update(clusters, frame_index_);
   object_store_.decay_values(config_.pipeline.priority.object_value_decay);
 
@@ -458,6 +545,7 @@ void AttentionSystem::reset_stage2()
   last_processed_label_ = -1;
   frames_since_processed_ = 0;
   history_.reset();
+  field_activity_ = cv::Mat();
 }
 
 void AttentionSystem::reset()
