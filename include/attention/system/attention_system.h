@@ -267,8 +267,8 @@ class AttentionSystem
   ObjectFileStore object_store_;
   std::unique_ptr<Behavior> behavior_;
   std::vector<std::unique_ptr<Processor>> processors_;
-  fusion::HistoryChannels history_;                     // M17 selection-history / value channels
-  cv::Mat previous_gray_;                               // camera compensation
+  fusion::HistoryChannels history_; // M17 selection-history / value channels
+  cv::Mat previous_gray_;           // camera compensation
   cv::Point2f last_camera_shift_ = cv::Point2f(0, 0);
   std::unique_ptr<selection::SelectionStrategy> field_; // ClusterSource::Field only
   cv::Mat field_activity_;                              //   its state across frames

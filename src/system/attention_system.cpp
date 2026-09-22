@@ -50,11 +50,11 @@ void AttentionSystem::apply_config_yaml(const std::string& yaml, Config& cfg)
   {
     return;
   }
-  reject_unknown_keys(
-      node,
-      {"cluster_source", "camera_compensation", "camera_max_shift", "segment_fraction", "segment_min", "min_cluster_size", "segment_close", "max_cluster_fraction",
-       "proto_objects", "proto_min_contrast", "proto_tolerance", "proto_window", "object_files"},
-      "attention_system");
+  reject_unknown_keys(node,
+                      {"cluster_source", "camera_compensation", "camera_max_shift", "segment_fraction", "segment_min",
+                       "min_cluster_size", "segment_close", "max_cluster_fraction", "proto_objects",
+                       "proto_min_contrast", "proto_tolerance", "proto_window", "object_files"},
+                      "attention_system");
   if (node["cluster_source"])
   {
     const std::string source = node["cluster_source"].as<std::string>();
@@ -487,8 +487,7 @@ void AttentionSystem::compensate_camera()
       if (!field_activity_.empty())
       {
         // The field is at its own resolution (the thesis's displacefield())
-        const double field_factor =
-            static_cast<double>(field_activity_.cols) / pipeline_.get_saliency_map().map.cols;
+        const double field_factor = static_cast<double>(field_activity_.cols) / pipeline_.get_saliency_map().map.cols;
         const cv::Mat warp =
             (cv::Mat_<double>(2, 3) << 1, 0, in_image.x * field_factor, 0, 1, in_image.y * field_factor);
         cv::Mat moved;

@@ -57,7 +57,7 @@ Source: `docs/DYNAMIC_IOR_STUDY.md`. Profile `configs/thesis/attend.yaml`.
 | 2.15 | Chain at 64 px loses to the segment-based reference on staleness (+1.6…+1.9 standard / occlusion); chain at 128 px: Table 5 of the paper; `chain:object-ior` best arm in *standard* (1.62 / 1.68), worst in *fast* and *occlusion* with 9–10 labels per object | same; `results/h1_v2_field128`, `results/h1_v2_field128_pairs.txt` | same | ok |
 | 2.16 | Identity under occlusion: 2.8 labels per object position-only, 2.7 with §7.2.3, 1.4 persistent identity | same block | same | ok — supersedes 2.6's attribution |
 | 2.17 | occlusion-slow (speed 6, 10-frame occlusion), chain at 128: chain:object-ior − chain:spatial-ior −1.09 [−1.95, −0.42] / −0.73 [−1.09, −0.46]; − chain:spatial-ior-mc −0.82 / −0.55; − segment spatial-ior −1.11 / −0.49; labels 2.9 | `docs/DYNAMIC_IOR_STUDY.md`; `results/h1_v2_field128/occlusion-slow`, `results/h1_v2_occlusion_slow_pairs.txt` | prediction `8045e29` | ok |
-| 2.9 | **Real video (DAVIS 2017)** | — | not built | **open** — see README, "Still to run" |
+| 2.9 | **Real video (DAVIS 2017 val, 17 multi-object sequences):** off-object 0.42–0.61 for every arm; segment-based object arms vs spatial: staleness −0.59 / −0.93 / −0.25, latency ±0.6, all intervals include zero; chain:object-ior − chain:spatial-ior-mc latency +1.53 [+0.22, +3.39]; compensation worse where it excludes zero (+3.53, +1.49, +1.57) | `docs/DYNAMIC_IOR_STUDY.md`, "Real video"; `results/h1_davis*`, `results/h1_davis_pairs.txt` | `eval/dynamic_ior.py --davis data/DAVIS --davis-split val …` (+ `--camera-compensation`); predictions `ba3ab2d` | ok — inconclusive by design of the ground truth; say so |
 
 ## Study 3 — H4
 

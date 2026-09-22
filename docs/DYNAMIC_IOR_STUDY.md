@@ -763,6 +763,79 @@ a limitation of the evaluation, not evidence against the claim; it is also the
 reason the world-model experiment (dossier, finding 22) and the synthetic
 regimes are the tests that carry it.
 
+### Outcome (17 validation sequences, 2026-09-22)
+
+`results/h1_davis` (primary), `results/h1_davis_cam` (compensated); arm minus
+`spatial-ior`, paired over sequences, 95% CI; **bold** = interval excludes zero.
+Frames per sequence 34–99; latency and staleness in frames.
+
+| Arm | off-object | labels / object | latency | Δ latency | staleness | Δ staleness |
+|---|---|---|---|---|---|---|
+| spatial-ior | 0.61 | 8.3 | 8.72 | | 6.52 | |
+| spatial-ior-mc | 0.60 | 8.5 | 7.25 | −1.47 [−3.53, +0.29] | 6.58 | +0.06 [−0.50, +0.70] |
+| object-ior (position only) | 0.43 | 12.4 | 8.73 | +0.01 [−4.74, +4.52] | 5.93 | −0.59 [−1.52, +0.38] |
+| object-ior+7.2.3 | 0.42 | 13.1 | 8.14 | −0.58 [−5.05, +3.49] | 5.59 | −0.93 [−2.03, +0.15] |
+| object-ior+id | 0.45 | 12.5 | 8.59 | −0.13 [−3.78, +3.85] | 6.27 | −0.25 [−0.99, +0.54] |
+| chain:spatial-ior (field 128) | 0.53 | 4.3 | 11.64 | **+2.92 [+0.44, +5.63]** | 6.65 | +0.13 [−1.46, +1.81] |
+| chain:spatial-ior-mc | 0.53 | 4.4 | 10.98 | +2.26 [−0.23, +5.13] | 6.11 | −0.41 [−1.72, +1.15] |
+| chain:object-ior | 0.49 | 4.6 | 12.50 | **+3.78 [+1.19, +6.50]** | 6.60 | +0.07 [−1.31, +1.43] |
+
+Within the chain, `chain:object-ior` minus `chain:spatial-ior-mc`: latency
+**+1.53 [+0.22, +3.39]**, staleness +0.48 [−0.37, +1.46]; minus `chain:spatial-ior`
++0.86 [−0.43, +2.31], −0.05 [−0.93, +0.84]. With camera compensation the same
+picture: segment-based object arms −0.7 to −1.1 staleness against the spatial
+arms, intervals including zero; `chain:object-ior` **+1.96** latency against
+both chain spatial arms. Compensated minus uncompensated, where it excludes
+zero, is *worse*: `spatial-ior-mc` latency +3.53 [+1.17, +6.21], `object-ior+id`
+latency +1.49 [+0.31, +2.83], `chain:spatial-ior-mc` staleness +1.57 [+0.23,
++3.02]; the ordering of the arms does not change.
+
+**The predictions, scored.**
+
+1. *Off-object share above 0.5 for every arm* — **holds for the spatial and
+   chain arms (0.49–0.61), not for the segment-based object arms (0.42–0.45)**;
+   no arm is below the refutation line of 0.4. Not predicted: object-based
+   inhibition on segments puts a sixth more of its fixations on the annotated
+   objects than space-based inhibition does (0.43 against 0.61) — an object
+   file, once inhibited, stays inhibited while it moves, and what is freed is
+   the background.
+2. *No difference between object-based and space-based inhibition excludes
+   zero; staleness point estimates favour object-based* — **holds for the
+   segment-based arms** (staleness −0.59 / −0.93 / −0.25, all intervals
+   including zero; latency ±0.6) and **is refuted against H1 for the chain**:
+   `chain:spatial-ior-mc` beats `chain:object-ior` on latency (+1.53 [+0.22,
+   +3.39]; with compensation +1.96 against both chain spatial arms); staleness
+   does not differ.
+3. *Camera compensation changes nothing* — **the ordering holds, the size does
+   not**: three compensated-minus-uncompensated differences exclude zero, all
+   for the worse. A phase-correlation estimate on scenes that are largely
+   moving objects and parallax, applied to every stored coordinate, adds error
+   more than it removes.
+
+### What real video says about H1
+
+Read together with the synthetic blocks: on DAVIS 2017 **the replication cannot
+decide H1** on the segment-based variant, and on the thesis's chain the one
+difference that excludes zero goes against it (latency, against the
+motion-compensated tag). The reason is in the first column of the table: half to
+three fifths of every arm's fixations land on things the ground truth does not
+name — crowds, tents, signs, trees — which are salient and are not what DAVIS
+annotates. Latency and staleness on the annotated objects are then decided by
+whether stage 1 ever selects them, and the inhibition domain is a second-order
+effect that 17 sequences cannot resolve. The chain's latency deficit is
+consistent with the synthetic finding that object-based inhibition on the field
+is only as good as the field's clusters: on natural video with a moving camera
+the field's clusters are large and merge (4–5 labels per object against 8–13 on
+segments, with fewer, bigger files), and inhibiting *them* inhibits more of the
+scene than inhibiting a location does.
+
+What this is evidence of: a limitation of the evaluation — the claim is about
+inhibition among *attended* objects, and a test of it on natural video needs a
+first stage or a ground truth that agree on what the objects are. What it is
+not: evidence for the claim on real video, which this study does not have. The
+tests that carry H1 remain the thesis's own world-model experiment (dossier,
+finding 22) and the synthetic regimes.
+
 ## Artifacts
 
 - `tools/make_dynamic_scene.py` — scene + `gt.json` generator (`dynamic-scene-gt/v1`).
