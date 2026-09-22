@@ -99,8 +99,8 @@ constexpr double kRecognized = 20.0; // px: beyond this the object does not coun
 // check, .github/workflows/replication.yml). This sampler is portable.
 double uniform(std::mt19937& rng, double lo, double hi)
 {
-  const double u = (rng() - std::mt19937::min()) /
-                   (static_cast<double>(std::mt19937::max()) - std::mt19937::min() + 1.0);
+  const double u =
+      (rng() - std::mt19937::min()) / (static_cast<double>(std::mt19937::max()) - std::mt19937::min() + 1.0);
   return lo + u * (hi - lo);
 }
 

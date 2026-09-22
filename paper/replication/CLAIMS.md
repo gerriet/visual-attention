@@ -76,6 +76,10 @@ Source: `docs/SCANPATH_VS_HUMAN.md`. Command
 | 3.7 | Unmatched score of a 4-fixation path falls below random (0.544 vs 0.636) while position/shape/length rise (+0.037 / +0.019 / +0.055) | "Update" | ok |
 | 3.8 | I-DT fixation extraction assumptions (240 Hz, column order) | "Honest caveats" | check — state the dispersion and duration thresholds in the paper |
 
+| 3.9 | **Determinism, not centrality**: constant centre 0.752 (gap 0.2) / 0.773 (gap 0) vs ceiling 0.757 / 0.782; sampled centre 0.688 / 0.718; random 0.638 / 0.674; constant − sampled +0.064 / +0.055 | `docs/SCANPATH_VS_HUMAN.md`, "Determinism, not centrality" | `eval/scanpath_vs_human.py --mit1003 --limit 200 --sample-seed 0 [--scanmatch-gap 0]`; `results/scanpath_gap02`, `results/scanpath_gap00` | ok — 200-image sample, not the full set |
+| 3.10 | Our ScanMatch uses gap 0.2 where Cristino et al. use 0; the length dependence is the normalisation by the longer sequence | `eval/attention_eval/scanpath.py` docstring | — | ok — every conclusion checked at both gap values |
+| 3.11 | The length confound is Jarodzka et al. 2010's point, not this paper's; what is ours is the own-length case and the below-random demonstration | paper §6.3 | — | check — Fahimi & Bruce 2021 unread (paywall) |
+
 ## Cross-platform
 
 | # | Claim | Value | Source | Status |
