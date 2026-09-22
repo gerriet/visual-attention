@@ -72,6 +72,11 @@ REGIMES = {
     "fast": {"scene": ["--objects", "4", "--frames", "40", "--speed", "40"], "ior_radius": 20},
     "occlusion": {"scene": ["--objects", "4", "--frames", "40", "--speed", "20", "--occlude",
                             "--occlude-len", "10"], "ior_radius": 18},
+    # Occlusion inside the neural field's tracking range (thesis Abb. 6.14 is about
+    # exactly this): the standard regime's speed with the occlusion regime's gap.
+    # Added 2026-09-22 for the field chain; the tag radius is the standard one.
+    "occlusion-slow": {"scene": ["--objects", "4", "--frames", "40", "--speed", "6", "--occlude",
+                                 "--occlude-len", "10"], "ior_radius": None},
 }
 
 # name -> (behavior, tracking flags, second-stage variant)

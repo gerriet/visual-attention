@@ -644,6 +644,23 @@ position-only −0.46 / −1.06 / −0.48, §7.2.3 −0.46 / −1.18 / −0.42, 
    *worst* behaviour; the spatial behaviours on the same clusters do not care
    whose cluster it is.
 
+### Occlusion inside the tracking range (prediction, written before the run, 2026-09-22)
+
+The occlusion regime moves objects at 8 field pixels per frame at 128 px — outside
+the range in which the thesis says its field tracks — so on the chain it tests
+the claim outside its stated domain. Thesis Abb. 6.14 is about identity through
+occlusion *at trackable speed*. New regime `occlusion-slow`: speed 6, a 10-frame
+occlusion, the standard tag radius; seeds 4000–4029, not yet generated at this
+commit; chain at 128 px.
+
+4. **Inside the tracking range, occlusion does not break object-based inhibition
+   on the chain.** `chain:object-ior` beats `chain:spatial-ior` and
+   `chain:spatial-ior-mc` on staleness, as in *standard*; the occluded object is
+   re-found with a new label more often than not (labels per object 2–4, against
+   3.0 in *standard*), so the latency advantage is smaller than in *standard* and
+   may not exclude zero. *(Refuted if `chain:object-ior` is worse than
+   `chain:spatial-ior` on staleness.)*
+
 ### Verdict on H1, refined
 
 **Supported — wherever the first stage delivers objects that can be tracked.**
