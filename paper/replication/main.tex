@@ -20,6 +20,8 @@
 \usepackage[round]{natbib}
 \usepackage[hidelinks,colorlinks=false]{hyperref}
 \usepackage{url}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,fit,backgrounds}
 
 \graphicspath{{../../docs/replication/figures/}{figures/}}
 
@@ -74,19 +76,37 @@ not by the downstream benchmark that they corrupted.
 \section{Introduction}
 \label{sec:intro}
 
-\todo{Opening paragraph: what the dissertation was, in two sentences a reader
-outside attention modelling can follow \citep{backer2004}. Cite the two earlier
-English-language publications of the model \citep{backer2001,backer2003}, since the
-thesis is in German.}
+A vision system that can afford to process only a small part of what it sees
+has to decide where to look next, and then not look there again. Models of
+visual attention in the tradition of \citet{koch1985} and \citet{itti1998} make
+that decision on a map: features are computed in parallel, fused into a saliency
+map, the maximum is selected, and the selected \emph{location} is suppressed so
+that the next maximum is somewhere else---inhibition of return. My 2004
+dissertation \citep{backer2004} argued that this breaks as soon as the scene
+moves. A location tag inhibits a place, but the object that was examined there
+has moved on; information extracted at a fixation is bound to coordinates that
+no longer hold it. The model it proposed therefore split selection in two: a
+first stage that keeps a handful of salient regions alive over time in a dynamic
+neural field, and a second, symbolic stage that maintains an \emph{object file}
+\citep{kahneman1992} per region and attaches inhibition of return to the object
+rather than to the place. Its central claim is that in multi-object dynamic
+scenes this is the better allocation of a serial process. Parts of the model
+were published in English \citep{backer2001,backer2003}; the thesis itself is in
+German.
 
-\todo{Why re-test now. (i) The claim's only quantitative support is the
-world-model experiment of thesis \S9.2 \citep[Fig.~5]{backer2003}: simulated
-master maps, 50 runs per condition, means without intervals, one hand-set
-baseline. (ii) The idea---a small symbolic world model that
-decides where an expensive serial process looks next---has a new use as a
-front-end for models with a token budget; that use needs the claim to be true.
-Keep (ii) to two sentences: it is the subject of separate work and not evaluated
-here.}
+Twenty years later I reimplemented it. The reason to re-test rather than only
+re-read is that the central claim was never tested the way such a claim would be
+tested now. Its quantitative support in the thesis is a single experiment
+(\S9.2, reproduced here as Section~\ref{sec:worldmodel}): 50 runs per condition
+on simulated saliency maps, reported as means without intervals, against one
+hand-configured baseline. Everything else is demonstration---figures of a system
+behaving sensibly on scenes chosen by its author. That was normal for the field
+and the time; it is not enough to know whether the claim is true. The mechanism
+has also acquired a second life: a small symbolic model of what is in a scene,
+deciding where an expensive process should look next, is the shape of problem a
+vision-language model with a token budget now faces. That use is the subject of
+separate work and is not evaluated here, but it is what made the question worth
+the effort.
 
 \paragraph{What this paper is, and is not.} It is a reimplementation and a
 re-test by the original author, with access to the thesis text and to part of the
@@ -119,12 +139,62 @@ Section~\ref{sec:sources} and Appendix~\ref{app:params}.
 \section{The 2004 model}
 \label{sec:model}
 
-\todo{One figure: the two stages (redraw thesis Abb.\ \todo{number}; own figure,
-no rights issue). Half a page of text per stage. Keep equations to those the
-dossier tests against: eq.~5.6 (eccentricity), 5.12 (sigmoid), 5.13--5.16
-(stereo), the exclusivity weighting, the field equation.}
+The model has three processing stages and two selection steps between them
+(Figure~\ref{fig:architecture}). Preattentive computations run over the whole
+image; the first selection step reduces them to a few candidate regions;
+\emph{semiattentive} computations maintain symbolic descriptions of those few
+over time; the second selection step picks one of them for the attentive stage,
+where expensive operations such as recognition run on that region alone. The
+middle stage is what distinguishes the model: conventional architectures step
+from a saliency map straight to one focus, so anything they extract is bound to
+a location, and anything they track has to be tracked by that location.
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[
+  font=\small, node distance=9mm and 12mm,
+  box/.style={draw, rounded corners=1.5pt, align=center, minimum height=8mm, minimum width=24mm, inner xsep=3pt},
+  arr/.style={-{Stealth[length=2mm]}, thick, black!70},
+  lbl/.style={font=\scriptsize, inner sep=1.5pt}]
+  % row 1, left to right: preattentive
+  \node[box] (input) {image sequence};
+  \node[box, right=of input] (features) {feature maps};
+  \node[box, right=of features] (saliency) {saliency\\representation};
+  % row 2, right to left: semiattentive
+  \node[box, below=of saliency] (field) {dynamic\\neural field};
+  \node[box, left=of field] (of) {object files};
+  \node[box, left=of of] (behavior) {behaviour};
+  % row 3, left to right: attentive
+  \node[box, below=of behavior] (foa) {focus of attention};
+  \node[box, right=of foa] (recog) {recognition};
+
+  \draw[arr] (input) -- (features);
+  \draw[arr] (features) -- node[lbl, above] {fusion,} node[lbl, below] {exclusivity} (saliency);
+  \draw[arr] (saliency) -- node[lbl, right] {\emph{first selection}} (field);
+  \draw[arr] (field) -- node[lbl, above] {activity} node[lbl, below] {clusters} (of);
+  \draw[arr] (of) -- (behavior);
+  \draw[arr] (behavior) -- node[lbl, left] {\emph{second selection}} (foa);
+  \draw[arr] (foa) -- (recog);
+  \draw[arr] (recog) -- node[lbl, right] {identity, class} (of);
+  \node[lbl, anchor=west, black!55] at ([yshift=6.5mm]input.north west) {\itshape preattentive: every pixel};
+  \node[lbl, anchor=east, black!55] at ([yshift=6.5mm]field.north east) {\itshape semiattentive: a few object files};
+  \node[lbl, anchor=west, black!55] at ([yshift=-6.5mm]foa.south west) {\itshape attentive: one region};
+\end{tikzpicture}
+\caption{The 2004 architecture. Two selection steps, with a semiattentive stage
+between them that keeps symbolic object files for a handful of regions over
+time. Inhibition of return lives in the behaviour, on object files---not on a
+map of locations. The behaviour also drives the camera of the active-vision
+system, which is not exercised in this paper. Redrawn after
+\citet[Fig.~2]{backer2003}.}
+\label{fig:architecture}
+\end{figure}
 
 \subsection{Stage one: region-based features and a neural field}
+The features are chosen for one purpose: to respond to \emph{objects} rather
+than to pixels, so that what the second stage tracks is object-like from the
+start. Each is computed on regions obtained by a fast segmentation, and each
+returns an absolute value in $[0,1]$ rather than a map normalised to its own
+maximum---a point that matters later (Section~\ref{sec:findingA}).
 \begin{itemize}
   \item \textbf{Colour contrast.} Transform to a perceptually uniform space
         (the mathematical transform to Munsell, \citealp{miyahara1988}); region
@@ -154,14 +224,34 @@ rather than min--max-normalised feature scales; a field that returns several
 clusters).}
 
 \subsection{Stage two: object files and inhibition of return on objects}
-\todo{Object files \citep{kahneman1992}; a handful of tracked entities
-\citep{pylyshyn1988}; correspondence by nearest centroid; behaviours that choose
-the focus among object files; inhibition of return \citep{posner1984,klein2000}
-attached to the object file, so that it moves with the object
-\citep{tipper1991}. The claim to be tested: in a dynamic scene this beats
-inhibiting locations. Related computational work on object-based attention:
-\citet{sun2003,walther2006} \todo{literature pass 2005--2026: proto-object models,
-object-based IOR in computational models, multi-object tracking as attention}.}
+Each activity cluster of the field gets an \emph{object file} \citep{kahneman1992}:
+a symbolic record holding the region's position, extent and trajectory, its mean
+feature values and a leaky-integrated history of them, when it was created, when
+it was last selected, and whatever later processing has concluded about it. The
+number of files is small by construction---the field sustains only a few
+clusters---which is the model's nod to the evidence that human vision indexes
+only a handful of objects at a time \citep{pylyshyn1988}. Between frames, files
+and clusters are put into correspondence by spatial proximity and feature
+similarity (\S7.2.3, the exact rule matters in Section~\ref{sec:chain}); a file
+whose cluster disappears becomes inactive but is kept, so that a reappearing
+object can reclaim its history rather than start again.
+
+The second selection step chooses one file. It operates on the symbols alone:
+the \emph{behaviour} sees positions, saliencies, selection times and labels, not
+the image. The default behaviour, ``exploration'', ranks files by how long ago
+they were last focally selected---never-selected files first, then the
+longest-unselected, ties broken by saliency---and dwells on its choice for about
+the duration of one attentive computation. That ranking \emph{is} inhibition of
+return \citep{posner1984,klein2000}, applied to an object: because the file
+follows its object, the inhibition travels with the object instead of staying
+where the object used to be, as the object-centred effects in human vision
+suggest it should \citep{tipper1991}. The claim to be tested is that in a
+dynamic scene this beats inhibiting locations.
+
+\todo{Related computational work 2005--2026 (proto-object models, object-based
+IOR in computational models, MOT as the correspondence stage): one paragraph,
+after the literature pass. Earlier object-based computational models:
+\citet{sun2003,walther2006}.}
 
 % ---------------------------------------------------------------------------
 \section{Reimplementation and protocol}
@@ -277,13 +367,38 @@ from the original, replicated after (Finding~A).}
 \end{table}
 
 \subsection{Features}
-\todo{Half a page. The quantitative anchors: eccentricity of a 2:1 ellipse 0.354
-against eq.~5.6's 0.360, of an 8:1 bar 0.934 against 0.940; symmetry falling
-0.67~$\to$~0.15 as the same object is stretched; colour contrast
-0.00~$\to$~0.32~$\to$~0.81~$\to$~0.98~$\to$~1.00; exclusivity ratio 1.51 for five
-bars against the predicted $1.1^4 = 1.46$. Figure~\ref{fig:ecc}. The side finding
-on histogram equalisation and three-level synthetic images belongs here as a
-warning about synthetic stimuli.}
+Where the thesis gives an equation, the reimplementation can be held to it.
+\textbf{Eccentricity} is defined to be 0 for a round region and 1 for a line, and
+is: 0.000 for a disk and for a square, 0.354 for an ellipse of axis ratio 2:1
+where eq.~5.6 gives 0.360, 0.934 for a bar of 8:1 where it gives 0.940. Stretching
+one object of constant area from 1:1 to 6:1 (Figure~\ref{fig:ecc}) tracks eq.~5.6
+to within 0.02 at every step, while its \textbf{symmetry} response falls
+monotonically, $0.67 \to 0.15$: the two features trade places as the thesis's
+figure shows. \textbf{Colour contrast} rises monotonically as a blob's colour
+moves away from its ground, $0.00 \to 0.32 \to 0.81 \to 0.98 \to 1.00$, saturating
+after a third of the way---the sigmoid of eq.~5.12 is steep on a contrast scale
+of 32 Munsell units, which the thesis's own argument (``high values are rare
+overall'') intends. Its two thresholds are insensitive over the range the thesis
+claims and beyond it, and the same two regions of the thesis's running example
+(a ball and a picture on a wall) stay the salient ones throughout; the variance
+term in the contrast earns its place, since without it the ball's response drops
+from 0.71 to 0.12. \textbf{Exclusivity} gives the odd one out the gain the
+formula predicts: five vertical bars and one horizontal, ratio odd-to-common
+$1.03 \to 1.51$ where $1.1^4 = 1.46$; for colour the following sigmoid stretches
+it further, to 2.13. Under added noise (20 seeds per level) the eccentricity
+maximum stays on its bar for 19 of 20 seeds at $\sigma \approx 38$ grey levels,
+14 of 20 at 64, and is lost beyond; the colour and symmetry maxima stay on their
+objects for every seed at every level tested, up to $\sigma \approx 115$.
+\src{dossier, findings 1--9}
+
+\paragraph{A trap for synthetic stimuli.} The eccentricity feature
+histogram-equalises its input, as the original does. On an image with three grey
+levels that maps a \emph{bright} object and a dominant background to nearly the
+same grey, the merge criterion then swallows the object, and the feature
+reports nothing where a human sees a bar. It does not arise on natural images,
+whose histograms are full; it arises exactly on the kind of clean synthetic
+stimulus a replication builds, and the same caution applies to the scenes of
+Section~\ref{sec:h1}.
 
 \begin{figure}[t]
 \centering
@@ -307,15 +422,40 @@ files, which is what thesis \S7.2.3 describes). \todo{revisit this verdict: with
 the correspondence the thesis specifies it may be ``replicated''.}
 
 \subsection{Depth}
-\todo{Synthetic pairs with known disparity: exact recovery for $d=0\ldots14$;
-9.91 of 10~px at noise $\sigma\approx90$ grey levels---\emph{without} the
-multi-scale scheme the thesis credits for the robustness, which is not ported: the
-finding replicates, the thesis's explanation is untested. Then the independent
-check on three Middlebury pairs \citep{scharstein2002}: 82--85\% of pixels within
-1~px at the default threshold; raising the threshold never reduces wrong pixels,
-it only discards correct ones. Note the corrected first reading (a synthetic band
-of pure noise suggested raising the threshold; real pairs say the opposite).
-Figure: \texttt{stereo\_real\_threshold.png}.}
+The depth feature is exercised on rendered random-dot pairs with known
+disparity, which carry no monocular cue---so every stimulus is also the
+random-dot stereogram of the thesis's Abb.~5.29. For a surface shifted by
+$0, 2, \ldots, 14$~px the estimated disparity is $0.0, 2.0, \ldots, 14.0$, with
+every surface pixel within one pixel of the truth and the ground at zero; the
+stereogram's square, whose mean grey differs from its ground by 3 of 255 and
+which is invisible in either image alone, is recovered completely. Under
+independent noise in the two images the estimate for a surface at 10~px is 10.0
+up to $\sigma \approx 38$, 9.99 at 64 and 9.91 at 90---``the estimate changes
+only in a very small range'', as the thesis says. The thesis credits its
+multi-scale scheme for that robustness; the scheme is \emph{not} ported, and the
+single-scale correlation with the spatial integration of eq.~5.14 is already
+this robust. The finding replicates; the thesis's explanation of it is untested
+here. Several near-vertical orientations help and the exact choice beyond one
+matters little (correct surface pixels at $\sigma = 90$: 0.84 for vertical only,
+0.92 with $\pm30^\circ$, 0.91 with $\pm15^\circ$ and $\pm30^\circ$), as claimed.
+
+The variance threshold, which rejects windows too flat to be matched, behaves as
+the thesis describes on a synthetic scene: below about 5 a textureless band is
+admitted and 89\% of its pixels get a wrong disparity; from about 20 the band is
+rejected; from 40 upward correct pixels start to go, the faint-textured surface
+first. But the practical advice that follows is the opposite of what that
+experiment alone suggests, and the first version of this dossier got it wrong.
+On three Middlebury pairs with ground truth \citep{scharstein2002}---data the
+thesis never saw---raising the threshold never buys fewer wrong pixels (their
+share stays at 12--20\% throughout) and only discards correct ones. The reason
+is visible when pixels are split by local texture: on the 40--50\% of each image
+with little grey-value variation, 81--86\% of the disparities are correct at
+threshold zero, because the spatial integration carries them from their textured
+surroundings. The errors sit at occlusions and depth discontinuities, which no
+variance threshold addresses. At the port's default the feature gets 82--85\% of
+all pixels with ground truth right, which is an independent check of the
+thesis's own summary of this feature (``in the great majority of regions the
+disparity has been determined correctly'').
 
 \subsection{Finding A: a symmetry feature that answered beside its objects}
 \label{sec:findingA}
@@ -404,15 +544,32 @@ check.}
 
 \subsection{Text or code?}
 \label{sec:textcode}
-\todo{A short paragraph and a compact version of the dossier's comparison table.
-The text's and the deployed system's parameter sets differ in the eccentricity
-and colour thresholds, exclusivity (1.1 vs.\ off) and the feature weights
-(1/1/1 vs.\ 1.2/0.35/1.6). Neither is decisively better: the text's values are
-the closer fit to the thesis's own equations (2:1 ellipse 0.35 vs.\ 0.19) and
-slightly ahead on agreement with human scanpaths ($-0.016$ [$-0.023$, $-0.008$]
-ScanMatch for code minus text); all other intervals include zero. H1 holds under
-both (Section~\ref{sec:h1}). General point: when text and code disagree, report
-both, and say which one the reader can check.}
+Where the thesis text and the deployed system disagree, which is ``the model''?
+They disagree in the eccentricity thresholds, the colour thresholds and the
+sigmoid's slope, in whether exclusivity is on at all, and in the feature weights
+(equal in the text, $1.2 / 0.35 / 1.6$ for symmetry, eccentricity and colour in
+the system). Both are kept runnable and compared on every benchmark the
+repository can run without a language model, paired on identical items. Neither
+is decisively better. The text's values are the closer fit to the thesis's own
+equations---the system adds a saliency offset that takes eccentricity off
+eq.~5.6, a 2:1 ellipse scoring 0.19 instead of 0.35---and are slightly ahead
+where a difference is measurable at all: on MIT1003 the model's own scanpath
+scores $0.016$ [$0.008$, $0.023$] ScanMatch higher with the text's values. On
+target coverage and on visual search every interval includes zero. The
+object-file readout's position agreement is the one place the system's values
+lead, by $0.008$ [$0.001$, $0.015$]. On the thesis's running example the two
+colour maps correlate at 0.92 and the two eccentricity maps at 0.59: eccentricity
+is where the variants really differ, and it is also the feature the system
+down-weights most, which is probably why so little of the difference reaches a
+benchmark.
+
+The documented replication profile follows the \emph{text}, because the text is
+what a reader can check; the system's values are a sibling profile. The general
+point is worth stating for other replications: when the text and the surviving
+code of an old system disagree, report both, say which one the reader can
+verify, and check that the paper's conclusions do not depend on the choice.
+Here they do not---the central claim holds under either parameter set
+(Section~\ref{sec:h1}).
 
 % ---------------------------------------------------------------------------
 \section{Study 2: object-based versus space-based inhibition of return}
@@ -533,8 +690,9 @@ discriminate.
 
 \subsection{Three runs, and why the third one stands}
 \label{sec:threeruns}
-\todo{This subsection is the spine of the paper; write it carefully and without
-hindsight polish.}
+The result above is the third answer this study gave to the same question. The
+first two were wrong, and they were wrong in a way worth reporting, because
+nothing about them looked careless at the time.
 \begin{enumerate}
   \item \textbf{Exploration} (July--September; $\le6$ seeds, no intervals):
         space-based inhibition at least as good as object-based, ``usually
@@ -551,6 +709,31 @@ hindsight polish.}
         involve inhibition of return. Same command, same arms, same committed
         predictions.
 \end{enumerate}
+
+Each explanation was mechanistically sensible and each was tested further. The
+tracker explanation predicted that a better tracker would close the gap; motion
+prediction and an appearance descriptor were added, they cut object-based
+inhibition's wasted revisits threefold, and the gap narrowed but did not close,
+which was read as confirmation that the bottleneck was real but deeper. The
+segmentation explanation was supported by a directly measured quantity: a third
+of the object-based arms' fixations landed on no object at all, so object files
+that were not objects were demonstrably being attended. Both explanations
+survived the obvious follow-up test. Neither was true of the 2004 model. The
+off-object third was the symmetry feature's rings---salient clusters in the empty
+space beside every disk, which only an object-based arm would select, because a
+location tag left on a moving disk frees the disk again and the disk outranks a
+ring. When the feature was ported faithfully, that share went to zero in every
+arm and the comparison changed sign.
+
+What makes the third run the one that stands is not that its answer is the one
+the thesis wanted. It is that the change between the second and the third was
+decided \emph{elsewhere}: by a single-disk experiment for a feature, judged
+against the thesis's Abb.~5.13 and 5.14, with no reference to inhibition of
+return; that the predictions were the second run's, committed before the first
+and left unchanged; and that they were pessimistic---three of the four were
+refuted, all in the direction of the thesis being right. A result that arrives by
+refuting one's own predictions is worth more than one that arrives by confirming
+them.
 
 \begin{table}[t]
 \caption{The re-run: 30 fresh scenes per regime. $\Delta$ is arm minus
@@ -836,14 +1019,44 @@ charging for unmatched fixations.
 \label{sec:discussion}
 
 \subsection{A negative result about a reimplementation}
-\todo{The argument, one page. For about ten weeks the project's record said that the
-thesis's central claim fails, with an explanation (``object-based IOR is only as
-good as its tracker'') that was mechanistically sensible, survived a better
-tracker, and was then replaced by a second sensible explanation (``what deserves
-an object file''). Both were wrong as accounts of the 2004 model; the cause was
-upstream, in a feature that produced salient clusters in empty space. What would
-have caught it earlier: the thesis's own smallest experiment for that feature---a
-single disk.}
+For most of this study's duration its written record said that the thesis's
+central claim fails. That record was not sloppy. It reported what had been
+measured, it named its own weaknesses, it offered a mechanism, and when the
+mechanism made a prediction the prediction was tested. It was still an artefact
+of two lines of code.
+
+The useful question is what would have caught it sooner, and the answer is
+uncomfortable, because the instrument that caught it was available from the
+start and is smaller than anything else in this paper: a white disk on a grey
+ground, with the question ``does the symmetry feature peak on it?''. That is the
+thesis's own Abb.~5.13, one of the demonstrations a modern reader is inclined to
+skip past on the way to the results. It fails in a single glance for the
+defective feature---the map's maximum lies about 80~px beside the disk, without
+noise, at every disk size---and it is the only test in this study that does.
+Every downstream measurement was corrupted by the same defect, and not one of
+them pointed at it: the object-coverage benchmarks reported plausible numbers,
+the scanpath study reported plausible numbers, and the H1 comparison reported a
+clean, interpretable, wrong result with an explanation attached.
+
+The same holds for the second infidelity. The neural field's parameters had been
+taken from the default arguments of the original's setter functions rather than
+from the program that configured the deployed system---eight times too little
+global inhibition, among other differences. Under those values the field's
+clusters never merge, noise leaks in at a third of the amplitude the thesis
+reports, and moving targets are lost; every one of those is visible in the
+thesis's own Abb.~6.4--6.10, and in nothing else that was being measured. A
+third instance appeared later still: over a stream the deployed system ran its
+field for a fixed number of cycles per frame, because its convergence test could
+never be met on noisy input, and the port's faithful-looking convergence check
+stopped it after three cycles and left ghost clusters behind moving objects
+(Section~\ref{sec:worldmodel}).
+
+Three infidelities, three different ways of being wrong about the same
+system---an algorithmic step, a parameter's provenance, a control-flow detail
+that no equation mentions---and in all three cases the unit-level experiment of
+the original found it and the headline benchmark did not. That is the case for
+replicating an old model's smallest demonstrations first, even when they look
+like decoration.
 
 Lessons, as far as one case supports them:
 \begin{itemize}
@@ -866,10 +1079,37 @@ Lessons, as far as one case supports them:
 \end{itemize}
 
 \subsection{What the thesis got right, and what it overstated}
-\todo{Right: object-based inhibition in dynamic scenes; the field's dynamics as
-described; feature behaviour. Overstated or untested: ``higher coverage'',
-``collapses''; the multi-scale explanation of stereo robustness. Not a
-model of human free viewing, and never claimed to be.}
+\textbf{Right.} The features behave as described, quantitatively where an
+equation is given. The neural field behaves as described---hysteresis, merging,
+noise suppression, tracking limits---once it runs on the parameters the system
+actually used. The depth feature recovers disparity exactly on synthetic pairs
+and correctly on four fifths of real ones. The world model the two-stage
+architecture maintains is the one the thesis reports, to the second decimal.
+And the central claim holds: with a first stage that delivers trackable objects,
+inhibition of return on objects reaches new objects sooner and keeps a scene more
+evenly covered than inhibition of return on locations, against a plain and a
+motion-compensated location tag, on four independent blocks of scenes.
+
+\textbf{Overstated, or true for a reason the thesis does not give.} ``Higher
+object coverage'' does not hold: every arm with any inhibition sees every object
+within 40 frames, and coverage is simply the wrong quantity. Space-based
+inhibition ``collapses'' with speed only in the sense of degrading badly; it
+still finds everything. The thesis's own comparison ``as soon as objects move''
+is earlier than this study can confirm: a conventional model built from the
+thesis's description is stronger than the thesis's own baseline was, and the
+two-stage model's extra cost per recognition is repaid only from three moving
+objects on. The robustness of the depth feature under noise is real but is not
+explained by the multi-scale scheme the thesis credits, since a single scale
+already has it. And identity through occlusion, which the thesis treats as a
+property of the architecture, is not delivered by the correspondence rule the
+thesis specifies---it needs an appearance descriptor and a memory that does not
+expire, neither of which is in the 2004 model.
+
+\textbf{Not claimed, and not found.} The model is not a model of human free
+viewing. Its scanpaths are slightly better than chance and well short of a
+constant central path on MIT1003 (Section~\ref{sec:h4}). The thesis never says
+otherwise; it is worth stating because a reader in 2026 will reach for that
+comparison first.
 
 \section{Limitations}
 \label{sec:limits}
@@ -903,14 +1143,29 @@ model of human free viewing, and never claimed to be.}
 \end{itemize}
 
 \section{Reproducibility}
-\todo{Tag \texttt{replication-v1}; archive with DOI (Zenodo). One command per
-study and its runtime on a laptop CPU: \texttt{eval/replication.py --all}
-($\sim$15~min); \texttt{eval/dynamic\_ior.py --regime all --seeds 30 --seed0 2000}
-($\sim$30~min); \texttt{eval/scanpath\_vs\_human.py --mit1003} (\todo{runtime}).
-Data: MIT1003, Middlebury 2001, DAVIS 2017---download instructions in the
-repository; none redistributed. Continuous integration runs the fidelity tests
-and behavioural goldens on Linux; the studies were run on macOS
-\todo{re-run Study 1 on Linux once and report whether any verdict moves}.}
+Every number in this paper is printed by one of four commands, on a laptop CPU,
+with no learned model and no API key:
+\begin{center}\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+Study & Command & Runtime \\
+\midrule
+1 (dossier) & \texttt{eval/replication.py -{}-all} & $\sim$60~min \\
+2 (H1) & \texttt{eval/dynamic\_ior.py -{}-regime all -{}-seeds 30 -{}-seed0 2000} & $\sim$2~h \\
+2 (real video) & \texttt{eval/dynamic\_ior.py -{}-davis data/DAVIS -{}-davis-split val} & $\sim$1~h \\
+3 (human gaze) & \texttt{eval/scanpath\_vs\_human.py -{}-mit1003} & \todo{runtime} \\
+\bottomrule
+\end{tabular}
+\end{center}
+The state that produced them is tagged: \texttt{replication-v1} for Studies 1--3
+as first reported, \texttt{replication-v2} after the thesis's own world-model
+experiment and its correspondence rule were added. \todo{Zenodo DOI for the
+tag.} Three datasets are used and none is redistributed: MIT1003
+\citep{judd2009}, the Middlebury 2001 stereo pairs \citep{scharstein2002} and
+DAVIS~2017 \citep{ponttuset2017}; the repository documents where to fetch each.
+Continuous integration builds and runs the full test suite---fidelity tests for
+every ported feature, behavioural goldens for the thesis profiles---on Linux at
+every commit. \todo{Study 1 on Linux: report whether any verdict moves.}
 
 \section*{Acknowledgements}
 \todo{B\"arbel Mertsching and the group in which the original system was built;
