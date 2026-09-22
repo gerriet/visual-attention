@@ -1,0 +1,63 @@
+# The replication dossier on Linux, on demand.
+#
+# The dossier's numbers (docs/replication/REPLICATION_DOSSIER.md) were measured
+# on macOS; the paper reports them, so at least once they have to be checked on
+# a second platform — different OpenCV build, different libm, different
+# rounding. This workflow runs every experiment that needs no downloaded data
+# and uploads the JSON, which is then compared against the macOS run
+# (tools/compare_replication.py).
+#
+# Manual: the full set takes ~20 min. The stereo-real experiment is skipped
+# (needs the Middlebury pairs, which are not in the repository), and the
+# world-model experiment runs 10 runs per condition rather than the dossier's 50
+# — the question here is whether the platform moves a number, not the
+# confirmatory value. Reproduce the macOS side with the same flags.
+name: Replication dossier (Linux)
+
+on:
+  workflow_dispatch:
+    inputs:
+      experiments:
+        description: "Comma-separated experiment names, or 'all-local'"
+        default: all-local
+        required: false
+
+jobs:
+  dossier:
+    runs-on: ubuntu-latest
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake g++ libopencv-dev libyaml-cpp-dev
+
+      - name: Set up Python evaluation venv
+        run: |
+          python3 -m venv eval/.venv
+          eval/.venv/bin/pip install --upgrade pip
+          eval/.venv/bin/pip install -r eval/requirements.txt
+
+      - name: Build
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build -j
+
+      - name: Run the dossier
+        run: |
+          if [ "${{ inputs.experiments }}" = "all-local" ]; then
+            ONLY="shapes,ecc-variation,gray-noise,grow-threshold,merge-threshold,colour-variation,colour-noise,colour-thresholds,exclusivity,symmetry-sides,stereo-distance,stereo-rds,stereo-noise,stereo-orientations,stereo-variance,text-vs-code,field,world-model"
+          else
+            ONLY="${{ inputs.experiments }}"
+          fi
+          eval/.venv/bin/python eval/replication.py --only "$ONLY" --no-plots \
+            --noise-seeds 20 --world-model-runs 10 \
+            --out results/replication_linux
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: replication-linux
+          path: results/replication_linux/replication.json

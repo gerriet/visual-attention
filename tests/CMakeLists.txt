@@ -100,7 +100,7 @@ if(Python3_Interpreter_FOUND)
             eval/priority_search.py eval/coco_search.py eval/plot_priority_search.py
             eval/vlm_frontend.py eval/plot_vlm_frontend.py eval/vlm_video.py eval/vlm_video_davis.py
             eval/coverage_table.py eval/dynamic_ior.py eval/check_scanpath.py
-            eval/compare_scanpath_json.py)
+            eval/compare_scanpath_json.py tools/compare_replication.py)
     # (eval/replication.py imports numpy: its --help runs under the eval venv, below)
         get_filename_component(script_name ${script} NAME_WE)
         add_test(NAME help_${script_name}

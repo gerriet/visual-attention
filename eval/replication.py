@@ -29,6 +29,8 @@ Replication track (docs/adr/0005): only dissertation components are exercised.
   field         Abb. 6.4-6.10 the neural field driven with synthetic activation (build/field_dynamics):
                            hysteresis, bifurcation, noise, convergence, tracking, two approaching
                            maxima — under the dissertation system's field parameters and the port's
+  symmetry-sides  finding A, quantified: the response of an edge on one side alone against a
+                           closed contour's, with and without the thesis's clip offset
   world-model   thesis 9.2, Abb. 9.2 (= WAPCV 2003, Fig. 5): the two-stage model against a conventional
                            inhibition-map model on simulated master maps — recognized objects and
                            position error, 50 runs per condition (build/world_model)
@@ -421,6 +423,10 @@ def exp_field(binary):
 # Development used seeds 0-9 (docs/replication/REPLICATION_DOSSIER.md, finding 22).
 WORLD_MODEL = {"seed0": 1000, "runs": 50}
 
+# Seeds per noise level (thesis gives no count; 5 was the first version's, 20
+# since 2026-09-22 — see the dossier, finding 3).
+NOISE = {"seeds": 20}
+
 # Read off the published figure (WAPCV 2003, Fig. 5), to about +-0.1: mean
 # recognized objects for 0..5 dynamic objects, and the conventional model's
 # position error in px (the two-stage model's is below 0.5 throughout).
@@ -521,7 +527,8 @@ def exp_ecc_variation(binary):
             "symmetry_first_to_last": [sym_values[0], sym_values[-1]]}
 
 
-def exp_gray_noise(binary, seeds=5):
+def exp_gray_noise(binary, seeds=None):
+    seeds = seeds or NOISE["seeds"]
     """A bar (eccentricity target) and a disk (symmetry target); does each
     feature's maximum stay on its target as noise grows?"""
     bar, disk = (60, 60, 260, 84), (270, 170, 350, 250)
@@ -553,6 +560,45 @@ def exp_gray_noise(binary, seeds=5):
             hits += inside(argmax_xy(m), (160, 110, 240, 190), 4)
         alone.append({"level": level, "symmetry_on_disk": hits / seeds})
     return {"levels": rows, "symmetry_disk_alone": alone, "sigma_gray_levels": [l * 128 for l in levels]}
+
+
+def exp_symmetry_sides(binary):
+    """Finding A's quantitative core: how much of a closed contour's symmetry
+    response does an edge on *one* side alone produce? The summation of eq.
+    5.2/5.3 is additive over the two opposite boxes, so a lone edge scores; the
+    original removes those responses with a fixed offset on an absolute scale.
+    The raw ratio is measured with the additive per-band bonus off and at gains
+    low enough that neither response reaches the clip at 1 — it is then
+    invariant to the gain and to the disk's radius, which the rows check; the
+    last rows add the bonus back and then the thesis's offset at gain 1."""
+    def responses(radius, offset, gain, bonus):
+        params = {"symmetry": {"clip_offset": offset, "gabor_gain": gain, "band_bonus": bonus}}
+        disk_img, d = canvas()
+        ellipse(d, 200, 150, radius, radius, (235,) * 3)
+        disk = feature_maps(binary, disk_img, ["symmetry"], params)["symmetry"]
+        edge_img, d = canvas()
+        d.rectangle([200, 0, 400, 300], fill=(235,) * 3)  # one straight edge at x = 200
+        edge = feature_maps(binary, edge_img, ["symmetry"], params)["symmetry"]
+        # The disk's response at its centre; the edge's maximum away from the
+        # image border (a lone edge has no centre of its own)
+        inner = (slice(40, 260), slice(40, 360))
+        centre = float(disk[150, 200])
+        return {"radius": radius, "clip_offset": offset, "gabor_gain": gain, "band_bonus": bonus,
+                "disk_centre": centre, "edge_max": float(edge[inner].max()), "saturated": centre >= 0.999,
+                "ratio_edge_to_disk": float(edge[inner].max() / centre) if centre > 0 else None}
+
+    rows = [responses(radius, 0.0, gain, 0.0) for radius in (12, 24, 40) for gain in (0.4, 0.25)]
+    rows.append(responses(24, 0.0, 0.4, 1.0 / 255))          # the bonus back
+    rows.append(responses(24, 60.0 / 255, 1.0, 1.0 / 255))   # the thesis's profile
+    # Per radius, the raw ratio (the two gains agree to 5 decimals)
+    raw = {}
+    for r in rows:
+        if r["clip_offset"] == 0 and r["band_bonus"] == 0 and not r["saturated"]:
+            raw.setdefault(r["radius"], []).append(r["ratio_edge_to_disk"])
+    return {"rows": rows,
+            "raw_ratio_by_radius": {radius: float(np.mean(v)) for radius, v in sorted(raw.items())},
+            "gain_invariant": all(max(v) - min(v) < 1e-3 for v in raw.values()),
+            "with_thesis_offset": rows[-1]["ratio_edge_to_disk"]}
 
 
 def sweep_on_running_example(binary, feature, param, values, default):
@@ -590,7 +636,8 @@ def exp_colour_variation(binary):
             "monotone": monotone_fraction(values, rising=True)}
 
 
-def exp_colour_noise(binary, seeds=5):
+def exp_colour_noise(binary, seeds=None):
+    seeds = seeds or NOISE["seeds"]
     blob = (155, 105, 245, 195)
     levels = [0.0, 0.1, 0.2, 0.3, 0.5, 0.7, 0.9]
     rows = []
@@ -666,6 +713,7 @@ EXPERIMENTS = {
     "text-vs-code": exp_text_vs_code,
     "field": exp_field,
     "world-model": exp_world_model,
+    "symmetry-sides": exp_symmetry_sides,
 }
 
 
@@ -876,11 +924,14 @@ def main():
     ap.add_argument("--figures", default=os.path.join(REPO, "docs", "replication", "figures"))
     ap.add_argument("--no-plots", action="store_true")
     ap.add_argument("--json", action="store_true")
+    ap.add_argument("--noise-seeds", type=int, default=NOISE["seeds"],
+                    help="seeds per level in the noise experiments (default %(default)s)")
     ap.add_argument("--world-model-seed0", type=int, default=WORLD_MODEL["seed0"],
                     help="world-model: first seed (default: the confirmatory block, %(default)s)")
     ap.add_argument("--world-model-runs", type=int, default=WORLD_MODEL["runs"],
                     help="world-model: runs per condition (default %(default)s, as in the thesis)")
     args = ap.parse_args()
+    NOISE["seeds"] = args.noise_seeds
     WORLD_MODEL["seed0"] = args.world_model_seed0
     WORLD_MODEL["runs"] = args.world_model_runs
 
