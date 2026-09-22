@@ -696,6 +696,73 @@ object-based inhibition keeps its advantage through a 10-frame occlusion.
   extension — not about the dissertation system.
 
 
+## Real video: DAVIS 2017 (2026-09-22)
+
+**Why.** Every H1 number above is from synthetic scenes of coloured disks. The
+paper needs one check on real video with ground truth for "which object was
+attended". DAVIS 2017 has per-frame instance masks; the 480p frames are the
+stream, the masks the ground truth (`eval/datasets/davis.py`); a focus is on an
+object when it lies on that object's mask dilated by 12 px. Test set: the
+validation sequences with at least two annotated objects (17 sequences, 34–99
+frames, 2–5 objects). Development: eight training sequences (crossing,
+dog-gooses, dancing, horsejump-low, schoolgirls, scooter-gray, swing,
+tractor-sand), all arms, with and without camera-motion compensation. Object
+speeds are 3–25 px per frame at 854 px width — 0.5–4 field pixels per frame on
+the 128-px field, inside its tracking range.
+
+**Camera motion.** Most DAVIS sequences pan. Location tags, object files and the
+field's activity are image coordinates; a moving camera moves the scene under
+them. Thesis §7.2.2 adjusts the coordinates by the camera movement (known from
+the active-vision platform there); here it is estimated by phase correlation of
+consecutive frames (`attention_system.camera_compensation`) and applied to
+everything the second stage stores. Both settings are run; without compensation
+is the primary one — the estimate is a reconstruction — and the compensated run
+is reported next to it.
+
+```bash
+eval/dynamic_ior.py --davis data/DAVIS --davis-split val --out results/h1_davis \
+  --chain-config configs/thesis/attend_field128.yaml \
+  --arms spatial-ior,spatial-ior-mc,object-ior,object-ior+7.2.3,object-ior+id,chain:spatial-ior,chain:spatial-ior-mc,chain:object-ior
+eval/dynamic_ior.py … --camera-compensation --out results/h1_davis_cam
+```
+
+### What the development set showed
+
+Between 50 and 90 per cent of every arm's fixations land on no annotated object
+— on the crowd behind the dancers, the tents and signs behind the tractor, the
+trees. They are not wrong: those things are salient, and DAVIS annotates the
+instances a segmentation benchmark cares about, not what a bottom-up system
+should attend. So latency and staleness on the annotated objects are decided
+mostly by whether stage 1 ever selects them, and the inhibition domain is a
+second-order effect on top of that. With eight sequences no difference between
+arms excluded zero; the point estimates for staleness favoured the object-based
+arms (`object-ior+7.2.3` −1.9, `chain:object-ior` −1.3 frames against
+`spatial-ior`), latency was noisy in both directions, and camera compensation
+changed nothing consistently.
+
+### Prediction, written down before the run (seeds: none — the 17 sequences are fixed; none has been scored)
+
+1. **Off-object share above 0.5 for every arm**, spatial and object-based, with
+   and without compensation. *(Refuted if any arm is below 0.4.)*
+2. **No difference between object-based and space-based inhibition excludes
+   zero** on latency or staleness, in either compensation setting, for any of
+   the object-based arms against `spatial-ior` or `spatial-ior-mc`. The point
+   estimates for staleness favour the object-based arms. *(Refuted — in H1's
+   favour — if an object-based arm beats both spatial arms on staleness with
+   intervals excluding zero; against it if a spatial arm beats an object-based
+   arm that way.)*
+3. **Camera compensation does not change the ordering** and no arm's
+   compensated-minus-uncompensated difference excludes zero.
+
+If 1–2 hold, the honest statement for the paper is: *on real video the
+replication cannot decide H1, because the thesis's bottom-up first stage attends
+mostly to things the ground truth does not name; the claim is a claim about
+inhibition among attended objects, and a test of it on natural video needs a
+first stage — or a ground truth — that agrees on what the objects are.* That is
+a limitation of the evaluation, not evidence against the claim; it is also the
+reason the world-model experiment (dossier, finding 22) and the synthetic
+regimes are the tests that carry it.
+
 ## Artifacts
 
 - `tools/make_dynamic_scene.py` — scene + `gt.json` generator (`dynamic-scene-gt/v1`).
