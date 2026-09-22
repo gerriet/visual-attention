@@ -217,11 +217,15 @@ maximum---a point that matters later (Section~\ref{sec:findingA}).
         clusters of activation that survive are the candidates handed to stage
         two. The field, not a fixed count, decides how many there are.
 \end{itemize}
-\todo{Relate to the saliency-map lineage \citep{treisman1980,koch1985,itti1998}
-in one paragraph: what is shared (parallel feature maps, fusion, a selection
-dynamics), what differs (regions rather than centre--surround pixels; absolute
-rather than min--max-normalised feature scales; a field that returns several
-clusters).}
+The lineage is the familiar one---parallel feature maps, a fusion into saliency,
+a selection dynamics \citep{treisman1980,koch1985,itti1998,borji2013survey}---and
+three things differ. The features are computed on \emph{regions} rather than on
+centre--surround differences between pixels, so what becomes salient is already
+a candidate object. Every feature map is on an absolute scale, not normalised to
+its own maximum, so ``nothing here is salient'' is representable; that turns out
+to matter more than it sounds (Section~\ref{sec:findingA}). And the selection
+step returns \emph{several} surviving clusters rather than one maximum, which is
+what makes a second stage possible at all.
 
 \subsection{Stage two: object files and inhibition of return on objects}
 Each activity cluster of the field gets an \emph{object file} \citep{kahneman1992}:
@@ -248,10 +252,49 @@ where the object used to be, as the object-centred effects in human vision
 suggest it should \citep{tipper1991}. The claim to be tested is that in a
 dynamic scene this beats inhibiting locations.
 
-\todo{Related computational work 2005--2026 (proto-object models, object-based
-IOR in computational models, MOT as the correspondence stage): one paragraph,
-after the literature pass. Earlier object-based computational models:
-\citet{sun2003,walther2006}.}
+\paragraph{Related work.} Object-based attention in computer vision was being
+built at the same time and has continued since. \citet{sun2003}, extended in
+\citet{sun2008}, is the closest contemporary in ambition---hierarchical
+selection over features, objects and groupings, with eye movements---and the
+2008 paper presents itself as the first implemented machine-vision model
+integrating object- and space-based attention. The proto-object line runs from
+\citet{walther2006} through \citet{orabona2007} to the border-ownership models
+of \citet{russell2014} and \citet{uejima2020}; \citet{wischnewski2010} share the
+two-stage framing most directly, with a selection stage over static and dynamic
+proto-objects. Whether objects predict fixations better than early saliency was
+argued out on the same data by \citet{einhauser2008} and \citet{borji2013objects}.
+Within the group the 2004 system came from, the region-based line continued with
+\citet{aziz2007}. On the field side, \citet{zibner2011} is the nearest prior art
+to this architecture---dynamic neural fields building a scene representation by
+controlling gaze---with the difference that there the persisting peak \emph{is}
+the object; there is no symbolic layer above it. Where identity has to survive
+more than a peak can carry, that work adds an explicit association step outside
+the field \citep{kamkar2022}, and recent field-based robotic search again needs
+two kinds of inhibition of return \citep{grieben2024}. The modern descendant of
+the object file is the persistent slot of object-centric learning
+\citep{locatello2020,peters2021}.
+
+\paragraph{The claim itself has been tested once, in 2023.} \citet{roth2023}
+build five scanpath models over dynamic real-world video and compare them
+against human gaze, among them a mixed model that is a single-module ablation:
+object-based attention and selection, but \emph{space}-based inhibition of
+return. Their overall finding favours object-based attention. On the specific
+question they are more careful than this paper's claim would like: they report
+that object-based \emph{selection} influences return-related measures more than
+the inhibition mechanism does, and they decline to decide whether inhibition of
+return is bound to objects or to locations, because their data contain too few
+return saccades. \citet{mengers2025} then reproduce the delay of returning
+saccades with no explicit inhibition of return at all, from segmentation
+uncertainty. The psychophysics the 2004 model relied on is likewise contested:
+\citet{tipper1991} found object-centred inhibition, \citet{mueller1996} found
+none in moving displays, and \citet{krueger2013} make it depend on prediction.
+Two implications for what follows. First, the comparison this paper runs---with
+latency to new objects and degradation with object speed as the dependent
+measures---has not been made before, in 2004 or since. Second, an intermediate
+position exists that the 2004 model does not consider: inhibition anchored in
+\emph{world} rather than image coordinates, as in the ego-sphere of
+\citet{ruesch2008}, which survives camera motion without knowing about objects.
+Section~\ref{sec:realvideo} effectively runs that baseline.
 
 % ---------------------------------------------------------------------------
 \section{Reimplementation and protocol}
@@ -1170,6 +1213,12 @@ comparison first.
   \item \textbf{The model changed between the two confirmatory H1 runs}
         (Section~\ref{sec:threeruns}); both are reported.
   \item \textbf{No learned saliency model} in Study~3.
+  \item \textbf{No head-to-head with the one prior test of the claim.}
+        \citet{roth2023} ask a version of the same question on human gaze over
+        natural video, with a different protocol (models fitted to human saccade
+        statistics, scored by scanpath similarity). Their setup is not re-run
+        here, and this paper's measures---latency to a new object, staleness of
+        the world model---are not theirs.
   \item The thesis is in German; quotations are my translations.
 \end{itemize}
 
