@@ -58,7 +58,7 @@ Twenty-two findings replicate and two replicate in part. The central claim holds
 on 30 fresh scenes per regime, object-based inhibition reaches new objects sooner
 and keeps cycling through a scene more evenly than space-based inhibition, also
 against a motion-compensated spatial baseline and under two parameter sets.
-\todo{one sentence on the real-video check once it has run.}
+On natural video (DAVIS~2017) the test is inconclusive, because the bottom-up first stage attends mostly to things the instance masks do not name.
 On still images the model's scanpaths are only slightly better than chance and
 do not beat a constant central path, which the thesis never claimed they would.
 The more general result is about replication itself. A first, approximate
@@ -106,7 +106,7 @@ Section~\ref{sec:sources} and Appendix~\ref{app:params}.
   \item A confirmatory test of the thesis's central claim, object-based versus
         space-based inhibition of return in dynamic scenes, with a strengthened
         baseline, fresh scenes and predictions committed before the run
-        (Section~\ref{sec:h1}). \todo{+ real video.}
+        (Section~\ref{sec:h1}), and a stated-inconclusive test on natural video.
   \item An evaluation of the model's scanpaths against human gaze on MIT1003,
         with two methodological findings about scoring scanpaths
         (Section~\ref{sec:h4}).
@@ -684,26 +684,42 @@ correspondence already carries most of the advantage.
 
 \subsection{Real video}
 \label{sec:realvideo}
-\todo{Planned; not run. The one experiment still to be added. Design sketch, to be
-fixed and committed \emph{before} any test sequence is scored:
-\begin{itemize}
-  \item Data: DAVIS~2017 \citep{ponttuset2017}, the multi-object sequences
-        (instance masks give per-frame ground truth for ``which object was
-        attended''). Split: a few training sequences for development; the
-        validation sequences with $\ge2$ annotated objects as the test set,
-        untouched until the predictions are committed.
-  \item Arms, metrics, profile: exactly those of Table~\ref{tab:arms} and
-        Table~\ref{tab:h1}; unit of the paired bootstrap: the sequence.
-  \item New issues to settle in development: annotated objects are a subset of
-        what is salient (off-object fixations are not errors---report them, do
-        not penalise); camera motion (the spatial arms inhibit image locations;
-        report results with and without global-motion compensation of the tags,
-        so the spatial baseline is not handicapped); sequences with one dominant
-        object carry no information about inhibition of return.
-  \item Prediction to be written: direction as in Table~\ref{tab:h1}, smaller
-        effect; refuted if \arm{object-ior} does not beat \arm{spatial-ior-mc} on
-        staleness.
-\end{itemize}}
+Every number so far is from synthetic scenes. DAVIS~2017 \citep{ponttuset2017}
+provides natural video with per-frame instance masks, which serve as ground
+truth for ``which object was attended'' (a focus on an object's mask, dilated
+by 12~px). Test set: the 17 validation sequences with at least two annotated
+objects (34--99 frames, 2--5 objects); development on eight training sequences;
+all arms of Table~\ref{tab:arms} on both first stages; predictions committed
+before any test sequence was scored (\texttt{ba3ab2d}). Most sequences pan, so
+every profile was also run with the second stage's coordinates moved by a
+phase-correlation estimate of the camera's shift (thesis \S7.2.2 adjusts
+coordinates by the camera movement, known there from the platform).
+\src{docs/DYNAMIC\_IOR\_STUDY.md, ``Real video''}
+
+\paragraph{Result.} The evaluation cannot decide the claim, and the reason is
+visible before any comparison: between 42\% and 61\% of every arm's fixations
+land on no annotated object---on the crowd behind the dancers, the tents behind
+the tractor, the trees. They are salient; DAVIS annotates what a segmentation
+benchmark cares about, not what a bottom-up system should attend. On the
+segment-based first stage no difference between object-based and space-based
+inhibition excludes zero (staleness $-0.6$ to $-0.9$ frames in the object-based
+arms' favour, 95\% intervals including zero); on the thesis's chain the one
+difference that excludes zero goes against it (latency $+1.53$ [$+0.22$,
+$+3.39$] against the motion-compensated tag), consistent with the synthetic
+finding that object-based inhibition on the field is only as good as the
+field's clusters, which on natural video are few and large. Camera compensation
+did not change the ordering and, where it changed a number with an interval
+excluding zero, made it worse. One unpredicted observation: object-based
+inhibition on segments puts a sixth more of its fixations on the annotated
+objects than space-based inhibition does (42--45\% against 60\%)---an inhibited
+object file stays inhibited as it moves; what a location tag frees is the
+object, what an object tag frees is the background.
+
+This is a limitation of the test, and it is stated as one: the claim concerns
+inhibition among \emph{attended} objects, and a test on natural video needs a
+first stage or a ground truth that agree on what the objects are. It is not
+evidence for the claim on real video. The tests that carry H1 remain
+Sections~\ref{sec:worldmodel} and~\ref{sec:chain}.
 
 % ---------------------------------------------------------------------------
 \section{Study 3: scanpaths against human gaze}
@@ -862,8 +878,9 @@ model of human free viewing, and never claimed to be.}
   \item \textbf{Rebuilt stimuli.} Except for one running example the thesis's
         images did not survive; experiments rebuild the kind of stimulus a figure
         describes.
-  \item \textbf{H1 on synthetic scenes} \todo{until Section~\ref{sec:realvideo}
-        has run}; one scene generator, disks of distinct colours.
+  \item \textbf{H1 rests on synthetic scenes}; the natural-video test
+        (Section~\ref{sec:realvideo}) is inconclusive for a stated reason. One
+        scene generator, disks of distinct colours.
   \item \textbf{Scope.} Two partial verdicts; not attempted: superposition and
         2D-versus-3D integration (Abb.~5.33, 5.35), systems of several fields
         (6.11, 6.12; not implemented), the 3D field's dynamics (6.13), the

@@ -87,3 +87,54 @@ class TestStaleness(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestDavisAdapter(unittest.TestCase):
+    """The DAVIS ground truth and mask lookup on a synthetic two-object mask."""
+
+    def _root(self):
+        import tempfile
+        import numpy as np
+        from PIL import Image
+        root = tempfile.mkdtemp()
+        for d in ("JPEGImages/480p/seq", "Annotations/480p/seq", "ImageSets/2017"):
+            os.makedirs(os.path.join(root, d))
+        with open(os.path.join(root, "ImageSets/2017/val.txt"), "w") as fh:
+            fh.write("seq\n")
+        for f in range(3):
+            mask = np.zeros((60, 80), dtype=np.uint8)
+            mask[10:30, 10 + 5 * f:30 + 5 * f] = 1  # object 1 moves right 5 px per frame
+            if f < 2:
+                mask[40:50, 60:70] = 2  # object 2 disappears on the last frame
+            img = Image.fromarray(mask, "P")
+            img.putpalette([0, 0, 0, 128, 0, 0, 0, 128, 0] + [0] * (768 - 9))  # DAVIS-style palette
+            img.save(os.path.join(root, "Annotations/480p/seq/%05d.png" % f))
+            Image.fromarray(np.zeros((60, 80, 3), dtype=np.uint8)).save(
+                os.path.join(root, "JPEGImages/480p/seq/%05d.jpg" % f))
+        return root
+
+    def test_ground_truth_and_lookup(self):
+        from datasets import davis
+        root = self._root()
+        gt = davis.ground_truth(root, "seq")
+        self.assertEqual(gt["frames"], 3)
+        self.assertEqual([o["id"] for o in gt["objects"]], [1, 2])
+        one = gt["objects"][0]["positions"]
+        self.assertEqual((one[0]["x"], one[0]["y"]), (20, 20))  # centroid 19.5 of [10,30), rounded
+        self.assertEqual(one[2]["x"] - one[0]["x"], 10)
+        two = gt["objects"][1]["positions"]
+        self.assertTrue(two[1]["visible"])
+        self.assertFalse(two[2]["visible"])
+        lookup = davis.MaskLookup(gt, margin_px=4)
+        self.assertEqual(lookup.object_at(0, 20, 20), 1)
+        self.assertEqual(lookup.object_at(0, 33, 20), 1)   # within the margin
+        self.assertIsNone(lookup.object_at(0, 40, 20))     # beyond it
+        self.assertEqual(lookup.object_at(1, 65, 45), 2)
+        self.assertIsNone(lookup.object_at(2, 65, 45))     # gone
+        self.assertIsNone(lookup.object_at(0, -1, 5))
+        # score() with the lookup: a path on object 1 then 2 covers both
+        path = [{"frame": 0, "x": 20, "y": 20, "label": 1}, {"frame": 1, "x": 65, "y": 45, "label": 2},
+                {"frame": 2, "x": 5, "y": 55, "label": 3}]
+        m = dio.score(gt, path, 0.0, lookup)
+        self.assertEqual(m["coverage"], 1.0)
+        self.assertAlmostEqual(m["off_object"], 1 / 3)

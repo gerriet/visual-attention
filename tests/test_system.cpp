@@ -666,3 +666,67 @@ TEST_CASE("attention_system config: cluster source and correspondence rule", "[s
   CHECK_THROWS_AS(system::AttentionSystem::apply_config_yaml("object_files:\n  correspondence: nearest\n", cfg),
                   std::runtime_error);
 }
+
+TEST_CASE("camera compensation: stored coordinates follow a panning camera", "[system][camera]")
+{
+  // A textured scene shifted by a known translation from frame to frame: the
+  // estimated shift must equal it in sign and size, and object files must move
+  // with the scene.
+  cv::Mat scene(400, 500, CV_8UC3);
+  cv::RNG rng(7);
+  rng.fill(scene, cv::RNG::UNIFORM, 0, 255);
+  cv::GaussianBlur(scene, scene, cv::Size(0, 0), 2.0);
+  cv::circle(scene, cv::Point(250, 200), 25, cv::Scalar(0, 0, 255), -1);
+
+  system::AttentionSystem::Config cfg;
+  system::AttentionSystem::apply_config_yaml("camera_compensation: true\n", cfg);
+  cfg.pipeline.selection = "nms";
+  system::AttentionSystem sys(cfg);
+  sys.reset();
+  const cv::Point2f pan(6.0f, -4.0f); // the camera pans: the scene moves by this per frame
+  int disk_label = 0;
+  cv::Point disk_at_start;
+  for (int t = 0; t < 4; ++t)
+  {
+    const cv::Point2f offset = pan * static_cast<float>(t);
+    const cv::Mat warp = (cv::Mat_<double>(2, 3) << 1, 0, offset.x, 0, 1, offset.y);
+    cv::Mat frame;
+    cv::warpAffine(scene, frame, warp, scene.size(), cv::INTER_LINEAR, cv::BORDER_REFLECT);
+    frame = frame(cv::Rect(40, 40, 400, 300)).clone(); // crop away the reflected borders
+    sys.process_frame(frame);
+    if (t == 0)
+    {
+      // The file nearest the disk (at 250 - 40, 200 - 40 in the crop)
+      double best = 1e9;
+      for (const auto& file : sys.active_files())
+      {
+        const double d = cv::norm(file.centroid - cv::Point(210, 160));
+        if (d < best)
+        {
+          best = d;
+          disk_label = file.label;
+          disk_at_start = file.centroid;
+        }
+      }
+      REQUIRE(best < 40.0);
+    }
+    else
+    {
+      CHECK(std::abs(sys.last_camera_shift().x - pan.x) < 1.0f);
+      CHECK(std::abs(sys.last_camera_shift().y - pan.y) < 1.0f);
+    }
+  }
+  // The same file, three pans later, has moved with the scene
+  bool kept = false;
+  for (const auto& file : sys.active_files())
+  {
+    if (file.label == disk_label)
+    {
+      kept = true;
+      const cv::Point expected = disk_at_start + cv::Point(18, -12);
+      // (the centroid is the current cluster's, so segmentation jitter adds to this)
+      CHECK(cv::norm(file.centroid - expected) < 20.0);
+    }
+  }
+  CHECK(kept);
+}

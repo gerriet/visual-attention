@@ -67,7 +67,7 @@ Open: the 128-px field size is ours, not the thesis's — state the dependence.
    clusters) in `docs/replication/WAPCV_2003_NOTES.md`. CPU only. Recommended
    before (1): it is the thesis's own experiment and the only one defined on
    the chain field → clusters → object files.
-1. **H1 on real video** (decided 2026-09-21: it goes into this paper). DAVIS
+1. ~~H1 on real video~~ — **done 2026-09-22, inconclusive** (42–61 % of fixations off the annotated objects for every arm; no object-vs-space difference excludes zero on segments; on the chain one goes against). Paper §5.6 states it as a limitation of the test. What it was: DAVIS
    2017 multi-object sequences; design sketch in `main.tex` §5.4. Needs: a
    DAVIS adapter that writes the `dynamic-scene-gt/v1` ground truth from the
    instance masks; a development / test split fixed up front; predictions

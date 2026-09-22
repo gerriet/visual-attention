@@ -109,6 +109,9 @@ class HistoryChannels
 
   const cv::Mat& location_map() const { return location_; }
 
+  // Camera-motion compensation: move the location history with the scene.
+  void displace(const cv::Point2f& shift);
+
  private:
   PriorityConfig config_;
   cv::Mat location_; // CV_32F, frame-sized, decayed each frame

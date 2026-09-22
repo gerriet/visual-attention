@@ -34,6 +34,14 @@ class Behavior
   virtual const ObjectFile* select_focus(ObjectFileStore& store, int frame) = 0;
 
   virtual void reset() = 0;
+
+  /**
+   * The camera moved: image coordinates the behavior stores (location tags)
+   * shift by `shift`, so they stay on the scene points they were left on.
+   * Thesis §7.2.2: coordinates are adjusted by the camera movement. Default:
+   * nothing to shift.
+   */
+  virtual void displace(const cv::Point2f& /*shift*/) {}
 };
 
 /**
@@ -136,6 +144,8 @@ class IorBehavior : public Behavior
   Mode mode_;
   std::string name_;
   Params params_;
+  void displace(const cv::Point2f& shift) override;
+
   std::vector<Spot> spatial_;         // Spatial mode: decaying location tags
   std::map<int, float> object_inhib_; // Object mode: decaying inhibition by label
 };

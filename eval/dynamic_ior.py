@@ -144,8 +144,12 @@ def first_visible_frame(obj):
     return 0
 
 
-def attended_object(gt, frame, x, y, match_radius):
-    """The visible object whose centroid is nearest (x, y) within match_radius."""
+def attended_object(gt, frame, x, y, match_radius, lookup=None):
+    """The visible object whose centroid is nearest (x, y) within match_radius —
+    or, with a mask `lookup` (real video), the object whose mask the point lies
+    on."""
+    if lookup is not None:
+        return lookup.object_at(frame, x, y)
     best_id, best_d2 = None, match_radius * match_radius
     for oid, ox, oy in visible_objects(gt, frame):
         d2 = (ox - x) ** 2 + (oy - y) ** 2
@@ -169,7 +173,7 @@ def staleness(gt, attended_by_frame):
     return total / count if count else 0.0
 
 
-def score(gt, scanpath, match_radius):
+def score(gt, scanpath, match_radius, lookup=None):
     n_obj = len(gt["objects"])
     n_frames = gt["frames"]
     covered, first_attended = set(), {}
@@ -179,7 +183,7 @@ def score(gt, scanpath, match_radius):
 
     for entry in sorted(scanpath, key=lambda e: e["frame"]):
         f = entry["frame"]
-        oid = attended_object(gt, f, entry["x"], entry["y"], match_radius)
+        oid = attended_object(gt, f, entry["x"], entry["y"], match_radius, lookup)
         if oid is None:
             off += 1
             prev = None
@@ -261,6 +265,26 @@ def identity_config(config, overlay=None):
     return handle.name
 
 
+def with_camera_compensation(config):
+    """A temp copy of `config` with attention_system.camera_compensation on —
+    inserted into an existing attention_system: block, or appended as one."""
+    with open(config) as fh:
+        lines = fh.read().splitlines(True)
+    out = []
+    inserted = False
+    for line in lines:
+        out.append(line)
+        if line.startswith("attention_system:") and not inserted:
+            out.append("  camera_compensation: true\n")
+            inserted = True
+    if not inserted:
+        out.append("\nattention_system:\n  camera_compensation: true\n")
+    handle = tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False)
+    handle.write("".join(out))
+    handle.close()
+    return handle.name
+
+
 def run_regime(binary, config, regime, seeds, seed0, out_dir, match_radius, arms, resume=False):
     """{arm: [per-scene metric dict]} over `seeds` generated scenes."""
     preset = REGIMES[regime]
@@ -285,6 +309,48 @@ def run_regime(binary, config, regime, seeds, seed0, out_dir, match_radius, arms
     return rows
 
 
+def run_davis(binary, config, root, split, min_objects, sequences, out_dir, arms, mask_margin, resume=False,
+              camera=False):
+    """{arm: [per-sequence metric dict]} over the DAVIS 2017 sequences of `split`
+    with at least `min_objects` annotated objects (or the named `sequences`).
+    Frames are the 480p JPEGs; ground truth comes from the instance masks
+    (eval/datasets/davis.py); a focus is on an object when it lies on that
+    object's mask dilated by `mask_margin` px. With `camera`, every profile runs
+    with camera-motion compensation (thesis 7.2.2)."""
+    sys.path.insert(0, os.path.join(REPO, "eval"))
+    from datasets import davis
+    names = sequences or davis.sequences(root, split)
+    id_config = identity_config(config)
+    thesis_config = identity_config(config, THESIS_CORRESPONDENCE_YAML)
+    variants = {None: config, "id": id_config, "thesis": thesis_config, "chain": CHAIN_OVERRIDE[0] or CHAIN_CONFIG}
+    temp = [id_config, thesis_config]
+    if camera:
+        variants = {k: with_camera_compensation(v) for k, v in variants.items()}
+        temp += list(variants.values())
+    rows = {arm: [] for arm in arms}
+    used = []
+    try:
+        for seq in names:
+            gt_path = os.path.join(out_dir, seq, "gt.json")
+            if resume and os.path.exists(gt_path):
+                gt = load_json(gt_path)
+            else:
+                gt = davis.write_ground_truth(root, seq, gt_path)
+            if len(gt["objects"]) < min_objects:
+                continue
+            used.append(seq)
+            lookup = davis.MaskLookup(gt, mask_margin)
+            for arm in arms:
+                behavior, tracking, variant = STUDY_ARMS[arm]
+                scanpath = run_arm(binary, davis.frame_dir(root, seq), variants[variant], behavior,
+                                   os.path.join(out_dir, seq, "arms", arm), None, tracking, resume)
+                rows[arm].append(score(gt, scanpath, 0.0, lookup))
+    finally:
+        for path in temp:
+            os.unlink(path)
+    return rows, used
+
+
 def summarize_regime(rows, reference=REFERENCE_ARM):
     """Per arm and metric: mean, its CI over scenes, and the paired difference
     to the reference arm over the same scenes."""
@@ -301,7 +367,7 @@ def summarize_regime(rows, reference=REFERENCE_ARM):
 
 
 def format_regime(regime, summary, reference=REFERENCE_ARM, metrics=("mean_latency", "staleness", "revisit_waste")):
-    summary = {arm: m for arm, m in summary.items() if arm != "scenes"}
+    summary = {arm: m for arm, m in summary.items() if arm not in ("scenes", "sequences")}
     n = next(iter(summary.values()))["coverage"]["n"]
     lines = ["", "regime: %s  (%d scenes; differences are paired, arm minus %s, 95%% CI)" % (regime, n, reference)]
     header = "%-16s %8s %8s %8s" % ("arm", "cover", "off-obj", "labels") + "".join(
@@ -343,6 +409,16 @@ def main():
     ap.add_argument("--chain-config", default=CHAIN_CONFIG,
                     help="profile of the chain:* arms (default: %(default)s)")
     ap.add_argument("--arms", default=",".join(STUDY_ARMS), help="study arms, comma-separated")
+    ap.add_argument("--davis", default=None, metavar="ROOT",
+                    help="real video: run the arms on DAVIS 2017 sequences under ROOT (masks as ground truth)")
+    ap.add_argument("--davis-split", default="val", choices=["train", "val"])
+    ap.add_argument("--davis-min-objects", type=int, default=2,
+                    help="skip sequences with fewer annotated objects (default %(default)s)")
+    ap.add_argument("--davis-sequences", default="", help="comma-separated sequence names (default: the split)")
+    ap.add_argument("--mask-margin", type=float, default=12.0,
+                    help="DAVIS: a focus within this many px of an object's mask is on it (default %(default)s)")
+    ap.add_argument("--camera-compensation", action="store_true",
+                    help="DAVIS: every profile with attention_system.camera_compensation on")
     ap.add_argument("--resume", action="store_true",
                     help="reuse the scanpaths already under --out (the pipeline is deterministic; "
                          "scenes are regenerated from their seed)")
@@ -367,6 +443,24 @@ def main():
     if not os.path.exists(args.binary):
         sys.exit("binary not found: %s (build first: cmake --build build)" % args.binary)
     CHAIN_OVERRIDE[0] = os.path.abspath(args.chain_config)
+    if args.davis:
+        arms = [a.strip() for a in args.arms.split(",")]
+        unknown = [a for a in arms if a not in STUDY_ARMS]
+        if unknown:
+            sys.exit("unknown arm(s): %s (available: %s)" % (", ".join(unknown), ", ".join(STUDY_ARMS)))
+        names = [n.strip() for n in args.davis_sequences.split(",") if n.strip()]
+        rows, used = run_davis(args.binary, args.config, args.davis, args.davis_split, args.davis_min_objects,
+                               names, args.out, arms, args.mask_margin, args.resume, args.camera_compensation)
+        label = "davis-%s%s" % (args.davis_split, "-camera" if args.camera_compensation else "")
+        summary = summarize_regime(rows, args.reference)
+        summary["scenes"] = rows
+        summary["sequences"] = used
+        print(format_regime(label, summary, args.reference))
+        os.makedirs(args.out, exist_ok=True)
+        with open(os.path.join(args.out, "summary.json"), "w") as fh:
+            json.dump({"config": vars(args), "regimes": {label: summary}}, fh, indent=2)
+        print("\nsummary: %s" % os.path.join(args.out, "summary.json"))
+        return
     if args.regime:
         arms = [a.strip() for a in args.arms.split(",")]
         unknown = [a for a in arms if a not in STUDY_ARMS]
