@@ -637,6 +637,29 @@ with the time unseen, and no expiry, none of which is the thesis's.
 | §9.3.2, §9.3.3 | flanker compatibility; early vs late selection | qualitative demonstrations |
 | ~~§9.2, Abb. 9.1–9.2~~ → finding 22 | **the thesis's own quantitative test of its central claim:** world-model quality (recognized objects, position error) of the two-stage model against a conventional inhibition-map model, 1/3/5 static × 0–5 dynamic objects, 50 runs of 40 frames | **missed when this dossier was built** (it drew on ch. 5–6); found 2026-09-21 on reading the WAPCV paper. Fully specified and CPU-only — to be replicated as finding 22. See `WAPCV_2003_NOTES.md`, which also records that the "thesis correspondence" of finding 10 is weaker than thesis §7.2.3 and that `--attend` forms object files from saliency segments, not from the field's activity clusters |
 
+## The dossier on a second platform (2026-09-22)
+
+The numbers above are macOS numbers, and the paper reports them. Every
+experiment that needs no downloaded data was therefore run once on Linux —
+different OpenCV build, different C++ standard library, different libm — through
+a manually dispatched CI job (`.github/workflows/replication.yml`), and compared
+value by value (`tools/compare_replication.py`).
+
+**Of 1420 compared values, none differs by more than 1e-3, and exactly one by
+more than 1e-4** (the share of wrongly matched pixels in a textureless band, at
+one threshold: 0.8847 against 0.8849). No verdict in this dossier depends on the
+platform.
+
+The exception was the world-model experiment, and it was a real defect rather
+than numerical noise: `std::uniform_real_distribution` is
+implementation-defined, so libc++ and libstdc++ draw different sequences from
+the same seeded generator and the same seed produced *different scenes* on the
+two platforms. The scenes are now sampled by a portable routine
+(`examples/world_model.cpp`) and finding 22 was re-run on the same seeds with
+the same predictions; both sets of numbers are reported there. The practical
+lesson for anyone re-running an old experiment: a seed is not a guarantee of the
+same data unless the sampler is fixed too.
+
 ## What the dossier says about the reimplementation
 
 - The three static features, all ported from the original sources in 2026-09 —

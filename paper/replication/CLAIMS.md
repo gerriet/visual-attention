@@ -76,6 +76,13 @@ Source: `docs/SCANPATH_VS_HUMAN.md`. Command
 | 3.7 | Unmatched score of a 4-fixation path falls below random (0.544 vs 0.636) while position/shape/length rise (+0.037 / +0.019 / +0.055) | "Update" | ok |
 | 3.8 | I-DT fixation extraction assumptions (240 Hz, column order) | "Honest caveats" | check — state the dispersion and duration thresholds in the paper |
 
+## Cross-platform
+
+| # | Claim | Value | Source | Status |
+|---|---|---|---|---|
+| 4.1 | Study 1 on Linux vs macOS: of 1420 values none differs by more than 1e-3, one by more than 1e-4 (0.8847 vs 0.8849) | dossier, "The dossier on a second platform" | `.github/workflows/replication.yml` (manual) → artifact; `tools/compare_replication.py --exclude world-model`; `results/replication_linux`, `results/replication_macos` | ok |
+| 4.2 | The world-model scenes were not portable: `std::uniform_real_distribution` is implementation-defined, so the same seed gave different scenes on libc++ and libstdc++; fixed, finding 22 re-run | same; commit `eee75a5` | `results/replication_world_model_libcxx.json` keeps the pre-fix run | **open** — re-run in flight |
+
 ## Statements that are not numbers, and who vouches for them
 
 | Statement | Basis |

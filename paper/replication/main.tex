@@ -1245,7 +1245,21 @@ tag.} Three datasets are used and none is redistributed: MIT1003
 DAVIS~2017 \citep{ponttuset2017}; the repository documents where to fetch each.
 Continuous integration builds and runs the full test suite---fidelity tests for
 every ported feature, behavioural goldens for the thesis profiles---on Linux at
-every commit. \todo{Study 1 on Linux: report whether any verdict moves.}
+every commit, and Study~1 was run there once in full and compared with the
+macOS run value by value: of 1420 compared numbers none differs by more than
+$10^{-3}$ and exactly one by more than $10^{-4}$. No verdict depends on the
+platform.
+
+That comparison did find one real defect, worth reporting because it is a trap
+for any replication of an old experiment. The world-model experiment's scenes
+are drawn from a seeded generator, but through
+\texttt{std::uniform\_real\_distribution}, which the C++ standard leaves
+implementation-defined: the two standard libraries draw different sequences from
+the same seed, so the same ``seed 1000'' was a different scene on the two
+machines. A seed is not a guarantee of the same data unless the sampler is
+pinned as well. The scenes are now drawn by a portable routine and
+Section~\ref{sec:worldmodel} reports the re-run. \todo{numbers, when it
+finishes.}
 
 \section*{Acknowledgements}
 The original system was built in B\"arbel Mertsching's group, and the parts of it
