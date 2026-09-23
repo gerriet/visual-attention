@@ -1,11 +1,15 @@
 // M6 tests: the symbolic second stage — object files, the Exploration
 // behavior, and the AttentionSystem end to end on the motion sequence.
 
+#include "attention/io/trace_writer.h"
 #include "attention/system/attention_system.h"
 #include "attention/system/behavior.h"
 #include "attention/system/object_file.h"
 #include <catch2/catch_test_macros.hpp>
 #include <filesystem>
+#include <fstream>
+#include <iomanip>
+#include <sstream>
 #include <stdexcept>
 
 namespace fs = std::filesystem;
@@ -729,4 +733,65 @@ TEST_CASE("camera compensation: stored coordinates follow a panning camera", "[s
     }
   }
   CHECK(kept);
+}
+
+TEST_CASE("trace writer: one record per frame, fixed map scales", "[system][trace]")
+{
+  const fs::path dir = fs::temp_directory_path() / "attention_trace_test";
+  fs::remove_all(dir);
+
+  system::AttentionSystem::Config cfg;
+  cfg.pipeline.selection = "neural-field";
+  system::AttentionSystem sys(cfg);
+  sys.reset();
+
+  io::TraceWriter trace(dir.string());
+  cv::RNG rng(3);
+  for (int t = 0; t < 3; ++t)
+  {
+    cv::Mat frame(120, 160, CV_8UC3);
+    rng.fill(frame, cv::RNG::UNIFORM, 40, 90);
+    cv::circle(frame, cv::Point(40 + 20 * t, 60), 14, cv::Scalar(30, 30, 220), -1);
+    sys.process_frame(frame);
+    trace.write_frame(sys);
+  }
+  trace.finish(sys);
+
+  CHECK(trace.frames_written() == 3);
+  REQUIRE(fs::exists(dir / "trace.json"));
+  for (int t = 0; t < 3; ++t)
+  {
+    std::ostringstream name;
+    name << "frame_" << std::setw(4) << std::setfill('0') << t;
+    const fs::path frame_dir = dir / name.str();
+    INFO("frame dir " << frame_dir);
+    REQUIRE(fs::exists(frame_dir / "state.json"));
+    REQUIRE(fs::exists(frame_dir / "saliency.png"));
+    CHECK(fs::exists(frame_dir / "field.png")); // the pipeline's selection is a field
+  }
+
+  // The saliency map is written on the fixed [0, 1] scale, not stretched: a
+  // 16-bit read back must match the pipeline's own map.
+  const cv::Mat stored = cv::imread((dir / "frame_0002" / "saliency.png").string(), cv::IMREAD_UNCHANGED);
+  REQUIRE(!stored.empty());
+  REQUIRE(stored.type() == CV_16U);
+  cv::Mat decoded;
+  stored.convertTo(decoded, CV_32F, 1.0 / 65535.0);
+  const cv::Mat& original = sys.pipeline().get_saliency_map().map;
+  REQUIRE(decoded.size() == original.size());
+  CHECK(cv::norm(decoded, original, cv::NORM_INF) < 1e-3);
+
+  // state.json names the frame, carries the objects, and records the field's
+  // true range so a reader can tell whether the fixed encoding clipped.
+  std::ifstream in((dir / "frame_0002" / "state.json").string());
+  const std::string json((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+  // Directories are numbered by the writer (0..2); the *system's* frame index
+  // goes into the record, and process_frame() has already advanced it, so the
+  // third call records 3. Driven from process_stream's callback the two agree.
+  CHECK(json.find("\"frame\": 3") != std::string::npos);
+  CHECK(json.find("\"objects\"") != std::string::npos);
+  CHECK(json.find("\"field_range\"") != std::string::npos);
+  CHECK(json.find("attention-trace-frame/v1") != std::string::npos);
+
+  fs::remove_all(dir);
 }

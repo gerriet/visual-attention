@@ -266,6 +266,19 @@ if(Python3_Interpreter_FOUND)
                 --pos-tol 20 --order-tol 1)
     set_tests_properties(scanpath_stereo PROPERTIES FIXTURES_REQUIRED stereo_json)
 
+    # A stereo stream through --attend (--right) with a per-frame trace: the
+    # depth feature needs a right image on every frame, and the trace is what
+    # the visualization reads (docs/DEMO_STEREO_SCENE.md).
+    add_test(NAME attend_stereo_trace
+        COMMAND attention --attend ${CMAKE_SOURCE_DIR}/data/test_images/stereo_seq/left
+                --right ${CMAKE_SOURCE_DIR}/data/test_images/stereo_seq/right
+                --config ${CMAKE_SOURCE_DIR}/configs/demo_stereo.yaml
+                --no-save-frames
+                --output ${CMAKE_BINARY_DIR}/attend_stereo
+                --emit-trace ${CMAKE_BINARY_DIR}/attend_stereo/trace
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+    set_tests_properties(attend_stereo_trace PROPERTIES PASS_REGULAR_EXPRESSION "Saved trace")
+
     # AttentionSystem (M6): second stage + Exploration behavior over the
     # synthetic motion sequence, under the compiled-in default profile. Checked
     # by behaviour, not against a golden: frame 0 is pure noise, the first focus

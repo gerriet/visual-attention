@@ -97,6 +97,35 @@ above, written by `--attend --emit-scanpath`:
   Where a sequence leaves the focus to chance (a first frame of pure noise),
   `eval/check_scanpath.py` checks stated expectations instead of a golden.
 
+## `attention-trace/v1` — what the model computed on every frame
+
+`attention-scanpath/v1` records where attention went; a trace records what the
+system saw and knew at each moment, which is what a visualization or a figure
+needs. Written by `--attend --emit-trace <dir>` (`io::TraceWriter`).
+
+```
+<dir>/trace.json            index: frames, size, feature names, map scales
+<dir>/frame_0000/state.json focus + every object file, active and inactive
+<dir>/frame_0000/saliency.png          16-bit, fixed [0, 1]
+<dir>/frame_0000/field.png             16-bit, fixed [-2, 2]
+<dir>/frame_0000/feature_<name>.png    16-bit, fixed [0, 1]
+```
+
+- Frame directories are numbered contiguously from zero **by the writer**; the
+  system's own frame index is the `frame` field inside `state.json`.
+- Every map is on a **fixed** scale, never per-frame normalized, so a change in
+  brightness between two frames means the response changed. `trace.json`'s
+  `map_scales` gives the decoding (`value/65535 * (hi - lo) + lo`), and each
+  frame records the field's true `field_range` so a reader can see whether the
+  fixed encoding clipped.
+- A feature that is not applicable on a frame (onset, on the first one) simply
+  has no file; `state.json` lists the features present on that frame and
+  `trace.json` the union over the stream.
+- `objects` carries every object file — active *and* inactive, since "the model
+  still knows about it" is part of the state — with position, box, size,
+  saliency, creation/last-seen/last-selected frames, selection count, mean
+  colour, per-feature means, a trajectory tail, and any recognition label.
+
 ### Recognition extensions (M13, additive — only present when processors ran)
 
 When `--attend` runs recognition processors (`--processors hog-person,...`),

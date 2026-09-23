@@ -4,6 +4,7 @@
 #include "attention/config/config_loader.h"
 #include "attention/io/result_writer.h"
 #include "attention/io/scanpath_writer.h"
+#include "attention/io/trace_writer.h"
 #include "attention/pipeline/attention_pipeline.h"
 #include "attention/system/attention_system.h"
 #include "attention/system/live_demonstrator.h"
@@ -153,6 +154,8 @@ struct AttendOptions
   float roi_margin = -1.0f;              // <0 = keep the config default
   int max_frames = 0;                    // 0 = whole stream
   bool save_frames = true;               // per-frame objects.png (off for sweeps)
+  std::string right_dir;                 // stereo: the right images of the pair sequence
+  std::string emit_trace;                // per-frame trace directory (attention-trace/v1)
 };
 
 attention::system::AttentionSystem::ProcessorCadence parse_cadence(const std::string& name)
@@ -210,7 +213,29 @@ void process_attend(const std::string& path, attention::pipeline::PipelineConfig
   attention::system::AttentionSystem sys(cfg);
 
   std::unique_ptr<attention::pipeline::FrameSource> source;
-  if (fs::is_directory(path))
+  if (!opt.right_dir.empty())
+  {
+    // A stereo stream: the depth feature needs a right image per frame, so the
+    // two directories are read in lock step (StereoImageSource).
+    if (!fs::is_directory(path) || !fs::is_directory(opt.right_dir))
+    {
+      throw std::runtime_error("--attend with --right needs two directories of images");
+    }
+    std::vector<std::string> left = attention::pipeline::collect_image_paths(path);
+    std::vector<std::string> right = attention::pipeline::collect_image_paths(opt.right_dir);
+    if (left.empty())
+    {
+      throw std::runtime_error("--attend: no images in " + path);
+    }
+    if (left.size() != right.size())
+    {
+      throw std::runtime_error("--attend --right: " + std::to_string(left.size()) + " left images but " +
+                               std::to_string(right.size()) + " right ones");
+    }
+    std::cout << "Attend: " << left.size() << " stereo pairs from " << path << " + " << opt.right_dir << std::endl;
+    source = std::make_unique<attention::pipeline::StereoImageSource>(std::move(left), std::move(right));
+  }
+  else if (fs::is_directory(path))
   {
     std::vector<std::string> frames = attention::pipeline::collect_image_paths(path);
     std::cout << "Attend: " << frames.size() << " frames from directory " << path << std::endl;
@@ -224,9 +249,18 @@ void process_attend(const std::string& path, attention::pipeline::PipelineConfig
   attention::pipeline::LimitedFrameSource limited(*source, opt.max_frames);
 
   const std::string out_base = opt.output_dir.empty() ? "results/attend" : opt.output_dir;
+  std::unique_ptr<attention::io::TraceWriter> trace;
+  if (!opt.emit_trace.empty())
+  {
+    trace = std::make_unique<attention::io::TraceWriter>(opt.emit_trace);
+  }
   sys.process_stream(limited,
                      [&](attention::system::AttentionSystem& s)
                      {
+                       if (trace)
+                       {
+                         trace->write_frame(s);
+                       }
                        std::ostringstream name;
                        name << "frame_" << std::setw(4) << std::setfill('0') << s.frame_index();
                        if (opt.save_frames)
@@ -245,6 +279,11 @@ void process_attend(const std::string& path, attention::pipeline::PipelineConfig
                        std::cout << std::endl;
                      });
 
+  if (trace)
+  {
+    trace->finish(sys);
+    std::cout << "✓ Saved trace: " << opt.emit_trace << " (" << trace->frames_written() << " frames)" << std::endl;
+  }
   std::cout << "Attend complete: " << sys.scanpath().size() << " foci over " << sys.frame_index() << " frames."
             << std::endl;
   for (const auto& entry : sys.processor_stats())
@@ -572,6 +611,10 @@ void print_usage(const char* program_name, std::ostream& out = std::cerr)
   out << "  --sequence <path>    Process a directory or video as a temporal stream (onset/motion)" << std::endl;
   out << "  --attend <path>      Run the full attention system (object files + behavior) over a stream" << std::endl;
   out << "  --emit-scanpath <p>  Write the scanpath JSON (with --attend)" << std::endl;
+  out << "  --right <dir>        Right images of a stereo sequence (with --attend on a directory):" << std::endl;
+  out << "                       the depth feature then runs on every frame" << std::endl;
+  out << "  --emit-trace <dir>   Per-frame trace (attention-trace/v1): feature maps, saliency," << std::endl;
+  out << "                       field activity and every object file, for visualization" << std::endl;
   out << "  --live <src>         Live demo: attention + object-file plugins on camera/video/dir (ESC quits)"
       << std::endl;
   out << "  --processors <a,b>   Object-file plugins on attended ROIs (--live and --attend;" << std::endl;
@@ -787,6 +830,14 @@ int main(int argc, char** argv)
         else if (arg == "--no-save-frames")
         {
           opt.save_frames = false;
+        }
+        else if (arg == "--right" && i + 1 < argc)
+        {
+          opt.right_dir = argv[++i];
+        }
+        else if (arg == "--emit-trace" && i + 1 < argc)
+        {
+          opt.emit_trace = argv[++i];
         }
       }
       opt.system_yaml = config.attention_system_yaml;

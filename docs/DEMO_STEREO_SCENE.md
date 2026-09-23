@@ -107,26 +107,26 @@ bounding box, instance mask, visibility. Written in the study's own
 
 ## 4 · Engineering, with today's status
 
-### G1 — `--attend` cannot read a stereo stream *(does not exist yet)*
-`StereoImageSource` exists in `frame_source.{h,cpp}` and sets `Frame::stereo_right`,
-but `process_attend` in `src/main.cpp` only ever builds an `ImageListSource` or a
-`VideoFrameSource`. Needed: `--attend <left_dir> --right <right_dir>` wiring the
-stereo source in. Small and self-contained; it also makes stereo streams
-available to every study, not just this demo.
+### G1 — stereo streams in `--attend` *(**done**, 2026-09-23)*
+`--attend <left_dir> --right <right_dir>` builds a `StereoImageSource`, so the
+depth feature runs on every frame of a sequence. The two directories must hold
+the same number of images. Covered by the `attend_stereo_trace` test on a
+four-frame generated sequence (`data/test_images/stereo_seq`).
 
-### G2 — per-frame trace output *(does not exist yet)*
-`--emit-features` writes feature maps but is wired for the single-image, `--config`
-and `--stereo` paths; the attend loop writes only `objects.png` and the final
-scanpath. Needed: `--emit-trace <dir>`, writing per frame
-- `frame_%04d.json`: focus; **all** active *and* inactive object files with label,
-  centroid, bbox, size, saliency, avg_saliency, created/last_seen/last_selected,
-  selection_count, appearance colour, per-feature means (`ObjectFile::features`
-  already exists), trajectory, recognition labels;
-- `feature_<name>_%04d.png`, `saliency_%04d.png`, `field_%04d.png` as 16-bit maps
-  on the fixed [0,1] scale the writer already uses.
+### G2 — per-frame trace output *(**done**, 2026-09-23)*
+`--attend --emit-trace <dir>` writes `attention-trace/v1`: per frame, the fused
+saliency, the neural field's activity, every feature map, and a `state.json`
+with the focus and **every** object file, active and inactive, including
+per-feature means and a trajectory tail. Schema and decoding rules:
+`docs/INTERCHANGE_FORMAT.md`. Maps are on fixed scales and each frame records
+the field's true range, so a reader can see whether the encoding clipped.
+Reusable beyond this demo: the same trace feeds README GIFs and paper figures.
 
-This is the only substantial C++ work, and it is reusable: the same trace feeds
-README GIFs and paper figures.
+Two things learned while building it, both now pinned by tests: a temporal
+feature (onset) is absent on frame 0, so the feature list has to be collected
+across frames rather than from the first; and `process_frame()` advances the
+frame index before returning, so trace directories are numbered by the writer
+and the system's index is recorded inside the record.
 
 ### G3 — the 3D field does not integrate over time *(known limitation)*
 `NeuralField3DSelection` writes only the depth-collapsed activity into
@@ -203,7 +203,7 @@ the timeline. No feature strip, no cards.
 |---|---|---|
 | 0 | Decisions D1–D5; install Blender | — |
 | 1 | `tools/make_stereo_scene.py` (Blender): room, three figures, two objects, choreography, stereo rig, ground-truth export | 1 milestone |
-| 2 | G1 + G2: stereo `--attend`, `--emit-trace` | 1 milestone |
+| 2 | ~~G1 + G2: stereo `--attend`, `--emit-trace`~~ — **done** | — |
 | 3 | `eval/visualize_demo.py`: layout, cards, arrows, timeline, encode | 1 milestone |
 | 4 | G4 tuning on a 3-second clip; freeze parameters | small |
 | 5 | Final render, stills, GIF, a paragraph in the README | small |

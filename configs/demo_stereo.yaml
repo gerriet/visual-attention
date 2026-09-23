@@ -1,0 +1,47 @@
+# A demonstration profile for stereo streams (modern track, docs/adr/0005):
+# the dissertation's feature set plus depth and onset, selected by the 2D neural
+# field with the dissertation system's parameters, feeding the object-file
+# second stage. Used by the stereo-stream test and by the visualization plan
+# (docs/DEMO_STEREO_SCENE.md).
+#
+#   ./attention --attend <left_dir> --right <right_dir> --config configs/demo_stereo.yaml \
+#       --emit-trace results/trace
+#
+# Not a thesis profile: it combines stereo and onset, which configs/thesis/
+# keeps in separate profiles, and it is free to change.
+pipeline:
+  fusion: weighted-sum
+  selection: neural-field
+  selection_params:
+    alpha: 0.33
+    beta: 30.0
+    resting: -0.33
+    global_mult: 8.0
+    kernel_size: 15
+    kernel_s: 3.3
+    kernel_k: 0.12
+    kernel_s2: 14.0
+    kernel_k2: 0.03
+    field_max_size: 96
+    cycles_per_frame: 20
+    input_mult: 0.765
+features:
+  color-munsell:
+    weight: 1.0
+  eccentricity:
+    weight: 1.0
+  symmetry:
+    weight: 1.0
+  stereo:
+    weight: 1.0
+  onset:
+    weight: 1.0
+  color:
+    enabled: false
+  intensity:
+    enabled: false
+  orientation:
+    enabled: false
+output:
+  output_dir: "results/"
+  display: false

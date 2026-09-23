@@ -228,6 +228,10 @@ class AttentionSystem
   int frame_index() const { return frame_index_; }
   // The camera shift applied on the most recent frame (zero when compensation is off).
   const cv::Point2f& last_camera_shift() const { return last_camera_shift_; }
+  // The second stage's own neural-field activity (empty unless
+  // Config::cluster_source is Field); the pipeline's field, if any, is in
+  // RunState::field_activity.
+  const cv::Mat& field_activity() const { return field_activity_; }
   const Config& config() const { return config_; }
 
   // Segment a fused saliency (priority) map into candidate object clusters —

@@ -70,6 +70,7 @@ add_library(attention_core STATIC
     src/visualization/visualizer.cpp
     src/io/result_writer.cpp
     src/io/scanpath_writer.cpp
+    src/io/trace_writer.cpp
 )
 target_include_directories(attention_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_include_directories(attention_core SYSTEM PUBLIC ${OpenCV_INCLUDE_DIRS})
