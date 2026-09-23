@@ -87,6 +87,28 @@ void NeuralField3D::initialize()
   }
 }
 
+bool NeuralField3D::set_activity(const std::vector<cv::Mat>& planes)
+{
+  if (static_cast<int>(planes.size()) != depth_)
+  {
+    return false;
+  }
+  for (const auto& plane : planes)
+  {
+    if (plane.size() != size_ || plane.type() != CV_32F)
+    {
+      return false;
+    }
+  }
+  activity_.clear();
+  activity_.reserve(planes.size());
+  for (const auto& plane : planes)
+  {
+    activity_.push_back(plane.clone());
+  }
+  return true;
+}
+
 cv::Mat NeuralField3D::sigmoid(const cv::Mat& u) const
 {
   cv::Mat result;
@@ -106,7 +128,9 @@ int NeuralField3D::update(const std::vector<cv::Mat>& input)
   const float threshold = params_.change_thresh * total; // sum |du| vs mean-per-neuron * N
 
   int cycle = 0;
-  for (; cycle < params_.max_cycles; ++cycle)
+  const bool fixed = params_.cycles_per_frame > 0;
+  const int cycles = fixed ? params_.cycles_per_frame : params_.max_cycles;
+  for (; cycle < cycles; ++cycle)
   {
     // Synchronous update: all planes use the previous cycle's sigmoids for the
     // depth accumulator, lateral term and global term.
@@ -138,7 +162,7 @@ int NeuralField3D::update(const std::vector<cv::Mat>& input)
       activity_[z] = updated;
     }
 
-    if (change <= threshold && cycle >= 2) // minimum 3 cycles, as in the 2D field
+    if (!fixed && change <= threshold && cycle >= 2) // minimum 3 cycles, as in the 2D field
     {
       ++cycle;
       break;
@@ -269,9 +293,12 @@ std::vector<core::Peak> NeuralField3DSelection::select(const cv::Mat& saliency, 
     }
   }
 
-  // Run the 3D field to convergence.
+  // Run the 3D field, continuing from the volume the previous frame left (the
+  // field is what carries an object through a brief occlusion; finding C).
   NeuralField3D field(input.size(), Z, params_.field);
+  field.set_activity(state.field_volume);
   field.update(volume);
+  state.field_volume = field.activity();
   cv::Mat collapsed = field.collapsed_activation();
   cv::Mat winning = field.winning_depth();
 

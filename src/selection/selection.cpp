@@ -291,6 +291,7 @@ std::unique_ptr<SelectionStrategy> create_selection_strategy(const std::string& 
     read_param(strategy_params, "plane_inhibition", nf.field.plane_inhibition);
     read_param(strategy_params, "max_cycles", nf.field.max_cycles);
     read_param(strategy_params, "change_thresh", nf.field.change_thresh);
+    read_param(strategy_params, "cycles_per_frame", nf.field.cycles_per_frame);
     read_param(strategy_params, "depth_layers", nf.depth_layers);
     read_param(strategy_params, "field_max_size", nf.field_max_size);
     read_param(strategy_params, "border_margin", nf.border_margin);

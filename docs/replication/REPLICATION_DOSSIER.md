@@ -657,9 +657,30 @@ standard architecture, not a variant.
 the thesis's occlusion experiment is a comparison *between field architectures*,
 and two of the three it compares are unavailable here — the 3D field cannot
 track, and the system of 2D fields with global inhibition (Abb. 6.11/6.12) is not
-implemented at all. The fix is a persisted volume in `RunState` and a field that
-is constructed once per run; it cannot change any frozen golden, because those
-are single pairs. Not yet done.
+implemented at all.
+
+**Fixed, 2026-09-23.** `RunState::field_volume` now carries the activity volume
+across the frames of a stream, `NeuralField3D::set_activity()` continues from a
+given volume, and the 3D field gained the `cycles_per_frame` option the 2D one
+has, for the same reason (finding 22: over a stream the deployed system ran a
+fixed cycle budget, because its convergence test compared a summed change with a
+threshold a noisy field never meets). A test drives the field for four frames and
+then removes the stimulus: the cluster survives, where a field started from rest
+on the same empty frame holds nothing.
+
+**Nothing frozen changed**, and the evidence for that is the golden rather than
+an argument: `configs/thesis/stereo.yaml` selects with `neural-field-3d`, and its
+behavioural golden (`scanpath_stereo`, the frozen synthetic pair) is unchanged.
+By construction it must be — a single pair leaves `field_volume` empty, so the
+field starts from rest exactly as before, and `cycles_per_frame` defaults to 0,
+leaving the convergence test alone. The dossier was re-run in full; its stereo
+experiments are identical value for value, and the only differences against the
+previously stored run are this month's earlier changes (the noise experiments at
+20 seeds instead of 5, and experiments added since that file was written), none
+of them attributable to the field.
+
+What this unlocks is Abb. 6.13's dynamics experiment and, once the system of 2D
+fields with global inhibition exists, Abb. 6.14 as the thesis actually ran it.
 
 ### 10 · Abb. 6.14 — tracking several objects through occlusion — partially
 

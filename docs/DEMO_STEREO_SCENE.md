@@ -36,7 +36,7 @@ follow-up; the demonstration comes first and stands on its own.
 |---|---|---|---|
 | D1 | Renderer | **Blender**, headless, driven by a Python script (`blender -b -P scene.py`) | Free, scriptable, exact ground truth (object-index and depth passes), built-in stereo rig. **Not currently installed** (`brew install --cask blender`, ~1 GB). |
 | D2 | Human figures | **Articulated primitives** (capsules and spheres on a simple armature), keyframed | CC0 by construction, no downloads, fully reproducible from the script; at 3–5 m they read as people. Rigged characters (MakeHuman, Mixamo) can be dropped in later — licence to check first. |
-| D3 | Selection stage | **2D neural field, with depth as one fused feature** for v1 | The 2D field persists across frames (`RunState::field_activity`), which is the whole point — hysteresis and tracking. The 3D field currently does **not** persist its volume (see G3). |
+| D3 | Selection stage | **Open again since the G3 fix**: 3D field (x, y, disparity), as the dissertation system ran it, with the 2D field as the fallback | Both now persist across frames. Decide on the development clip: the 3D field is the faithful choice and shows depth competition; the 2D one is cheaper and easier to read. |
 | D4 | Recognition labels on the cards | Optional, off by default | The M13 processors can put "person" on an object file, but need model weights (`tools/fetch_models.py`). Nice, not necessary. |
 | D5 | Output | 1920×1080, 25 fps, H.264, plus stills and a short GIF | Matches the README-GIF goal in the papers plan. |
 
@@ -143,9 +143,12 @@ and the original `NeuralField3D` holds its activity across frames like the 2D on
 change with a stated reason; it does not affect any frozen golden, since those
 are single pairs and a single pair has no previous state.
 
-Hence D3 for v1 (the 2D field, which does persist). Once the 3D field is
-stateful the demo could show selection in (x, y, disparity), which is what the
-dissertation system actually ran.
+**Fixed on 2026-09-23** (dossier, finding C): `RunState::field_volume` carries
+the volume across frames, `NeuralField3D::set_activity()` continues from it, and
+the 3D field gained `cycles_per_frame`. So **D3 can be revisited**: the demo can
+use `neural-field-3d`, selecting in (x, y, disparity) as the dissertation system
+actually ran it, which is a better demonstration than the 2D fallback. Worth
+tuning both on the development clip and keeping whichever reads more clearly.
 
 ### G4 — parameters to tune on a 3-second development clip
 Field `field_max_size` (64 is coarse for 640×480; 96–128 may read better),
