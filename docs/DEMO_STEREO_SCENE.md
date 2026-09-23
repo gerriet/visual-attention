@@ -128,13 +128,24 @@ across frames rather than from the first; and `process_frame()` advances the
 frame index before returning, so trace directories are numbered by the writer
 and the system's index is recorded inside the record.
 
-### G3 — the 3D field does not integrate over time *(known limitation)*
-`NeuralField3DSelection` writes only the depth-collapsed activity into
-`RunState::field_activity` and starts from rest each frame; there is no persisted
-volume. For a dynamic demo that removes exactly the property worth showing. Hence
-D3 (use the 2D field for v1). Making the 3D field stateful — a `field_volume` in
-`RunState` — is a worthwhile separate piece of work and would let the demo show
-selection in (x, y, disparity), which is the thesis's ch. 6.4 architecture.
+### G3 — the 3D field does not integrate over time *(a port defect, investigated 2026-09-23)*
+`NeuralField3DSelection::select()` constructs a fresh `NeuralField3D` **inside
+the call**, so the volume starts from rest on every frame; only the
+depth-collapsed activity reaches `RunState::field_activity`. Within one frame it
+relaxes normally, which is why nothing ever failed — every test of it is on a
+single pair.
+
+This is not a simplification the thesis licenses. See
+`docs/replication/REPLICATION_DOSSIER.md`, finding C: the thesis's §6.4 exists
+*for* tracking through occlusion over time, its Abb. 6.14 measures exactly that,
+and the original `NeuralField3D` holds its activity across frames like the 2D one
+— the deployed system's default architecture. Fixing it is a replication-track
+change with a stated reason; it does not affect any frozen golden, since those
+are single pairs and a single pair has no previous state.
+
+Hence D3 for v1 (the 2D field, which does persist). Once the 3D field is
+stateful the demo could show selection in (x, y, disparity), which is what the
+dissertation system actually ran.
 
 ### G4 — parameters to tune on a 3-second development clip
 Field `field_max_size` (64 is coarse for 640×480; 96–128 may read better),
