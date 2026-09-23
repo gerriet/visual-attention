@@ -264,7 +264,32 @@ two-stage framing most directly, with a selection stage over static and dynamic
 proto-objects. Whether objects predict fixations better than early saliency was
 argued out on the same data by \citet{einhauser2008} and \citet{borji2013objects}.
 Within the group the 2004 system came from, the region-based line continued with
-\citet{aziz2007}. On the field side, \citet{zibner2011} is the nearest prior art
+\citet{aziz2007}.
+
+The model's top-down half was carried further immediately after the thesis, in
+work of mine with Frintrop and Rome on VOCUS \citep{frintrop2006}. There the
+weights that bias the saliency computation toward a search target are not set by
+hand but \emph{learned} from a training image: for each feature map, the weight
+is the ratio of its mean value inside the target region to its mean outside it,
+so a feature counts to the extent that it \emph{separates} the target from its
+background, and search then adds an excitation term over the features with
+weight above one and subtracts an inhibition term over those below, mixed with
+the bottom-up map by a single top-down factor \citep{frintrop2005dagm}. Which
+training images to learn from, and how to combine them---by a geometric mean,
+because the weights are ratios---is the subject of \citet{frintrop2005ki}.
+VOCUS also carries its own version of the thesis's exclusivity weighting,
+dividing each map by the square root of the number of local maxima above a
+threshold where the thesis divides by $c^{\,n}$: the same idea, arrived at
+independently, in a different functional form. The line continued into a faster
+reimplementation \citep{frintrop2015}, attention-driven object proposals where
+scale-specific objectness decides where to spend computation
+\citep{wilms2018}, and open-world instance segmentation \citep{wilms2024},
+which asks in current terms exactly what this paper's second stage keeps running
+into: which regions of an image deserve to be treated as objects at all, without
+a fixed category list. Section~\ref{sec:realvideo} is a concrete instance of
+that question going unanswered.
+
+On the field side, \citet{zibner2011} is the nearest prior art
 to this architecture---dynamic neural fields building a scene representation by
 controlling gaze---with the difference that there the persisting peak \emph{is}
 the object; there is no symbolic layer above it. Where identity has to survive

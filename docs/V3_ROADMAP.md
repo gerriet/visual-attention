@@ -29,16 +29,26 @@ threads added by the 2026 positioning pass (below) turn the master saliency map
 into a full **priority map** (M17) and reframe the whole instrument as an
 attention front-end for large vision models (M18).
 
-## Status (2026-09-21): the replication track is closed
+## Status (2026-09-23): the replication track is closed
 
-Tagged **`replication-v1`**. The dissertation's model is reimplemented from its
-surviving sources and its text; 22 of 24 of its findings reproduce and 2
-partially (`docs/replication/REPLICATION_DOSSIER.md`); its central claim, H1 —
-object-based inhibition of return beats space-based in dynamic scenes — is
-supported on three independent blocks of scenes; H4 (human scanpaths) is
-answered. The thesis profiles are frozen (ADR-0005). What remains in this
-roadmap is the **modern track**: H2, H5, H6, H7 and the milestones that serve
-them, judged by usefulness.
+Tagged **`replication-v1`**, reopened once with a stated replication reason and
+re-tagged **`replication-v2`** (ADR-0005). The dissertation's model is
+reimplemented from its surviving sources and its text; **22 of 25 of its
+findings reproduce and 3 partially**
+(`docs/replication/REPLICATION_DOSSIER.md`), including the thesis's own
+quantitative test of its central claim (finding 22); H1 — object-based
+inhibition of return beats space-based in dynamic scenes — is supported on four
+independent blocks of scenes, on the thesis's own chain inside the neural
+field's tracking range, and is **inconclusive on real video** for a stated
+reason (`docs/DYNAMIC_IOR_STUDY.md`); H4 (human scanpaths) is answered. The
+dossier was checked on a second platform. The thesis profiles are frozen. The
+paper draft is `paper/replication/`.
+
+What remains in this roadmap is the **modern track**: H2, H5, H6, H7 and the
+milestones that serve them, judged by usefulness. Concrete next steps, with
+what each would answer and what it costs: **`docs/MODERN_TRACK_IDEAS.md`**
+(learned top-down weights; an open-world object source; scale-specific
+objectness) and the feature shortlist in `docs/FEATURE_ASSESSMENT.md`.
 
 ## Positioning: sharpen, don't redirect (2026)
 
