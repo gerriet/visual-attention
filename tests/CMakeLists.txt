@@ -215,6 +215,12 @@ if(Python3_Interpreter_FOUND)
         # Replication dossier (M10), smoke: three experiments end to end through
         # --emit-features (absolute feature maps; also in --stereo mode); the values themselves are
         # asserted by tests/test_thesis_features.cpp.
+        # The demo compositor (docs/DEMO_STEREO_SCENE.md): --help needs numpy and
+        # PIL, hence the venv. There is no smoke run — composing needs a trace
+        # and the rendered scene, which is a Blender dependency and 175 MB.
+        add_test(NAME help_visualize_demo
+            COMMAND ${EVAL_PYTHON} ${CMAKE_SOURCE_DIR}/eval/visualize_demo.py --help)
+        set_tests_properties(help_visualize_demo PROPERTIES PASS_REGULAR_EXPRESSION "usage")
         add_test(NAME help_replication
             COMMAND ${EVAL_PYTHON} ${CMAKE_SOURCE_DIR}/eval/replication.py --help)
         set_tests_properties(help_replication PROPERTIES PASS_REGULAR_EXPRESSION "usage")

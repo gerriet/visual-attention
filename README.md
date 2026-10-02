@@ -16,6 +16,44 @@ driven by bottom-up saliency and object-based inhibition of return. Reproduce wi
 `./build/attention data/samples/images/butterfly.jpg --no-display` (writes
 `results/scan_path.png`).*
 
+## Watch it work
+
+![The attention mechanism on a stereo scene](docs/images/demo_305.png)
+
+A 15-second stereo scene, rendered in Blender so that every object's position is
+known exactly, run through the whole system: the feature maps and the fused
+saliency along the bottom, the neural field's activity beside them, and every
+object file the second stage holds — outlined in the scene, with a card for the
+five most salient and a leader line to what each one refers to. The band at the
+foot is which file held the focus, frame by frame.
+
+![The moment a new object appears](docs/images/demo_reveal.gif)
+
+The frame above is the one the scene was built for. A cover drops off a box at
+12.0 s; the onset channel fires, object file **#17** is created on frame 302 and
+holds the focus on frame 303 — attentional capture by onset, one frame later, in
+the running system.
+Earlier in the take a ball is handed from one figure to another and keeps **one
+object file across the handover, with zero identity switches**.
+
+What the picture also shows, because it was not tuned away: the field holds
+**fourteen** clusters on a scene with five objects, and the extra ones sit on
+legs, arms and torsos. They are the same size and nearly as salient as the ball,
+so no threshold removes them — the 2004 second stage segments *parts*, not
+people. The third figure, far and static, holds a file on only ~17% of its
+frames. Both are the field's capacity limit, measured rather than asserted:
+[DEMO_STEREO_SCENE.md §6b](docs/DEMO_STEREO_SCENE.md).
+
+```bash
+# Render the scene (needs Blender), run the system, compose the video
+blender --background --python tools/make_stereo_scene.py -- --out results/demo_scene --seconds 15
+./build/attention --attend results/demo_scene/left --right results/demo_scene/right \
+    --config configs/demo_stereo.yaml --no-save-frames \
+    --output results/demo_attend --emit-trace results/demo_trace
+eval/visualize_demo.py --trace results/demo_trace --frames results/demo_scene/left \
+    --out results/demo_attention.mp4            # --style clean for the scene alone
+```
+
 ## What this is
 
 Given an image — or a video / stereo stream — the system builds a **saliency

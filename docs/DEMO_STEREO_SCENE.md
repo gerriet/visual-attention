@@ -150,7 +150,7 @@ use `neural-field-3d`, selecting in (x, y, disparity) as the dissertation system
 actually ran it, which is a better demonstration than the 2D fallback. Worth
 tuning both on the development clip and keeping whichever reads more clearly.
 
-### G4 — parameters to tune on a 3-second development clip
+### G4 — parameters to tune on a 3-second development clip *(**done**, 2026-10-02 — see §6b)*
 Field `field_max_size` (64 is coarse for 640×480; 96–128 may read better),
 `cycles_per_frame` (20, from the dissertation system), the object-file
 correspondence radius against the observed per-frame motion in pixels, and the
@@ -218,9 +218,9 @@ the timeline. No feature strip, no cards.
 | 0 | Decisions D1–D5; install Blender | — |
 | 1 | ~~`tools/make_stereo_scene.py` (Blender): room, three figures, two objects, choreography, stereo rig, ground-truth export~~ — **done** | — |
 | 2 | ~~G1 + G2: stereo `--attend`, `--emit-trace`~~ — **done** | — |
-| 3 | `eval/visualize_demo.py`: layout, cards, arrows, timeline, encode | 1 milestone |
-| 4 | G4 tuning on a 3-second clip; freeze parameters | small |
-| 5 | Final render, stills, GIF, a paragraph in the README | small |
+| 3 | ~~`eval/visualize_demo.py`: layout, cards, arrows, timeline, encode~~ — **done** | — |
+| 4 | ~~G4 tuning; freeze parameters~~ — **done**, and it produced a finding (§6b) | — |
+| 5 | ~~Final render, stills, GIF, a paragraph in the README~~ — **done** | — |
 
 Phases 1 and 2 are independent and can be done in either order; phase 3 needs a
 trace from phase 2, which can be produced from any existing sequence
@@ -258,6 +258,114 @@ Three things the staging had to fix, all found by rendering and looking:
   empty frame range at half-second boundaries, rendering a scene with nothing
   animated in it. Fixed, and worth knowing: a preview that silently contains only
   static props looks like a scene bug and is not one.
+
+## 6b · What the tuning settled (2026-10-02), and the finding in it
+
+G4 was supposed to be parameter tuning. It turned into two measurements worth
+keeping, because the first run put object files on A, B and the ball and on
+*nothing else* — not on the third person, and not on the box whose reveal is the
+whole point of the last third of the take.
+
+### The scene was asking for channels that cannot see it
+
+Probing the maps at the ground-truth positions separated two different failures
+that looked like one:
+
+| | saliency | field | why |
+|---|---|---|---|
+| C, frame 200 | **0.72** | −0.28 | salient, and *suppressed* |
+| box, after reveal | **0.29** | −0.47 | never salient to begin with |
+
+The box's own number was the scene's fault, not the model's. At 0.35 m and 5.6 m
+it spans 35 px; the colour channel's center-surround (c ∈ {2,3,4}) smears a blob
+that small away, symmetry read 0.02, and the plan's own geometry section asks for
+30–300 px. It is now 0.50 m at 3.8 m — 73 px, the ball's scale — and saturated
+blue rather than yellow, so it owns the blue-yellow opponent axis instead of
+having to outbid a saturated red ball on red-green.
+
+Two further changes are about the onset channel specifically, and both follow
+from how it is defined rather than from taste:
+
+- Onset is **normalised by its own per-frame maximum**, so it is a competition,
+  not a measurement. With a figure still walking and a cover sliding at 12 s, the
+  box arrived as a 0.25 blip. The walk now ends at 11.4 s.
+- Onset is **rectified** — structure disappearing is deliberately not salient
+  (thesis §3.2.5). So the cover now drops *straight down inside the table*, which
+  is wider than it is: its departure costs nothing on the channel, and the box
+  underneath is the frame's one positive change. The reveal also takes 0.24 s
+  rather than 0.5, because spread over twelve frames each frame uncovers only a
+  sliver.
+
+After restaging, the box reads **saliency 0.776, stereo 1.00** — the equal of the
+two near figures. The staging, not the model, had been the limit.
+
+### The field's capacity is the real constraint, and it costs parts
+
+That left the genuine half. With the demo's first settings the box *still* got no
+file: at 0.776 saliency the field drove it to −0.21. The field holds about three
+clusters, and A, B and the ball had taken them.
+
+Measured over the whole 375-frame take, against the ground truth, two knobs turn
+out to do two different jobs — which looked like one job until they were measured
+apart. "Carded" below means the file was among the five most salient, i.e. the
+ones the visualisation can actually show; "holds a file" means any cluster sat on
+the object at all.
+
+| `global_mult` | `input_mult` | files | box holds a file | box carded | C holds a file |
+|---|---|---|---|---|---|
+| 8.0 | 0.765 | 8 | **never** | — | 8% |
+| 8.0 | 1.0 | 11 | 100% | 7% | 17% |
+| **5.0** | **1.0** | **14** | **100%** | **100%** | 17% |
+| 3.0 | 1.0 | 18 | 100% | 5% | 20% |
+
+So `input_mult` decides whether the box exists to the second stage, and
+`global_mult` decides whether it is ever among the things attention can get to.
+And the ordering is **not monotone**: weakening inhibition further *loses* the
+box again, because the eighteen clusters it admits push it out of the top five.
+More capacity is not more attention.
+
+A, B and the ball hold a file on 100% of frames throughout, the ball with **zero
+identity switches across the handover**. C is the one the demo cannot rescue: the
+third person, at 5.5 m and static for most of the take, holds a file on 17–20% of
+its visible frames at every setting tried. That is the capacity limit stated
+plainly, and it is left in rather than tuned away.
+
+The obvious next move — prune the extra clusters by size or saliency — does not
+work, and that is the finding. Measured over the window, clusters sitting on a
+staged object and clusters sitting on nothing have the *same* size distribution
+(median 1846 vs 1818 px) and nearly the same saliency (0.49 vs 0.40). They are
+not noise. They are legs, arms and torsos: **the field segments at the scale of
+parts, not of people**, and from its point of view a pair of legs is a perfectly
+good proto-object. There is no threshold that separates a leg from a ball,
+because there is nothing in the model that knows what a person is. It shows up
+in the tracking too: the ball switches identity 0 times, while A — split across
+head, torso and legs — switches 15 times as first one part and then another is
+the largest cluster at A's position.
+
+Widening the lateral excitation to merge a figure does not rescue it either: it
+merges indiscriminately. `kernel_s` 5.0 with an untruncated `kernel_size` 31
+gives a clean 6 files — and loses C and the box again; at 7.0 the ball merges
+into the figure holding it.
+
+The reveal itself then works as the plan intended, and this is the measurement
+the whole scene exists for: the cover leaves at frame 300, onset fires at the
+box, **object file #17 is created on frame 302 and holds the focus on frame
+303** — capture by onset, one frame after the object exists to the model. By
+frame 305 it has been selected three times. Across the handover earlier in the
+take the ball keeps one file with **zero identity switches**.
+
+So the demo keeps `global_mult: 5.0`, `input_mult: 1.0`, and shows all fourteen
+files, with the uncarded ones drawn as thin outlines rather than hidden. This is
+the honest picture of what the 2004 second stage does, and it is the motivating
+figure for `docs/MODERN_TRACK_IDEAS.md` §2: an open-world instance segmenter as a
+cluster source is exactly the missing piece, and this is what its absence looks
+like.
+
+*Worth recording separately:* at the dissertation's own `kernel_size: 15` with
+`kernel_s2: 14.0`, the inhibitory lobe of the DoG is nearly flat across the
+kernel — it acts as a DC offset, and the actual surround suppression comes from
+`global_mult`. That is the frozen replication setting (`field_esab2.yaml`) and is
+not being changed; it explains why `global_mult` is the effective capacity dial.
 
 ## 7 · The follow-up this makes possible
 

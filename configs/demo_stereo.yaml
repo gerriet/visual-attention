@@ -16,7 +16,18 @@ pipeline:
     alpha: 0.33
     beta: 30.0
     resting: -0.33
-    global_mult: 8.0
+    # Measured on this scene over the whole take, not inherited. Two separate
+    # effects, which looked like one until they were measured apart:
+    #   input_mult 0.765 -> 1.0 is what lets the revealed box form a cluster at
+    #     all (at 0.765 it never does, despite saliency 0.78 -- the equal of the
+    #     two near figures);
+    #   global_mult 8.0 -> 5.0 is what lets it *rank*, from carded on 7% of its
+    #     visible frames to 100%.
+    # Lowering global_mult further is not better: at 3.0 the field holds 18
+    # clusters instead of 14, and the box falls out of the five most salient
+    # again (carded 5%). The extra clusters are legs, arms and torsos -- the
+    # field segments parts, not people. See docs/DEMO_STEREO_SCENE.md section 6b.
+    global_mult: 5.0
     kernel_size: 15
     kernel_s: 3.3
     kernel_k: 0.12
@@ -24,7 +35,7 @@ pipeline:
     kernel_k2: 0.03
     field_max_size: 96
     cycles_per_frame: 20
-    input_mult: 0.765
+    input_mult: 1.0    # see global_mult above
 features:
   color-munsell:
     weight: 1.0
@@ -45,3 +56,13 @@ features:
 output:
   output_dir: "results/"
   display: false
+
+# The second stage builds its object files from the neural field's activity
+# clusters rather than from thresholded saliency — the thesis's own chain
+# (ch. 6 -> 7.2.2), and the thing that keeps render grain and background texture
+# from each becoming an object file. Correspondence follows thesis 7.2.3.
+attention_system:
+  cluster_source: field
+  object_files:
+    correspondence: thesis
+    correspondence_radius: 40

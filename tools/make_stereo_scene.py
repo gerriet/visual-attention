@@ -61,17 +61,24 @@ BACK_WALL_Y = 7.5
 #  plan's "avoid too much occlusion" holds for the whole take.
 PERSON_A = {"name": "A", "x": -1.30, "y": 3.00, "shirt": (0.30, 0.34, 0.42)}  # slate
 PERSON_B = {"name": "B", "x": 1.30, "y": 3.40, "shirt": (0.36, 0.38, 0.30)}   # olive
-PERSON_C = {"name": "C", "x": -1.30, "y": 6.80, "shirt": (0.42, 0.38, 0.36)}  # warm grey
+PERSON_C = {"name": "C", "x": -1.30, "y": 5.50, "shirt": (0.42, 0.38, 0.36)}  # warm grey
 
 BALL_RADIUS = 0.15        # 0.30 m across
-BOX_SIZE = 0.35
-TABLE = {"x": -0.20, "y": 5.60, "top": 0.75}
+#  The box has to be an object the *model* can see, not just one a viewer can:
+#  measured on the first render, a 0.35 m box at 5.6 m spans 35 px, and at that
+#  size the colour channel's center-surround (c in {2,3,4}) smears it away and
+#  symmetry reads 0.02. 0.50 m at 3.8 m spans 73 px -- the ball's scale, and
+#  inside the 30-300 px band the plan's geometry section asks for.
+BOX_SIZE = 0.50
+TABLE = {"x": 0.10, "y": 3.80, "top": 0.75}
 
 SKIN = (0.52, 0.44, 0.38)
 ROOM = (0.55, 0.52, 0.48)
 FLOOR = (0.38, 0.36, 0.34)
 BALL_COLOUR = (0.75, 0.05, 0.04)    # saturated red: the colour channel should own this
-BOX_COLOUR = (0.80, 0.68, 0.05)     # saturated yellow
+BOX_COLOUR = (0.05, 0.20, 0.78)     # saturated blue: owns the blue-yellow
+                                    # opponent axis, so it does not have to
+                                    # outbid the red ball on red-green
 COVER_COLOUR = (0.47, 0.45, 0.43)   # muted, so the box is the event when it slips off
 
 
@@ -227,8 +234,11 @@ def choreograph(frame):
         PERSON_A["y"] - 0.15 - 0.10 * raise_amount,
         HIP_Z + 0.05 + 0.48 * raise_amount + wave_a))
 
-    # --- B: walks forward 9-12 s, carrying the ball; reaches for the handover
-    walk = phase_mix(frame, 9.0, 12.0)
+    # --- B: walks forward 9-11.4 s, carrying the ball; reaches for the handover.
+    # The walk ends before the reveal on purpose: onset is normalized by its own
+    # per-frame maximum, so a figure still walking at 12 s would take the onset
+    # map and the new object would arrive as a fraction of it.
+    walk = phase_mix(frame, 9.0, 11.4)
     b_y = PERSON_B["y"] + (2.90 - PERSON_B["y"]) * walk
     # Walk straight toward the camera: holding x/y fixed keeps B at the same
     # image column while it grows, instead of sliding off the right edge.
@@ -257,15 +267,25 @@ def choreograph(frame):
     ball = hold_a.lerp(hold_b, pass_t)
     ball.z += 0.10 * math.sin(math.pi * pass_t)  # a slight arc across the gap
 
-    # --- the cover slips off the box at 12 s: a genuinely new object appears
-    cover_slide = phase_mix(frame, 12.0, 12.5)
-    cover = Vector((TABLE["x"] + 0.95 * cover_slide,
+    # --- the cover drops away at 12 s: a genuinely new object appears.
+    # Two choices here are about the onset channel rather than about realism.
+    # It takes 0.24 s, not 0.5: spread over twelve frames, each frame uncovers
+    # a sliver whose edge energy is a fraction of the cover's own movement, and
+    # the measured onset at the box was a 0.25 blip. And it leaves *downwards
+    # behind the table*, because onset is rectified -- structure disappearing is
+    # deliberately not salient (thesis 3.2.5) -- so the fall costs nothing while
+    # the box underneath is the frame's one positive change. It drops straight
+    # down rather than aside: the table is 1.1 m wide and 0.9 m deep against the
+    # cover's 0.59 m, so the cover ends up inside it and out of sight instead of
+    # landing on the floor, where it would be a second new object in the frame.
+    cover_slide = phase_mix(frame, 12.0, 12.24)
+    cover = Vector((TABLE["x"],
                     TABLE["y"],
-                    TABLE["top"] + BOX_SIZE * 0.5 - 0.62 * cover_slide))
+                    TABLE["top"] + BOX_SIZE * 0.5 - 1.00 * cover_slide))
 
     return {"a_hands": a_hands, "b_hands": b_hands, "c_hands": c_hands,
             "b_x": b_x, "b_y": b_y, "b_phase": b_phase, "ball": ball, "cover": cover,
-            "box_visible": cover_slide > 0.55}
+            "box_visible": cover_slide > 0.75}
 
 
 # --- scene --------------------------------------------------------------------
