@@ -35,7 +35,7 @@ follow-up; the demonstration comes first and stands on its own.
 | # | Decision | Recommendation | Why it matters |
 |---|---|---|---|
 | D1 | Renderer | **Blender**, headless, driven by a Python script (`blender -b -P scene.py`) | Free, scriptable, exact ground truth (object-index and depth passes), built-in stereo rig. **Not currently installed** (`brew install --cask blender`, ~1 GB). |
-| D2 | Human figures | **Articulated primitives** (capsules and spheres on a simple armature), keyframed | CC0 by construction, no downloads, fully reproducible from the script; at 3–5 m they read as people. Rigged characters (MakeHuman, Mixamo) can be dropped in later — licence to check first. |
+| D2 | Human figures | **Articulated primitives** — decided 2026-10-02 | CC0 by construction, no downloads, reproducible from the script. They also read as what this is: a controlled simulation. Photoreal humans would add texture and clothing folds that produce spurious salience, and would invite the misreading that the video shows real-world performance, which the DAVIS result says it does not. `build_figure()` is the one place to change. |
 | D3 | Selection stage | **Open again since the G3 fix**: 3D field (x, y, disparity), as the dissertation system ran it, with the 2D field as the fallback | Both now persist across frames. Decide on the development clip: the 3D field is the faithful choice and shows depth competition; the 2D one is cheaper and easier to read. |
 | D4 | Recognition labels on the cards | Optional, off by default | The M13 processors can put "person" on an object file, but need model weights (`tools/fetch_models.py`). Nice, not necessary. |
 | D5 | Output | 1920×1080, 25 fps, H.264, plus stills and a short GIF | Matches the README-GIF goal in the papers plan. |
@@ -216,7 +216,7 @@ the timeline. No feature strip, no cards.
 | Phase | Work | Effort |
 |---|---|---|
 | 0 | Decisions D1–D5; install Blender | — |
-| 1 | `tools/make_stereo_scene.py` (Blender): room, three figures, two objects, choreography, stereo rig, ground-truth export | 1 milestone |
+| 1 | ~~`tools/make_stereo_scene.py` (Blender): room, three figures, two objects, choreography, stereo rig, ground-truth export~~ — **done** | — |
 | 2 | ~~G1 + G2: stereo `--attend`, `--emit-trace`~~ — **done** | — |
 | 3 | `eval/visualize_demo.py`: layout, cards, arrows, timeline, encode | 1 milestone |
 | 4 | G4 tuning on a 3-second clip; freeze parameters | small |
@@ -225,6 +225,39 @@ the timeline. No feature strip, no cards.
 Phases 1 and 2 are independent and can be done in either order; phase 3 needs a
 trace from phase 2, which can be produced from any existing sequence
 (`data/test_images/motion_seq`) before phase 1 exists.
+
+## 6a · What the first render settled (2026-10-02)
+
+The generator exists and the scene is validated against the two constraints the
+plan derived, by running the system on a rendered pair rather than by assertion:
+
+| Measured at | Depth-feature response | Implied disparity | Planned |
+|---|---|---|---|
+| A, 3.0 m | 0.56 | 9.0 px | 8.9 px |
+| B, 3.4 m | 0.50 | 8.0 px | 7.8 px |
+| C, 6.8 m | 0.25 | 4.0 px | 3.9 px |
+| back wall, 7.5 m | 0.00 | — | 3.5 px |
+
+The rig and the disparity budget hold. The wall reads zero because it is an
+untextured plane and the variance threshold rejects it — the behaviour finding 15
+describes, and welcome here: a flat wall should not be salient in depth.
+
+Three things the staging had to fix, all found by rendering and looking:
+
+- **Cast layout is an image-space problem, not a world-space one.** Placed by
+  world coordinates, C stood exactly behind A (both near x≈100 px) and B walked
+  out of the right edge. The cast is now positioned by where it lands in the
+  640-px frame, and B walks *along its own line of sight* so it grows without
+  sliding out.
+- **Props compete.** The table and cover started brighter than the wall, which
+  made them salient in their own right; they are now at the wall's own tone, so
+  the yellow box appearing is the event. They also had to move out of the column
+  B ends up occupying, or the ball would have sat on the box at the moment the
+  box was revealed.
+- A rounding bug in the frame helper (`round()`'s banker's rounding) produced an
+  empty frame range at half-second boundaries, rendering a scene with nothing
+  animated in it. Fixed, and worth knowing: a preview that silently contains only
+  static props looks like a scene bug and is not one.
 
 ## 7 · The follow-up this makes possible
 
