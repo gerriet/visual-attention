@@ -620,6 +620,68 @@ moving objects on. Why the thesis's baseline fell short of its optimum the
 sources do not say. The position-error claim holds in direction and size of the
 gap, not at the stated 0.5 px.
 
+### Finding C — the 3D neural field does not integrate over time (found 2026-09-23)
+
+*A third infidelity of the same family as findings A and B, found while planning
+a stereo demonstration rather than by any test.*
+
+`NeuralField3DSelection::select()` constructs a fresh `NeuralField3D` inside the
+call. The volume therefore starts from its resting level on **every frame**: the
+3D field relaxes within a frame, but carries nothing across frames. Only the
+depth-collapsed 2D activity is written back into `RunState::field_activity`.
+Nothing failed, because every test of the 3D field is on a single stereo pair,
+where there is no previous state to carry.
+
+**The thesis is unambiguous that this is wrong.** §6.4 extends the fields into
+depth *in order to* select and track: "of special interest is the behaviour of
+the system under temporary occlusions, which have so far been the main problem
+for tracking by neural fields". It criticises the one prior use of 3D fields it
+knows (Braumann 2001) precisely because "the dynamic change of the stimuli and
+the tracking connected with it play as little a role as the computation of depth
+data". And §6.4.2's experiment — Abb. 6.14, finding 10 below — moves 2 to 7
+objects for 15 cycles with at least one occlusion and measures *the average
+duration of correct tracking* for each field architecture. Without cross-frame
+state that experiment has no meaning.
+
+**The original implements it.** `NeuralField3D` (`nf3d.h`) holds
+`activityvalues` as a member, allocated once and set to the resting level by
+`initialize()`; `ESAB2::update_nf()` calls `nf->update(updateCycles, input)` once
+per frame on the *same* field object, so activity carries over exactly as in the
+2D case. The class even has `displacefield(x_move, y_move, z_move, usememory)`,
+which shifts the persisting volume when the camera moves — a function that would
+be meaningless on a field rebuilt every frame. And `neuralmode = 3`, the 3D
+field, is the **default** in `readargs.h`: this was the dissertation system's
+standard architecture, not a variant.
+
+**Consequences.** Finding 10 (Abb. 6.14) is partial in part because of this:
+the thesis's occlusion experiment is a comparison *between field architectures*,
+and two of the three it compares are unavailable here — the 3D field cannot
+track, and the system of 2D fields with global inhibition (Abb. 6.11/6.12) is not
+implemented at all.
+
+**Fixed, 2026-09-23.** `RunState::field_volume` now carries the activity volume
+across the frames of a stream, `NeuralField3D::set_activity()` continues from a
+given volume, and the 3D field gained the `cycles_per_frame` option the 2D one
+has, for the same reason (finding 22: over a stream the deployed system ran a
+fixed cycle budget, because its convergence test compared a summed change with a
+threshold a noisy field never meets). A test drives the field for four frames and
+then removes the stimulus: the cluster survives, where a field started from rest
+on the same empty frame holds nothing.
+
+**Nothing frozen changed**, and the evidence for that is the golden rather than
+an argument: `configs/thesis/stereo.yaml` selects with `neural-field-3d`, and its
+behavioural golden (`scanpath_stereo`, the frozen synthetic pair) is unchanged.
+By construction it must be — a single pair leaves `field_volume` empty, so the
+field starts from rest exactly as before, and `cycles_per_frame` defaults to 0,
+leaving the convergence test alone. The dossier was re-run in full; its stereo
+experiments are identical value for value, and the only differences against the
+previously stored run are this month's earlier changes (the noise experiments at
+20 seeds instead of 5, and experiments added since that file was written), none
+of them attributable to the field.
+
+What this unlocks is Abb. 6.13's dynamics experiment and, once the system of 2D
+fields with global inhibition exists, Abb. 6.14 as the thesis actually ran it.
+
 ### 10 · Abb. 6.14 — tracking several objects through occlusion — partially
 
 The thesis compares variants of its neural fields. The reimplementation tracks
@@ -647,7 +709,7 @@ with the time unseen, and no expiry, none of which is the thesis's.
 |---|---|---|
 | Abb. 5.33, 5.35 | superposition; 2D vs 3D integration | qualitative figures on lab stereo imagery |
 | Abb. 6.11, 6.12 | systems of several 2D fields with global inhibition and per-feature weights | not implemented: the reimplementation has the single 2D field and the 3D field only |
-| Abb. 6.13 | the 3D field with local inhibition on a stereo scene | the 3D field is ported and tested; a dynamics experiment like the 2D ones needs the harness extended to the depth volume |
+| Abb. 6.13 | the 3D field with local inhibition on a stereo scene | the 3D field is ported and tested on single pairs, but does not carry activity across frames (finding C), so a dynamics experiment like the 2D ones is not merely unimplemented — it is impossible until that is fixed |
 | §9.3.2, §9.3.3 | flanker compatibility; early vs late selection | qualitative demonstrations |
 | ~~§9.2, Abb. 9.1–9.2~~ → finding 22 | **the thesis's own quantitative test of its central claim:** world-model quality (recognized objects, position error) of the two-stage model against a conventional inhibition-map model, 1/3/5 static × 0–5 dynamic objects, 50 runs of 40 frames | **missed when this dossier was built** (it drew on ch. 5–6); found 2026-09-21 on reading the WAPCV paper. Fully specified and CPU-only — to be replicated as finding 22. See `WAPCV_2003_NOTES.md`, which also records that the "thesis correspondence" of finding 10 is weaker than thesis §7.2.3 and that `--attend` forms object files from saliency segments, not from the field's activity clusters |
 

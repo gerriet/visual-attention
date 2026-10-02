@@ -36,7 +36,7 @@ follow-up; the demonstration comes first and stands on its own.
 |---|---|---|---|
 | D1 | Renderer | **Blender**, headless, driven by a Python script (`blender -b -P scene.py`) | Free, scriptable, exact ground truth (object-index and depth passes), built-in stereo rig. **Not currently installed** (`brew install --cask blender`, ~1 GB). |
 | D2 | Human figures | **Articulated primitives** (capsules and spheres on a simple armature), keyframed | CC0 by construction, no downloads, fully reproducible from the script; at 3–5 m they read as people. Rigged characters (MakeHuman, Mixamo) can be dropped in later — licence to check first. |
-| D3 | Selection stage | **2D neural field, with depth as one fused feature** for v1 | The 2D field persists across frames (`RunState::field_activity`), which is the whole point — hysteresis and tracking. The 3D field currently does **not** persist its volume (see G3). |
+| D3 | Selection stage | **Open again since the G3 fix**: 3D field (x, y, disparity), as the dissertation system ran it, with the 2D field as the fallback | Both now persist across frames. Decide on the development clip: the 3D field is the faithful choice and shows depth competition; the 2D one is cheaper and easier to read. |
 | D4 | Recognition labels on the cards | Optional, off by default | The M13 processors can put "person" on an object file, but need model weights (`tools/fetch_models.py`). Nice, not necessary. |
 | D5 | Output | 1920×1080, 25 fps, H.264, plus stills and a short GIF | Matches the README-GIF goal in the papers plan. |
 
@@ -107,34 +107,48 @@ bounding box, instance mask, visibility. Written in the study's own
 
 ## 4 · Engineering, with today's status
 
-### G1 — `--attend` cannot read a stereo stream *(does not exist yet)*
-`StereoImageSource` exists in `frame_source.{h,cpp}` and sets `Frame::stereo_right`,
-but `process_attend` in `src/main.cpp` only ever builds an `ImageListSource` or a
-`VideoFrameSource`. Needed: `--attend <left_dir> --right <right_dir>` wiring the
-stereo source in. Small and self-contained; it also makes stereo streams
-available to every study, not just this demo.
+### G1 — stereo streams in `--attend` *(**done**, 2026-09-23)*
+`--attend <left_dir> --right <right_dir>` builds a `StereoImageSource`, so the
+depth feature runs on every frame of a sequence. The two directories must hold
+the same number of images. Covered by the `attend_stereo_trace` test on a
+four-frame generated sequence (`data/test_images/stereo_seq`).
 
-### G2 — per-frame trace output *(does not exist yet)*
-`--emit-features` writes feature maps but is wired for the single-image, `--config`
-and `--stereo` paths; the attend loop writes only `objects.png` and the final
-scanpath. Needed: `--emit-trace <dir>`, writing per frame
-- `frame_%04d.json`: focus; **all** active *and* inactive object files with label,
-  centroid, bbox, size, saliency, avg_saliency, created/last_seen/last_selected,
-  selection_count, appearance colour, per-feature means (`ObjectFile::features`
-  already exists), trajectory, recognition labels;
-- `feature_<name>_%04d.png`, `saliency_%04d.png`, `field_%04d.png` as 16-bit maps
-  on the fixed [0,1] scale the writer already uses.
+### G2 — per-frame trace output *(**done**, 2026-09-23)*
+`--attend --emit-trace <dir>` writes `attention-trace/v1`: per frame, the fused
+saliency, the neural field's activity, every feature map, and a `state.json`
+with the focus and **every** object file, active and inactive, including
+per-feature means and a trajectory tail. Schema and decoding rules:
+`docs/INTERCHANGE_FORMAT.md`. Maps are on fixed scales and each frame records
+the field's true range, so a reader can see whether the encoding clipped.
+Reusable beyond this demo: the same trace feeds README GIFs and paper figures.
 
-This is the only substantial C++ work, and it is reusable: the same trace feeds
-README GIFs and paper figures.
+Two things learned while building it, both now pinned by tests: a temporal
+feature (onset) is absent on frame 0, so the feature list has to be collected
+across frames rather than from the first; and `process_frame()` advances the
+frame index before returning, so trace directories are numbered by the writer
+and the system's index is recorded inside the record.
 
-### G3 — the 3D field does not integrate over time *(known limitation)*
-`NeuralField3DSelection` writes only the depth-collapsed activity into
-`RunState::field_activity` and starts from rest each frame; there is no persisted
-volume. For a dynamic demo that removes exactly the property worth showing. Hence
-D3 (use the 2D field for v1). Making the 3D field stateful — a `field_volume` in
-`RunState` — is a worthwhile separate piece of work and would let the demo show
-selection in (x, y, disparity), which is the thesis's ch. 6.4 architecture.
+### G3 — the 3D field does not integrate over time *(a port defect, investigated 2026-09-23)*
+`NeuralField3DSelection::select()` constructs a fresh `NeuralField3D` **inside
+the call**, so the volume starts from rest on every frame; only the
+depth-collapsed activity reaches `RunState::field_activity`. Within one frame it
+relaxes normally, which is why nothing ever failed — every test of it is on a
+single pair.
+
+This is not a simplification the thesis licenses. See
+`docs/replication/REPLICATION_DOSSIER.md`, finding C: the thesis's §6.4 exists
+*for* tracking through occlusion over time, its Abb. 6.14 measures exactly that,
+and the original `NeuralField3D` holds its activity across frames like the 2D one
+— the deployed system's default architecture. Fixing it is a replication-track
+change with a stated reason; it does not affect any frozen golden, since those
+are single pairs and a single pair has no previous state.
+
+**Fixed on 2026-09-23** (dossier, finding C): `RunState::field_volume` carries
+the volume across frames, `NeuralField3D::set_activity()` continues from it, and
+the 3D field gained `cycles_per_frame`. So **D3 can be revisited**: the demo can
+use `neural-field-3d`, selecting in (x, y, disparity) as the dissertation system
+actually ran it, which is a better demonstration than the 2D fallback. Worth
+tuning both on the development clip and keeping whichever reads more clearly.
 
 ### G4 — parameters to tune on a 3-second development clip
 Field `field_max_size` (64 is coarse for 640×480; 96–128 may read better),
@@ -203,7 +217,7 @@ the timeline. No feature strip, no cards.
 |---|---|---|
 | 0 | Decisions D1–D5; install Blender | — |
 | 1 | `tools/make_stereo_scene.py` (Blender): room, three figures, two objects, choreography, stereo rig, ground-truth export | 1 milestone |
-| 2 | G1 + G2: stereo `--attend`, `--emit-trace` | 1 milestone |
+| 2 | ~~G1 + G2: stereo `--attend`, `--emit-trace`~~ — **done** | — |
 | 3 | `eval/visualize_demo.py`: layout, cards, arrows, timeline, encode | 1 milestone |
 | 4 | G4 tuning on a 3-second clip; freeze parameters | small |
 | 5 | Final render, stills, GIF, a paragraph in the README | small |

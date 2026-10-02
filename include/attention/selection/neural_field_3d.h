@@ -49,12 +49,25 @@ class NeuralField3D
     float plane_inhibition = 5.0f; // per-plane inhibition factor (nf3d.h: *5)
     int max_cycles = 50;
     float change_thresh = 0.01f; // mean |du| per neuron convergence
+    // >0: run exactly this many cycles per frame, no convergence check. Over a
+    // stream the dissertation system did exactly that — its convergence test
+    // compared a *summed* change with a threshold a noisy field never meets, so
+    // it ran its full cycle budget every frame (dossier, findings 22 and C).
+    int cycles_per_frame = 0;
   };
 
   NeuralField3D(const cv::Size& plane_size, int depth, const Params& params);
 
   // Reset every plane to the resting level.
   void initialize();
+
+  /**
+   * Continue from an existing activity volume instead of from rest — how a
+   * field survives across the frames of a stream. Planes must match the
+   * field's size, depth and type; anything else is ignored and the field keeps
+   * its current state.
+   */
+  bool set_activity(const std::vector<cv::Mat>& planes);
 
   /**
    * Run the field to convergence on the given input volume (one CV_32F plane
@@ -97,6 +110,7 @@ class NeuralField3D
  * YAML parameters (pipeline: selection_params:), beyond the 2D field's keys:
  *   depth_layers: 11        # number of depth planes (thesis: 11)
  *   plane_inhibition: 5.0   # per-plane inhibition factor
+ *   cycles_per_frame: 0     # >0: exactly this many cycles per frame (streams)
  */
 class NeuralField3DSelection : public SelectionStrategy
 {

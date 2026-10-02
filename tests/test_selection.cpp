@@ -1,5 +1,6 @@
 // Selection strategy tests on synthetic saliency maps.
 
+#include "attention/selection/neural_field_3d.h"
 #include "attention/selection/neural_field_selection.h"
 #include "attention/selection/selection_strategy.h"
 #include <catch2/catch_test_macros.hpp>
@@ -275,4 +276,87 @@ TEST_CASE("neural field: activity clusters follow their input from frame to fram
     }
   }
   CHECK(last_x > 38); // it has travelled with its input
+}
+
+TEST_CASE("3D neural field: the volume survives across frames and through a gap", "[selection][neural-field-3d][time]")
+{
+  // Thesis §6.4 extends the field into depth *in order to* track through
+  // temporary occlusion, and Abb. 6.14 measures how long tracking survives.
+  // Before 2026-09-23 this port rebuilt the field on every frame, so nothing
+  // survived anything (dossier, finding C).
+  selection::NeuralField3D::Params params;
+  params.cycles_per_frame = 20;
+  const cv::Size size(48, 48);
+  const int depth = 5;
+
+  auto input_with_blob = [&](bool present)
+  {
+    std::vector<cv::Mat> volume(depth);
+    for (int z = 0; z < depth; ++z)
+    {
+      volume[z] = cv::Mat::zeros(size, CV_32F);
+    }
+    if (present)
+    {
+      cv::circle(volume[2], cv::Point(24, 24), 5, cv::Scalar(1.0f), -1);
+    }
+    return volume;
+  };
+
+  selection::NeuralField3D field(size, depth, params);
+  field.initialize();
+
+  // Drive it while the stimulus is present, then take the stimulus away.
+  for (int t = 0; t < 4; ++t)
+  {
+    field.update(input_with_blob(true));
+  }
+  const double driven = cv::sum(field.collapsed_activation() > 0.0f)[0];
+  REQUIRE(driven > 0.0); // the field found it at all
+
+  field.update(input_with_blob(false));
+  const double after_gap = cv::sum(field.collapsed_activation() > 0.0f)[0];
+  CHECK(after_gap > 0.0); // ... and still holds it one frame later
+
+  // A field that starts from rest on the empty frame holds nothing: this is
+  // exactly what the port did before, and what the assertion above rules out.
+  selection::NeuralField3D fresh(size, depth, params);
+  fresh.initialize();
+  fresh.update(input_with_blob(false));
+  CHECK(cv::sum(fresh.collapsed_activation() > 0.0f)[0] == 0.0);
+
+  // set_activity continues from a given volume; a mismatched one is refused.
+  selection::NeuralField3D continued(size, depth, params);
+  continued.initialize();
+  REQUIRE(continued.set_activity(field.activity()));
+  CHECK(cv::norm(continued.activity()[2], field.activity()[2], cv::NORM_INF) == 0.0);
+  CHECK_FALSE(continued.set_activity(std::vector<cv::Mat>(depth, cv::Mat::zeros(size, CV_8U))));
+  CHECK_FALSE(continued.set_activity(std::vector<cv::Mat>(depth + 1, cv::Mat::zeros(size, CV_32F))));
+}
+
+TEST_CASE("3D neural-field selection carries its volume in RunState", "[selection][neural-field-3d][time]")
+{
+  YAML::Node params;
+  params["depth_layers"] = 5;
+  params["field_max_size"] = 48;
+  params["cycles_per_frame"] = 20;
+  auto strategy = selection::create_selection_strategy("neural-field-3d", selection::SelectionParams{}, params);
+
+  cv::Mat saliency = cv::Mat::zeros(48, 48, CV_32F);
+  cv::circle(saliency, cv::Point(24, 24), 5, cv::Scalar(1.0f), -1);
+
+  core::RunState state;
+  CHECK(state.field_volume.empty());
+  strategy->select(saliency, state);
+  REQUIRE(state.field_volume.size() == 5);
+  CHECK(state.field_volume[0].size() == cv::Size(48, 48));
+
+  // The next frame continues from it: driving the same input again must not
+  // reproduce the first frame's activity exactly (the field has moved on).
+  const cv::Mat first = state.field_volume[2].clone();
+  strategy->select(saliency, state);
+  CHECK(cv::norm(first, state.field_volume[2], cv::NORM_INF) > 0.0);
+
+  state.reset();
+  CHECK(state.field_volume.empty());
 }

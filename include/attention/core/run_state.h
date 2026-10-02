@@ -24,6 +24,16 @@ struct RunState
   // field dynamics carry over instead of restarting per frame.
   cv::Mat field_activity;
 
+  // The 3D neural field's activity volume, one CV_32F plane per depth layer,
+  // at field resolution (empty until the 3D selection strategy first runs).
+  // Persists across stream frames for the same reason field_activity does: the
+  // thesis's §6.4 extends the field into depth *in order to* select and track
+  // through temporary occlusion, and its Abb. 6.14 measures how long tracking
+  // survives — neither means anything if the volume restarts every frame. The
+  // original kept one NeuralField3D for the life of the run
+  // (docs/replication/REPLICATION_DOSSIER.md, finding C).
+  std::vector<cv::Mat> field_volume;
+
   // Space-based inhibition-of-return map at field resolution: selected
   // regions are inhibited in subsequent frames, decaying over time
   // (thesis §8.3: static inhibition map, ~20% decay per frame).
