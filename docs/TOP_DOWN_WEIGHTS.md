@@ -323,6 +323,21 @@ Three things are worth keeping anyway, and they are why this was worth running:
   measurable effect on nine split ones, and it was *not* explained by the weights
   becoming more category-specific — they did not.
 
+### Postscript (2026-10-03): what the weights actually lost to
+
+H5's own control, run the same day, found that **about half** the category
+prior's advantage over bottom-up is recovered by a *category-agnostic* pooled
+prior (−0.67 of −1.25), and that the category-specific remainder is −0.58
+[−1.21, +0.07] — not established (`docs/PRIORITY_MAP.md`). So the arm that beat
+the learned weights by +0.87 is one whose own advantage is substantially generic
+centre bias.
+
+This does not rescue H8: the weights still lose to it, and losing to centre bias
+is losing. But it changes what the loss *means*. The comparison is less "a
+featural rule loses to a semantic one" than "a featural rule loses to knowing
+roughly where things sit in a photograph" — a fact about photographs, and one
+that would not transfer to a benchmark without that regularity.
+
 ### What this says about the method, not just the result
 
 VOCUS's rule is doing something defensible and the implementation is faithful,

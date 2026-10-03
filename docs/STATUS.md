@@ -42,7 +42,7 @@ profile is one arm, not the subject.*
 | | Hypothesis | Verdict | Basis | n | Date | Detail |
 |---|---|---|---|---|---|---|
 | **H2** | Gated recognition reaches near-full-frame accuracy at a fraction of the compute | **Supported, and now against floors** — 0.61 of full-frame person detections at 7.5% of detector pixels; **+0.15 over a random-ROI floor that costs twice the pixels**, and a motion-gated baseline recovers nothing matchable (best IoU 0.20 < 0.3) | first pass + both controls | vtest, 300 frames | 2026-10-03 | [GATED_RECOGNITION.md](GATED_RECOGNITION.md) |
-| **H5** | A priority map beats salience-only for task-driven search | **Supported** — the top-down channel is decisive; the history term buys hold, not acquisition | first pass; one control open | synthetic search + COCO-Search18 | 2026-07-20 | [PRIORITY_MAP.md](PRIORITY_MAP.md) |
+| **H5** | A priority map beats salience-only for task-driven search | **Supported on synthetic** (target-colour channel decisive, 33.4 → 0.1 frames). **On COCO, weakened by its control**: a spatial prior helps (−1.25 [−1.84, −0.65]) but a *category-agnostic* one already buys −0.67 [−1.21, −0.12], and the category-specific remainder is −0.58 [−1.21, **+0.07**] — not established | first pass + control | 150 validation trials (random sample) | 2026-10-03 | [PRIORITY_MAP.md](PRIORITY_MAP.md) |
 | **H6** | Attention as a VLM token budget | **Partly** — right-region crops beat full resolution at a third of the tokens, but bottom-up crops find the target on 10% of V\*Bench items (65% question-conditioned) and still lose to a same-budget uniform downsample | **pilot** (20 items per V\*Bench category, 10 per HR-Bench category) | pilot scale | 2026-09 | [VLM_FRONT_END.md](VLM_FRONT_END.md) |
 | **H7** | Object files as a video token cache | **Supported on synthetic** (0.95 identity-keyed vs 0.80 location-keyed vs 0.27 frames, chance 0.25); **ties on DAVIS** at 480p and full resolution | **first pass — reported on the seeds the mechanisms were developed on (0–9)** | 10 synthetic scenes × 6 questions = 60; 30 DAVIS val sequences | 2026-09-18 | [VLM_VIDEO.md](VLM_VIDEO.md) |
 | **H8** | Learned top-down weights beat hand-built channels | **Not supported** — the effect is real in direction across two splits and three controls, but ~0.4 fixations out of 9 and the confirmatory interval includes zero; M17's hand-built category prior is reliably better (+0.87 [+0.27, +1.43]) | **confirmatory** | 150 validation trials, 18 categories | 2026-10-03 | [TOP_DOWN_WEIGHTS.md](TOP_DOWN_WEIGHTS.md) |
@@ -70,11 +70,15 @@ Ranked by how much a reviewer would care:
 3. **H6 at full scale.** Everything is pilot-scale: the full V\*Bench run, three
    budgets, `fovea-random` as the floor, HR-Bench at full size. No credentials
    needed — the backend is a local Ollama model.
-4. ~~**The H2 control.**~~ **Done 2026-10-03** — H2 clears both floors, and the
+4. **Separate H5's category-specific prior from centre bias.** The control
+   showed half the COCO gain is category-agnostic and left the remainder at
+   −0.58 [−1.21, +0.07]. More trials would settle it; it is the same shape of
+   open question as M20's, and cheap.
+5. ~~**The H2 control.**~~ **Done 2026-10-03** — H2 clears both floors, and the
    random floor turned out to be worth 0.46 on its own, so the old "51% at 5.8%
    of pixels" wording was standing on more chance than it admitted. The H5
    pooled-prior control is implemented (`--pooled-control`) and running.
-5. **Two cheap things that would move H4**, and are named in its own verdict: a
+6. **Two cheap things that would move H4**, and are named in its own verdict: a
    centre prior on the priority map (the `top_down_map` slot takes one as it is)
    and a face channel at weight 0 by default — MIT1003 is full of faces and text.
 

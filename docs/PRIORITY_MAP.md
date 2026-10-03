@@ -93,6 +93,66 @@ the old default, bottom-up found@10 +0.18 [+0.09, +0.27]) — the prior still
 helps, from a much better floor. Details: `docs/FEATURE_ASSESSMENT.md`,
 "Ablation".
 
+## The control (2026-10-03): half the COCO gain is centre bias
+
+The closure plan's control for H5: *"pooled, category-agnostic prior as a
+control; random sample of validation trials instead of the first 150. If the
+pooled prior recovers most of the gain, the finding is centre bias."*
+
+The worry is specific. The category prior is built from where training-split
+targets of **that category** were found. But targets of *every* category sit
+away from the edges of a photograph, so a category prior inherits a generic
+centre bias for free, and the COCO result could be that bias wearing a category
+label. The control builds one prior from **all** categories' boxes together and
+gives it to every trial — same construction, same weight, no category knowledge.
+
+*150 validation trials, randomly sampled (seed 11) rather than the first 150, as
+the plan also asked.*
+
+| arm | mean fixations-to-target | found@10 |
+|---|---|---|
+| human | 2.65 | 0.91 |
+| bottom-up | 8.74 | 0.32 |
+| **category prior** | **7.49** | **0.47** |
+| pooled prior (no category knowledge) | 8.07 | 0.37 |
+
+| paired difference | Δ | 95% CI | |
+|---|---|---|---|
+| category prior − bottom-up | −1.25 | [−1.84, −0.65] | excludes zero |
+| **pooled prior − bottom-up** | **−0.67** | **[−1.21, −0.12]** | **excludes zero** |
+| category prior − pooled | −0.58 | [−1.21, +0.07] | **includes zero** |
+
+**Half the gain is category-agnostic.** A prior that knows nothing about what is
+being searched for buys −0.67 of the category prior's −1.25. And the remaining
+half — the part that is actually about the category — is **−0.58 [−1.21, +0.07],
+which does not exclude zero at this n.**
+
+So the plan's own criterion ("most of the gain") is not met: it is about half,
+not most. The correct reading is in two parts, and both belong in any statement
+of H5:
+
+1. **A dense spatial prior helps COCO search, and that is solid** — both versions
+   clear bottom-up with intervals excluding zero.
+2. **That it helps *because it is category-specific* is not established here.**
+   The category-specific increment points the right way and needs a larger n to
+   be called. Until it is, "a category prior helps on COCO-Search18" overstates
+   what was measured; "a spatial prior helps, and we cannot yet separate the
+   category-specific part from generic centre bias" is what the data support.
+
+The synthetic half of H5 is untouched by this — there the top-down channel is a
+*target-colour* channel on scenes with no layout regularity to exploit, and
+time-to-target 33.4 → 0.1 frames is not a centre effect.
+
+### This also reframes M20
+
+M20 (H8) found that VOCUS's learned feature weights lose to this category prior
+by +0.87 [+0.27, +1.43] (`docs/TOP_DOWN_WEIGHTS.md`). Read with the control, the
+thing that beat the learned weights is a prior whose advantage over bottom-up is
+about half generic centre bias. That does not rescue H8 — the weights still lose
+to it — but it changes what the loss means: the comparison is less "a featural
+rule loses to a semantic one" and more "a featural rule loses to knowing where
+things usually are in a photograph", which is a fact about photographs.
+
 ## Reading the results
 
 **Each term earns its weight — or honestly fails to.** The ablation separates

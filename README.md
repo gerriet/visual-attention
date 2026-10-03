@@ -203,11 +203,17 @@ The summaries below are that table in prose.
   stage's ordering does not help on stills — its benefit is in dynamic scenes
   (H1). A side result: ScanMatch cannot tell the constant-centre path from the
   inter-observer ceiling on this dataset. [SCANPATH_VS_HUMAN.md](docs/SCANPATH_VS_HUMAN.md)
-- **Recognition gated by attention (H2).** Detectors restricted to attended
-  ROIs recover 51% of all full-frame detections at 5.8% of the pixels.
+- **Recognition gated by attention (H2).** Detectors restricted to attended ROIs
+  recover 0.61 of full-frame person detections at 7.5% of the detector pixels —
+  **+0.15 over a random-ROI floor that costs twice the pixels**, and against a
+  motion-gated baseline that recovers nothing matchable at all.
   [GATED_RECOGNITION.md](docs/GATED_RECOGNITION.md)
-- **Priority map (H5).** A top-down target channel is decisive for search; a
-  category prior helps on COCO-Search18. [PRIORITY_MAP.md](docs/PRIORITY_MAP.md)
+- **Priority map (H5).** A top-down target channel is decisive for search on
+  synthetic scenes (33.4 → 0.1 frames to target). On COCO-Search18 a dense
+  spatial prior helps, but its control showed **half that gain survives when the
+  prior is told nothing about the category** — so the category-specific part is
+  not yet separable from generic centre bias.
+  [PRIORITY_MAP.md](docs/PRIORITY_MAP.md)
 - **Attention as a VLM token budget, stills (H6).** Crops on the *right*
   region beat full resolution at a third of the tokens — but bottom-up crops
   land on the target on only 10% of V\*Bench items; question-conditioned crops
