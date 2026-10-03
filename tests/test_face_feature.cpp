@@ -4,12 +4,15 @@
 // normalized up from nothing, and config plumbing — plus one real detection on
 // an image that is in the repository, so the suite needs no dataset.
 
+#include "attention/config/config_loader.h"
 #include "attention/features/face_feature.h"
 #include "attention/pipeline/attention_pipeline.h"
 #include "attention/util/haar_cascade.h"
 #include <catch2/catch_test_macros.hpp>
 #include <filesystem>
 #include <opencv2/opencv.hpp>
+#include <set>
+#include <string>
 
 using attention::features::FaceFeature;
 
@@ -108,4 +111,45 @@ TEST_CASE("the cascade finder agrees with the processor's", "[face]")
   // OpenCV put them.
   const std::string path = attention::util::find_haar_cascade("haarcascade_frontalface_default.xml");
   CHECK(path == FaceFeature::default_cascade_path());
+}
+
+TEST_CASE("the H4 arm differs from the thesis profile by exactly the face channel", "[face][config]")
+{
+  // configs/h4_face.yaml copies the thesis profile so that an ablation against
+  // it is attributable to one change. Copies drift; this fails when it does,
+  // which is the only reason the comparison means anything.
+  namespace fs = std::filesystem;
+  const fs::path root(ATTENTION_SOURCE_DIR);
+  const fs::path thesis = root / "configs" / "thesis" / "thesis.yaml";
+  const fs::path arm = root / "configs" / "h4_face.yaml";
+  if (!fs::exists(thesis) || !fs::exists(arm))
+  {
+    SUCCEED("configs missing");
+    return;
+  }
+
+  const auto baseline = attention::config::ConfigLoader::load(thesis.string());
+  const auto with_face = attention::config::ConfigLoader::load(arm.string());
+
+  CHECK(with_face.pipeline.fusion == baseline.pipeline.fusion);
+  CHECK(with_face.pipeline.selection == baseline.pipeline.selection);
+  CHECK(with_face.pipeline.selection_params_yaml == baseline.pipeline.selection_params_yaml);
+  CHECK(with_face.pipeline.peak_max_count == baseline.pipeline.peak_max_count);
+
+  auto enabled_names = [](const attention::pipeline::PipelineConfig& config)
+  {
+    std::set<std::string> names;
+    for (const auto& spec : config.features)
+    {
+      if (spec.enabled)
+      {
+        names.insert(spec.name.empty() ? spec.type : spec.name);
+      }
+    }
+    return names;
+  };
+
+  std::set<std::string> expected = enabled_names(baseline.pipeline);
+  expected.insert("face");
+  CHECK(enabled_names(with_face.pipeline) == expected);
 }

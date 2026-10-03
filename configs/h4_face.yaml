@@ -1,31 +1,73 @@
-# H4 ablation arm: the thesis stage 1 plus a face channel.
+# H4 ablation arm: the thesis stage 1, plus a face channel, and nothing else
+# changed.
 #
-# Track: modern (docs/adr/0005). This is NOT a thesis profile — it exists to
-# answer a question the thesis profile raised.
+# Track: modern (docs/adr/0005). This is NOT a thesis profile; it is the arm
+# that tests an explanation the thesis profile's own result offered.
 #
 # Why. H4's verdict (docs/SCANPATH_VS_HUMAN.md) is that the model's scanpaths
 # are above random but NOT above a centre baseline on MIT1003, and it names the
 # reason it suspects: "MIT1003 is full of faces and text" and the model has no
-# channel for either. Measured here: a frontal-face detector fires on 29 of 60
-# MIT1003 stimuli. So the model is being asked to predict gaze driven by
-# something it cannot see.
+# channel for either. Measured rather than assumed: OpenCV's frontal-face
+# cascade fires on 29 of 60 MIT1003 stimuli. The model is being asked to predict
+# gaze driven by something it cannot see.
 #
-# This arm adds the channel and changes nothing else, so the difference is
-# attributable. It is a test of the explanation, not an attempt to win a
-# benchmark: if the gap to the centre baseline does not close, "no face channel"
-# stops being the account of it.
+# Every value below is copied from configs/thesis/thesis.yaml so that the ONLY
+# difference between this arm and the H4 baseline is the face channel. If that
+# file changes, this one has to be re-synced — the whole point is that the two
+# differ in one thing.
+#
+#   eval/scanpath_vs_human.py --mit1003 --profile face=configs/h4_face.yaml
+#
+# It is a test of the explanation, not an attempt to win a benchmark: if the gap
+# to the centre baseline does not close, "no face channel" stops being the
+# account of it, and that is the more useful outcome of the two.
 pipeline:
   fusion: weighted-sum
-  selection: ior
+  selection: neural-field
+  selection_params:
+    alpha: 0.33
+    beta: 30.0
+    resting: -0.33
+    global_mult: 8.0
+    kernel_size: 15
+    kernel_s: 3.3
+    kernel_k: 0.12
+    kernel_s2: 14.0
+    kernel_k2: 0.03
+    field_max_size: 64
+    max_cycles: 55
+    change_thresh: 0.02
+    ior_decay: 0.8
+
 features:
+  color-munsell:
+    weight: 1.0
+    params:
+      exclusivity: 1.1
+  eccentricity:
+    weight: 1.0
+    params:
+      exclusivity: 1.1
+  symmetry:
+    weight: 1.0
+  # The one addition.
   face:
     weight: 1.0
     params:
-      backend: haar        # yunet is better; set model_path to its ONNX to use it
+      backend: haar      # yunet is stronger; set model_path to its ONNX to use it
       min_size: 24
       sigma_frac: 0.35
+  color:
+    enabled: false
+  intensity:
+    enabled: false
+  orientation:
+    enabled: false
+
 peaks:
   max_count: 10
-  threshold: 0.05
+  ior_strength: 0.8
+
 output:
+  output_dir: "results/"
   display: false
