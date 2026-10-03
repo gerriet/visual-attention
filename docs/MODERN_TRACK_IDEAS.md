@@ -156,12 +156,21 @@ as a baseline and as the precedent for the claim.
 
 ---
 
-## Suggested order
+## Suggested order — now scheduled
 
-1. **Top-down weights** (§1) — smallest, self-contained, improves an existing
-   hypothesis (H5), and gives H6 the missing middle arms.
-2. **Object proposals as a cluster source** (§2) — the one that could make the
-   real-video test of H1 decidable, which is currently the paper's weakest point.
-3. **Scale-specific objectness** (§3) — the small-target and cost story for H6.
+*2026-10-03: §1–§3 are milestones in `docs/V3_ROADMAP.md`, with hypotheses
+written down. This file stays as the argument and the sources; the roadmap holds
+the plan and the deliverables.*
+
+1. **Top-down weights** (§1) → **M20, H8** — smallest, self-contained, improves
+   an existing hypothesis (H5), and gives H6 the missing middle arms.
+2. **Object proposals as a cluster source** (§2) → **M21, H9** — the one that
+   could make the real-video test of H1 decidable, which is currently the
+   paper's weakest point. The demo scene is the motivating figure: the field
+   holds fourteen clusters for five objects and the extras are legs and arms
+   (`docs/DEMO_STEREO_SCENE.md` §6b).
+3. **Scale-specific objectness** (§3) → **M22, H10**, deliberately later — the
+   small-target and cost story for H6, which reads better once a real object
+   source is under it.
 4. §4's two cheap items whenever convenient; the exclusivity ablation is also
-   interesting for the replication paper.
+   interesting for the replication paper. Not scheduled.

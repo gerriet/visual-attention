@@ -45,10 +45,12 @@ dossier was checked on a second platform. The thesis profiles are frozen. The
 paper draft is `paper/replication/`.
 
 What remains in this roadmap is the **modern track**: H2, H5, H6, H7 and the
-milestones that serve them, judged by usefulness. Concrete next steps, with
-what each would answer and what it costs: **`docs/MODERN_TRACK_IDEAS.md`**
-(learned top-down weights; an open-world object source; scale-specific
-objectness) and the feature shortlist in `docs/FEATURE_ASSESSMENT.md`.
+milestones that serve them, judged by usefulness — now with three of them
+written up as milestones rather than as ideas: **M20** (learned top-down
+weights, H8) and **M21** (an open-world object source, H9) lead, **M22**
+(scale-specific objectness, H10) follows later. Their argument and sources are
+in **`docs/MODERN_TRACK_IDEAS.md`**; the feature shortlist is in
+`docs/FEATURE_ASSESSMENT.md`.
 
 ## Positioning: sharpen, don't redirect (2026)
 
@@ -118,6 +120,25 @@ large learned models lack and increasingly need.
   tracking errors (every identity switch is a re-send). *Where the second
   stage earns its keep: M12 showed object-IOR only ties space-IOR on
   exploration; H7 tests the predicted win — persistent, identity-keyed memory.*
+- **H8 — Learned top-down weights beat hand-built channels.** Feature weights
+  derived from one or more examples of the target by VOCUS's rule — each
+  channel weighted by how far it *separates* target from background, not by how
+  strongly it fires on the target — guide search at least as well as M17's
+  hand-written target-colour channel and category prior, across more targets,
+  with no detector in the loop. *Replaces a channel we chose with a rule that
+  chooses for itself.*
+- **H9 — A real object source makes the object/space question decidable.** With
+  object files built from class-agnostic open-world instance proposals instead
+  of saliency or field blobs, the off-object share of fixations on real video
+  collapses — and only then does object-based IOR separate from space-based IOR
+  on DAVIS. *The one hypothesis that could turn H1's inconclusive real-video
+  result into a decidable one; the demo scene is its motivating figure — the
+  field segments parts, not people (`docs/DEMO_STEREO_SCENE.md` §6b).*
+- **H10 — Scale-specific objectness pays for the controller.** Restricting
+  proposal generation to scale-specific objectness maps raises small-target
+  coverage on V\*Bench *and* costs less than the uniform tiling it replaces —
+  the front-end saving more than it spends, which is the whole argument for an
+  attention controller.
 
 ## Milestones
 
@@ -597,6 +618,98 @@ textured video remains the open problem. Full
 story: `docs/VLM_VIDEO.md`; where this stands for a publication (and what a
 reviewer would object to): `docs/PAPER_READINESS.md`.
 
+### M20 — Learned top-down weights (H8)
+
+*Modern track. Source and full argument: `docs/MODERN_TRACK_IDEAS.md` §1.*
+
+M17 gave the priority map a top-down slot and filled it with a channel we wrote
+by hand: a target colour, plus a category prior. VOCUS fills the same slot by a
+rule instead. Given a training image and a box around the target, it computes
+its *own* bottom-up saliency, takes the most salient region inside the box — so
+it decides for itself what in the box is the object — and sets, per feature and
+conspicuity map *i*,
+
+```
+w_i = mean of map i inside the target region / mean outside it
+```
+
+A feature counts to the degree it **separates** target from background. Search
+mode is an excitation minus an inhibition term, `S_td = Σ_{w>1} w·X − Σ_{w<1}
+(1/w)·X`, mixed with bottom-up by one factor `t ∈ [0,1]`. Weights from several
+examples combine by the **geometric mean**, because they are ratios.
+
+- `fusion/top_down_weights.{h,cpp}`: weights from a mask or box; a
+  `TopDownChannel` applying `E − I` at configurable `t`. A sibling of the
+  existing `top_down_map` slot, not a replacement — M17's channels stay.
+- Sweep `t` from 0 to 1 on COCO-Search18 through the existing H5 harness
+  (`eval/coco_search.py`), against M17's hand-built channel as the baseline to
+  beat.
+- Report **average hit number** (rank of the first fixation on target, with the
+  detection rate beside it) alongside found@k. That is VOCUS's metric and the
+  same quantity read the other way round; reporting it makes these numbers
+  comparable with twenty years of that literature.
+- **The H6 variant that matters.** A VLM front-end has no training image, it has
+  a *question*. Two cheap ways to weights without a detector: parse colour and
+  size words out of the question into channel weights; or, where the task
+  supplies an example crop, apply the rule unchanged. That finally gives H6 a
+  cost axis with middle arms — bottom-up only → text-weighted channels →
+  one-shot learned weights → open-vocabulary detector, on one token budget.
+  Today we have only the first and the last.
+
+Deliverable: the fusion stage, the `t` sweep, `docs/TOP_DOWN_WEIGHTS.md`.
+
+### M21 — An open-world object source for object files (H9)
+
+*Modern track. Source and full argument: `docs/MODERN_TRACK_IDEAS.md` §2.*
+
+The second stage builds object files from thresholded saliency or from the
+field's activity clusters. Both are blob detectors, and two results now say so
+out loud: on DAVIS, 42–61% of fixations land on things the ground truth does not
+name, which is why real-video H1 is inconclusive; and on the demo scene the
+field holds fourteen clusters for five objects, the extras sitting on legs, arms
+and torsos with the *same* size distribution and nearly the same saliency as the
+real ones. No threshold separates a leg from a ball, because nothing in the
+model knows what a person is.
+
+- A third `attention_system.cluster_source` — `object-proposals` — beside
+  `saliency` and `field`, fed by a class-agnostic segmenter behind the existing
+  processor interface (SOS, ECCV 2024, or an equivalent).
+- Re-run H1 on DAVIS with it. **Prediction to commit before the data:** the
+  off-object share collapses, and *only then* does the object- versus
+  space-based comparison become decidable on real video.
+- Re-run the demo scene with it as the companion qualitative check: one file per
+  person is the visible success criterion.
+
+Worth saying plainly in the write-up: a self-supervised transformer's attention
+map used as an object prior is a learned proto-object detector — the same job
+the 2004 stage 1 gave to symmetry, eccentricity and colour contrast, done by a
+model that was trained rather than designed.
+
+Deliverable: the cluster source, a re-run of `docs/DYNAMIC_IOR_STUDY.md`'s
+real-video block, `docs/OBJECT_PROPOSALS.md`.
+
+### M22 — Scale-specific objectness for small targets (H10) *(later)*
+
+*Modern track. Source: `docs/MODERN_TRACK_IDEAS.md` §3. Deliberately sequenced
+after M20 and M21 — it is the cost-and-small-target story for H6, and it reads
+better once there is a real object source under it.*
+
+V\*Bench is a small-target benchmark and we sit at 0.15 top-3 target coverage.
+Our answer so far was 2×2 tiling, which moved top-3 from 0.13 to 0.18 — not
+significant, and crude, since it processes every tile equally. AttentionMask
+(ACCV 2018) generates proposals from *scale-specific objectness attention maps*,
+reporting a 33% speed-up and +53% average recall on small objects.
+
+The point is not the recall number but the direction: it **saves** computation
+rather than multiplying it. If the modern track has one thing to prove to a
+reviewer, it is that the controller costs less than it saves; this is the
+mechanism that makes that provable, and it must be reported with its own cost
+accounted, not just its coverage.
+
+Deliverable: scale-specific proposals as an option on M21's cluster source, a
+V\*Bench re-run with cost measured on both arms, folded into
+`docs/VLM_FRONT_END.md`.
+
 ## Datasets
 
 | Dataset | For | Status |
@@ -631,24 +744,40 @@ Corpora stay pointed-to, never redistributed (v2 convention).
 
 ## Recommended order & rationale
 
-**M10 → M10b → M12 → M13 → M17 → M11 → M14 → M15 → M18 → M19 → M16.**
-Replication first (anchors credibility, and its stimulus generators feed M12).
-Then the selection backends (M10b), because the headline H1 study wants them as
-baselines and the Kalman backend hands M12 its occlusion handling. Then the H1
-study while the momentum is on stage 2. M13 next because the recognition
-processors unlock the best scenarios *and* supply the labels/embeddings the
-priority map's top-down term needs — so M17 (priority map) follows immediately;
-it is the highest-leverage positioning upgrade, pull it earlier if the
-task-driven story is more urgent than replication. M11/M14 are Python-heavy and
-independent — swap earlier if the human-comparison story leads. M15 (virtual
-fovea) sets up **M18, the flagship VLM-front-end demo** — though a minimal M18
-can ride the M8 processors before the full fovea lands, and if timeliness
-dominates it is the single most repositioning result to front-load. M16
-packages the story. M10 is independent and can start immediately.
+**Done so far: M10 → M10b → M12 → M13 → M17 → M11 → M18 → M19.**
+**Next, the modern track: M20 → M21 → … → M22**, with M14/M15/M16 slotted in
+where they serve a result rather than on their own account.
 
-The two positioning milestones (M17, M18) are the parts a reviewer will read as
-"current"; everything before them makes them credible. Don't skip the science
-to reach them, but don't defer them to the end either.
+M20 first because it is the smallest, is self-contained, improves a hypothesis
+that already has a harness (H5, via `eval/coco_search.py`), and hands H6 the
+middle arms it is missing. M21 next because it is the one that could turn H1's
+inconclusive real-video result into a decidable one — the highest-value open
+question in the project — and because the demo scene has just made the case for
+it concrete. M22 is deliberately later: it is the cost-and-small-target story
+for H6 and it reads better with a real object source already under it.
+
+<details>
+<summary>The original ordering, for the record</summary>
+
+> Replication first (anchors credibility, and its stimulus generators feed M12).
+> Then the selection backends (M10b), because the headline H1 study wants them as
+> baselines and the Kalman backend hands M12 its occlusion handling. Then the H1
+> study while the momentum is on stage 2. M13 next because the recognition
+> processors unlock the best scenarios *and* supply the labels/embeddings the
+> priority map's top-down term needs — so M17 (priority map) follows immediately;
+> it is the highest-leverage positioning upgrade, pull it earlier if the
+> task-driven story is more urgent than replication. M11/M14 are Python-heavy and
+> independent — swap earlier if the human-comparison story leads. M15 (virtual
+> fovea) sets up **M18, the flagship VLM-front-end demo** — though a minimal M18
+> can ride the M8 processors before the full fovea lands, and if timeliness
+> dominates it is the single most repositioning result to front-load. M16
+> packages the story. M10 is independent and can start immediately.
+>
+> The two positioning milestones (M17, M18) are the parts a reviewer will read as
+> "current"; everything before them makes them credible. Don't skip the science
+> to reach them, but don't defer them to the end either.
+
+</details>
 
 ## Working agreement (unchanged)
 
