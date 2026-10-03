@@ -1,4 +1,5 @@
 #include "attention/system/processor.h"
+#include "attention/util/haar_cascade.h"
 #include <algorithm>
 #include <chrono>
 #include <cstdlib>
@@ -276,29 +277,7 @@ class HaarFace : public Processor
   }
 
  private:
-  static std::string find_cascade(const std::string& file)
-  {
-    std::vector<std::string> dirs;
-    if (const char* env = std::getenv("ATTENTION_HAAR_DIR"))
-    {
-      dirs.push_back(env);
-    }
-#ifdef ATTENTION_OPENCV_HAAR_DIR
-    dirs.push_back(ATTENTION_OPENCV_HAAR_DIR); // the linked OpenCV's own, baked in by CMake
-#endif
-    dirs.insert(dirs.end(),
-                {"/opt/homebrew/opt/opencv/share/opencv4/haarcascades", "/usr/local/share/opencv4/haarcascades",
-                 "/usr/share/opencv4/haarcascades", "/usr/share/opencv/haarcascades"});
-    for (const auto& dir : dirs)
-    {
-      const std::filesystem::path candidate = std::filesystem::path(dir) / file;
-      if (std::filesystem::exists(candidate))
-      {
-        return candidate.string();
-      }
-    }
-    return "";
-  }
+  static std::string find_cascade(const std::string& file) { return util::find_haar_cascade(file); }
 
   // detectMultiScale is non-const in OpenCV; processors run single-threaded.
   mutable cv::CascadeClassifier cascade_;

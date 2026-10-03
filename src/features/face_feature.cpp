@@ -1,9 +1,6 @@
 #include "attention/features/face_feature.h"
+#include "attention/util/haar_cascade.h"
 #include <stdexcept>
-
-#ifndef ATTENTION_HAARCASCADE_FILE
-#define ATTENTION_HAARCASCADE_FILE ""
-#endif
 
 namespace attention
 {
@@ -12,7 +9,7 @@ namespace features
 
 std::string FaceFeature::default_cascade_path()
 {
-  return std::string(ATTENTION_HAARCASCADE_FILE);
+  return util::find_haar_cascade("haarcascade_frontalface_default.xml");
 }
 
 FaceFeature::FaceFeature(const Config& config) : config_(config)
@@ -22,9 +19,9 @@ FaceFeature::FaceFeature(const Config& config) : config_(config)
     const std::string path = config_.model_path.empty() ? default_cascade_path() : config_.model_path;
     if (path.empty())
     {
-      throw std::runtime_error("FaceFeature: no Haar cascade available. CMake found none at configure "
-                               "time; set features.face.params.model_path to a "
-                               "haarcascade_frontalface_*.xml");
+      throw std::runtime_error(
+          "FaceFeature: no Haar cascade found. Set $ATTENTION_HAAR_DIR, or "
+          "features.face.params.model_path to a haarcascade_frontalface_*.xml");
     }
     if (!cascade_.load(path))
     {
@@ -35,8 +32,9 @@ FaceFeature::FaceFeature(const Config& config) : config_(config)
   {
     if (config_.model_path.empty())
     {
-      throw std::runtime_error("FaceFeature: backend 'yunet' needs features.face.params.model_path "
-                               "(an ONNX file, e.g. face_detection_yunet_2023mar.onnx)");
+      throw std::runtime_error(
+          "FaceFeature: backend 'yunet' needs features.face.params.model_path "
+          "(an ONNX file, e.g. face_detection_yunet_2023mar.onnx)");
     }
     // Built lazily on the first frame: FaceDetectorYN wants the input size up
     // front, and we do not know it here.
@@ -84,8 +82,8 @@ std::vector<cv::Rect> FaceFeature::detect(const cv::Mat& image) const
   }
   if (!yunet_ || yunet_size_ != bgr.size())
   {
-    yunet_ = cv::FaceDetectorYN::create(config_.model_path, "", bgr.size(), config_.score_threshold,
-                                        config_.nms_threshold);
+    yunet_ =
+        cv::FaceDetectorYN::create(config_.model_path, "", bgr.size(), config_.score_threshold, config_.nms_threshold);
     if (!yunet_)
     {
       throw std::runtime_error("FaceFeature: failed to create YuNet from '" + config_.model_path + "'");
@@ -133,9 +131,9 @@ core::FeatureMap FaceFeature::extract(const core::Frame& frame, DebugContext& de
     // beyond 3 sigma the Gaussian is below 2% and the cost is quadratic in the
     // radius.
     const int radius = cvRound(3.0f * sigma);
-    const cv::Rect roi = cv::Rect(cvRound(centre.x) - radius, cvRound(centre.y) - radius, 2 * radius + 1,
-                                  2 * radius + 1) &
-                         cv::Rect(0, 0, map.cols, map.rows);
+    const cv::Rect roi =
+        cv::Rect(cvRound(centre.x) - radius, cvRound(centre.y) - radius, 2 * radius + 1, 2 * radius + 1) &
+        cv::Rect(0, 0, map.cols, map.rows);
     for (int y = roi.y; y < roi.y + roi.height; ++y)
     {
       float* row = map.ptr<float>(y);

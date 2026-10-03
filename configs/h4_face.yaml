@@ -1,0 +1,31 @@
+# H4 ablation arm: the thesis stage 1 plus a face channel.
+#
+# Track: modern (docs/adr/0005). This is NOT a thesis profile — it exists to
+# answer a question the thesis profile raised.
+#
+# Why. H4's verdict (docs/SCANPATH_VS_HUMAN.md) is that the model's scanpaths
+# are above random but NOT above a centre baseline on MIT1003, and it names the
+# reason it suspects: "MIT1003 is full of faces and text" and the model has no
+# channel for either. Measured here: a frontal-face detector fires on 29 of 60
+# MIT1003 stimuli. So the model is being asked to predict gaze driven by
+# something it cannot see.
+#
+# This arm adds the channel and changes nothing else, so the difference is
+# attributable. It is a test of the explanation, not an attempt to win a
+# benchmark: if the gap to the centre baseline does not close, "no face channel"
+# stops being the account of it.
+pipeline:
+  fusion: weighted-sum
+  selection: ior
+features:
+  face:
+    weight: 1.0
+    params:
+      backend: haar        # yunet is better; set model_path to its ONNX to use it
+      min_size: 24
+      sigma_frac: 0.35
+peaks:
+  max_count: 10
+  threshold: 0.05
+output:
+  display: false

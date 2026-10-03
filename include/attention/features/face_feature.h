@@ -51,8 +51,8 @@ class FaceFeature : public FeatureExtractor
   struct Config
   {
     std::string backend = "haar"; ///< "haar" or "yunet"
-    /// Cascade XML (haar) or ONNX (yunet). Empty = the cascade CMake found at
-    /// configure time; for yunet it is required.
+    /// Cascade XML (haar) or ONNX (yunet). Empty = whatever
+    /// util::find_haar_cascade turns up; for yunet it is required.
     std::string model_path;
     double scale_factor = 1.1; ///< haar: pyramid step
     int min_neighbors = 4;     ///< haar: higher = fewer false positives
@@ -76,7 +76,7 @@ class FaceFeature : public FeatureExtractor
   /// Needs pixels; works on colour or grayscale (Haar converts, YuNet needs BGR).
   bool applicable(const core::Frame& frame) const override { return !frame.empty(); }
 
-  /// Where the default Haar cascade was found, or "" if CMake found none.
+  /// Where the default Haar cascade was found, or "" if none is installed.
   static std::string default_cascade_path();
 
  private:

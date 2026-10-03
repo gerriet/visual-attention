@@ -3,6 +3,7 @@
 #include "attention/features/boolean_map_feature.h"
 #include "attention/features/color_feature.h"
 #include "attention/features/eccentricity_feature.h"
+#include "attention/features/face_feature.h"
 #include "attention/features/frequency_tuned_feature.h"
 #include "attention/features/image_signature_feature.h"
 #include "attention/features/intensity_feature.h"
@@ -140,6 +141,25 @@ void register_builtin_features()
                  read_param(params, "compute_at_scale", config.compute_at_scale);
                  read_param(params, "only_orientation", config.only_orientation);
                  return std::make_unique<OrientationFeature>(config);
+               });
+
+  // Opt-in, modern track (docs/adr/0005): deliberately NOT in any default
+  // profile — the replication profiles stay what the thesis described. H4's own
+  // verdict names this channel as the cheap thing that would move its numbers,
+  // since MIT1003 is full of faces that a bottom-up model cannot see.
+  registry.add("face",
+               [](const YAML::Node& params)
+               {
+                 FaceFeature::Config config;
+                 read_param(params, "backend", config.backend);
+                 read_param(params, "model_path", config.model_path);
+                 read_param(params, "scale_factor", config.scale_factor);
+                 read_param(params, "min_neighbors", config.min_neighbors);
+                 read_param(params, "min_size", config.min_size);
+                 read_param(params, "sigma_frac", config.sigma_frac);
+                 read_param(params, "score_threshold", config.score_threshold);
+                 read_param(params, "nms_threshold", config.nms_threshold);
+                 return std::make_unique<FaceFeature>(config);
                });
 
   registry.add("eccentricity",
