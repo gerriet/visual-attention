@@ -658,6 +658,24 @@ examples combine by the **geometric mean**, because they are ratios.
 
 Deliverable: the fusion stage, the `t` sweep, `docs/TOP_DOWN_WEIGHTS.md`.
 
+**Status (2026-10-03): done. H8 not supported.** The rule is implemented in C++
+(`fusion/top_down_weights.{h,cpp}`, `attention --learn-weights`), with the
+COCO-Search18 study and 12 tests. On the confirmatory split the learned weights
+beat bottom-up by 0.44 fixations [−0.97, +0.09] — the interval includes zero —
+while M17's hand-built category prior beats *them* by +0.87 [+0.27, +1.43]. The
+effect is real in direction (matched > category-blind > mismatched, with the
+mismatched-vs-blind gap excluding zero) and too small to establish.
+
+Two results worth carrying forward. **The best arm measured is weights + prior**
+(found@10 0.49, −1.67 vs bottom-up), and whether it beats the prior *alone*
+(−0.36 [−0.74, +0.02]) is the cheapest open question in the project. And the
+design lesson, which was not what the milestone looked for: *a top-down weight
+vector is worth as much as the spatial independence of the channels it weights* —
+on five fused channels the result was a flat null, on nine split ones it was
+measurable, and the weights did **not** become more category-specific in
+between (log-SD 0.23 vs 0.25). That motivated `configs/split_channels.yaml` and
+the named-feature-instance capability, both of which outlive this result.
+
 ### M21 — An open-world object source for object files (H9)
 
 *Modern track. Source and full argument: `docs/MODERN_TRACK_IDEAS.md` §2.*

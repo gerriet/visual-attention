@@ -23,6 +23,26 @@ list(APPEND CMAKE_PREFIX_PATH "/opt/homebrew/opt/opencv@4")
 find_package(OpenCV 4 REQUIRED)
 find_package(OpenMP)
 
+# The Haar face cascade ships with OpenCV but its install layout varies, so find
+# it once here and compile the path in. Not finding it is not an error: the face
+# feature is modern-track and opt-in (no default profile enables it), and it
+# reports the missing path only if a config actually asks for it.
+find_file(ATTENTION_HAARCASCADE_FILE
+    NAMES haarcascade_frontalface_default.xml
+    PATHS "${OpenCV_INSTALL_PATH}/share/opencv4/haarcascades"
+          "${OpenCV_DIR}/../../../share/opencv4/haarcascades"
+          "${OpenCV_DIR}/../haarcascades"
+          /usr/share/opencv4/haarcascades
+          /usr/local/share/opencv4/haarcascades
+          /opt/homebrew/share/opencv4/haarcascades
+          /opt/homebrew/opt/opencv@4/share/opencv4/haarcascades
+    NO_DEFAULT_PATH)
+if(ATTENTION_HAARCASCADE_FILE)
+    message(STATUS "Haar face cascade: ${ATTENTION_HAARCASCADE_FILE}")
+else()
+    message(STATUS "Haar face cascade: not found (the opt-in face feature will need an explicit path)")
+endif()
+
 # yaml-cpp: prefer an installed CMake package config; the Homebrew prefix is
 # appended so a plain `brew install yaml-cpp` is found without configuration
 list(APPEND CMAKE_PREFIX_PATH "/opt/homebrew/opt/yaml-cpp")
@@ -45,6 +65,7 @@ add_library(attention_core STATIC
     src/features/eccentricity_feature.cpp
     src/features/symmetry_feature.cpp
     src/features/stereo_feature.cpp
+    src/features/face_feature.cpp
     src/features/onset_feature.cpp
     src/features/spectral_residual_feature.cpp
     src/features/frequency_tuned_feature.cpp

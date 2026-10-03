@@ -270,6 +270,76 @@ as much as the spatial independence of the channels it weights**, not as much as
 the variance of the weights themselves. That is the useful thing this milestone
 found, and it was not what it set out to look for.
 
+## Result 3 — the confirmatory run: H8 is not supported
+
+*Validation split, untouched until this run. n = 150 trials, t = 1.0 (fixed
+beforehand on the development split), weights learned from 10 training images
+per category, cap 10.*
+
+| arm | mean ftt | found@10 | paired Δ vs bottom-up |
+|---|---|---|---|
+| bottom-up | 8.69 | 0.34 | — |
+| learned weights | 8.25 | 0.35 | −0.44 [−0.97, **+0.09**] |
+| M17 category prior | 7.38 | 0.49 | **−1.31 [−1.85, −0.75]** |
+| weights + prior | **7.02** | **0.49** | **−1.67 [−2.31, −1.02]** |
+
+| paired difference | Δ | 95% CI | |
+|---|---|---|---|
+| weights − prior | **+0.87** | [+0.27, +1.43] | excludes zero — the weights are *worse* |
+| weights + prior − weights | −1.23 | [−1.80, −0.64] | excludes zero |
+| weights + prior − prior | −0.36 | [−0.74, +0.02] | just includes zero |
+
+### Verdict against the predictions
+
+| | Prediction | Outcome |
+|---|---|---|
+| 1 | weights beat bottom-up, interval excluding zero | **refuted** — −0.44 [−0.97, +0.09]. The development split gave −0.77 [−1.40, −0.16]; it did not replicate on fresh trials. |
+| 2 | weights do *not* beat the category prior | **held** — and more decisively than expected: the prior is better by +0.87 [+0.27, +1.43]. |
+| 3 | weights + prior beats either alone | **partly** — clearly better than weights (−1.23), only marginally better than the prior (−0.36, just includes zero). |
+| 4 | the best `t` is interior | **refuted** — `t` = 1.0 is best throughout. |
+
+**H8 is not supported.** The learned weights move search in the right direction
+on every split and every control, and the effect is too small to establish: about
+half a fixation out of nine, which an n of 150 cannot separate from zero. The
+hand-built category prior that M17 already had is reliably better, for a tenth of
+the machinery.
+
+Three things are worth keeping anyway, and they are why this was worth running:
+
+- **The effect is real in direction, repeatedly.** Across two splits and three
+  controls the ordering never inverted: matched > blind > mismatched, and giving
+  a category the *wrong* category's weights was reliably worse than giving it the
+  *average* one's (−0.75, excluding zero, development split). Weights that were
+  noise could not do that. H8 is small, not absent.
+- **The best arm is the combination.** Weights + prior is the best thing measured
+  here (7.02, found@10 0.49, −1.67 vs bottom-up), and it beats the weights arm
+  decisively. Whether it genuinely beats the prior *alone* is the one question
+  this run leaves open — −0.36 [−0.74, +0.02] is exactly the result that needs a
+  bigger n, and it is cheap to get. It is the natural first thing for anyone
+  picking this up.
+- **The design lesson generalises** (see Result 2): a top-down weight vector is
+  worth as much as the spatial independence of the channels it weights. That is
+  what made the difference between a flat null on five fused channels and a
+  measurable effect on nine split ones, and it was *not* explained by the weights
+  becoming more category-specific — they did not.
+
+### What this says about the method, not just the result
+
+VOCUS's rule is doing something defensible and the implementation is faithful,
+but the comparison it loses is informative: a **spatial** prior ("targets of this
+category are usually here") beats a **featural** one ("targets of this category
+look like this") on natural indoor photographs, by a clear margin. That is a fact
+about COCO-Search18 and about indoor scenes — ovens are at floor level, keyboards
+on desks — more than about either mechanism. On a benchmark where layout carried
+no information the ranking could easily reverse, and the honest form of the claim
+is conditional on that.
+
+The claim M20 set out to test — *a rule generalises where a hand-built channel
+does not* — is not refuted by this; it was never measured, because every category
+here has training examples. Testing it needs a target with no training data at
+all, which is what the question-conditioned variant in §"The interesting variant
+for H6" is for, and that remains open.
+
 ## Reproducing
 
 ```bash

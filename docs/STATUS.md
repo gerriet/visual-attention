@@ -45,7 +45,7 @@ profile is one arm, not the subject.*
 | **H5** | A priority map beats salience-only for task-driven search | **Supported** — the top-down channel is decisive; the history term buys hold, not acquisition | first pass; one control open | synthetic search + COCO-Search18 | 2026-07-20 | [PRIORITY_MAP.md](PRIORITY_MAP.md) |
 | **H6** | Attention as a VLM token budget | **Partly** — right-region crops beat full resolution at a third of the tokens, but bottom-up crops find the target on 10% of V\*Bench items (65% question-conditioned) and still lose to a same-budget uniform downsample | **pilot** (20 items per V\*Bench category, 10 per HR-Bench category) | pilot scale | 2026-09 | [VLM_FRONT_END.md](VLM_FRONT_END.md) |
 | **H7** | Object files as a video token cache | **Supported on synthetic** (0.95 identity-keyed vs 0.80 location-keyed vs 0.27 frames, chance 0.25); **ties on DAVIS** at 480p and full resolution | **first pass — reported on the seeds the mechanisms were developed on (0–9)** | 10 synthetic scenes × 6 questions = 60; 30 DAVIS val sequences | 2026-09-18 | [VLM_VIDEO.md](VLM_VIDEO.md) |
-| **H8** | Learned top-down weights beat hand-built channels | not started (M20) | — | — | — | [V3_ROADMAP.md](V3_ROADMAP.md) |
+| **H8** | Learned top-down weights beat hand-built channels | **Not supported** — the effect is real in direction across two splits and three controls, but ~0.4 fixations out of 9 and the confirmatory interval includes zero; M17's hand-built category prior is reliably better (+0.87 [+0.27, +1.43]) | **confirmatory** | 150 validation trials, 18 categories | 2026-10-03 | [TOP_DOWN_WEIGHTS.md](TOP_DOWN_WEIGHTS.md) |
 | **H9** | A real object source makes the object/space question decidable | not started (M21) | — | — | — | [V3_ROADMAP.md](V3_ROADMAP.md) |
 | **H10** | Scale-specific objectness pays for the controller | not started (M22, later) | — | — | — | [V3_ROADMAP.md](V3_ROADMAP.md) |
 
@@ -59,16 +59,21 @@ profile is one arm, not the subject.*
 
 Ranked by how much a reviewer would care:
 
-1. **H7's confirmatory run.** The headline is on the development seeds. It needs
+1. **Does weights + prior beat the prior alone?** M20's best arm by every
+   measure (found@10 0.49, −1.67 fixations vs bottom-up), but −0.36 [−0.74,
+   +0.02] against the prior on its own — the one result there that needs a
+   bigger n, and the cheapest open question in the project.
+2. **H7's confirmatory run.** The headline is on the development seeds. It needs
    fresh seeds, a frozen config, paired intervals, and the baselines the study
    already names (colour-keyed dedup, decaying location memory, random crops).
    This is the biggest gap between what is claimed and what is established.
-2. **H6 at full scale.** Everything is pilot-scale: the full V\*Bench run, three
+3. **H6 at full scale.** Everything is pilot-scale: the full V\*Bench run, three
    budgets, `fovea-random` as the floor, HR-Bench at full size. No credentials
    needed — the backend is a local Ollama model.
-3. **The H2 and H5 controls**, one each, both cheap and both already specified
-   in the closure plan.
-4. **Two cheap things that would move H4**, and are named in its own verdict: a
+4. **The H2 and H5 controls**, one each. Both are now *implemented* — a
+   `random` selection strategy and `configs/control_motion_roi.yaml` for H2,
+   `--pooled-control` for H5 — and need only to be run.
+5. **Two cheap things that would move H4**, and are named in its own verdict: a
    centre prior on the priority map (the `top_down_map` slot takes one as it is)
    and a face channel at weight 0 by default — MIT1003 is full of faces and text.
 
