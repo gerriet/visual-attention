@@ -20,7 +20,7 @@ of this table.
 |---|---|---|---|---|---|---|
 | **H1** | Object-based IOR beats space-based in dynamic scenes | **Supported**, under stated conditions | confirmatory | 30 scenes × 3 regimes, on four independent blocks (seeds 1000/2000/3000/4000) | 2026-09-21 | [DYNAMIC_IOR_STUDY.md](DYNAMIC_IOR_STUDY.md) |
 | **H1** | …the same question on real video | **Inconclusive**, for a stated reason | confirmatory design, uninformative outcome | 17 DAVIS-2017 validation sequences | 2026-09-22 | [DYNAMIC_IOR_STUDY.md](DYNAMIC_IOR_STUDY.md) |
-| **H4** | Scanpaths land above random/centre toward the human ceiling | **Split: above random weakly; _not_ above centre; no stage-2 ordering benefit** | confirmatory | all 1003 MIT1003 stimuli | 2026-09-21 | [SCANPATH_VS_HUMAN.md](SCANPATH_VS_HUMAN.md) |
+| **H4** | Scanpaths land above random/centre toward the human ceiling | **Split: above random weakly; _not_ above centre; no stage-2 ordering benefit.** Its own proposed explanation ("no face channel") is **refuted** (2026-10-03): adding one moves fixations onto faces by +0.216 [+0.188, +0.247], past the human rate, and the scanpath metrics score it very slightly *worse* — the gap is about centrality, not content | confirmatory | 1003 stimuli; 173 with faces for the follow-up | 2026-09-21 / 2026-10-03 | [SCANPATH_VS_HUMAN.md](SCANPATH_VS_HUMAN.md) |
 | **M10** | The thesis's findings, figure by figure | **22 of 25 replicate, 3 partially** | dossier | 25 findings | 2026-09-22 | [REPLICATION_DOSSIER.md](replication/REPLICATION_DOSSIER.md) |
 
 **The conditions on H1 matter and are not footnotes.** With the
@@ -78,8 +78,11 @@ Ranked by how much a reviewer would care:
    random floor turned out to be worth 0.46 on its own, so the old "51% at 5.8%
    of pixels" wording was standing on more chance than it admitted. The H5
    pooled-prior control is implemented (`--pooled-control`) and running.
-6. **Two cheap things that would move H4**, and are named in its own verdict: a
-   centre prior on the priority map (the `top_down_map` slot takes one as it is)
-   and a face channel at weight 0 by default — MIT1003 is full of faces and text.
+6. **The centre-prior half of H4's proposal.** The face half was run and
+   refuted (above); the centre prior is untested and is now the more promising
+   of the two, since the gap H4 reports is about centrality. Also worth one run:
+   calibrating the face channel's weight so its face coverage *matches* the
+   human 0.320 instead of overshooting to 0.449 — a one-parameter fit against a
+   measured target.
 
 Nothing here needs an API key or a dataset that is not already on disk.

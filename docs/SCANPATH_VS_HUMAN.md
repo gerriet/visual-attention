@@ -245,10 +245,98 @@ human free viewing, and it does not — its scanpaths are slightly better than
 chance and far from human agreement. What it claimed was a mechanism for dynamic
 scenes, and that holds (H1).
 
+## The face channel, tested (2026-10-03): the metric is the problem
+
+The verdict above names the face channel as the cheap thing that would move
+these numbers. It was built (`configs/h4_face.yaml`, the thesis profile plus one
+feature and nothing else — a test enforces that) and run. The result is a clean
+negative on the scanpath metrics and something more interesting underneath.
+
+### On the scanpath metrics: nothing, then slightly worse
+
+200 MIT1003 stimuli, same WTA readout, map with and without the face channel:
+
+| arm | ScanMatch | shape | direction | length | position |
+|---|---|---|---|---|---|
+| thesis-wta | 0.676 | 0.869 | 0.598 | 0.795 | 0.817 |
+| + face, weight 1 | 0.676 | 0.866 | 0.595 | 0.790 | 0.817 |
+| + face, weight 3 | 0.674 | 0.865 | 0.595 | 0.787 | 0.814 |
+| + face, weight 8 | 0.672 | 0.862 | 0.592 | 0.784 | 0.811 |
+
+Paired on ScanMatch: `thesis − face1` = +0.000 [−0.002, +0.002]; `thesis −
+face3` = +0.003 [+0.000, +0.005]; `thesis − face8` = +0.005 [+0.002, +0.007].
+Monotone, and in the **wrong** direction — the more the model attends to faces,
+the slightly *worse* its scanpath scores. It is not dilution: three weights,
+one trend.
+
+### But the channel does exactly what it was supposed to
+
+That could mean the explanation was wrong, or it could mean the metrics cannot
+see the change. `eval/face_coverage.py` separates the two by measuring the thing
+directly — **what fraction of fixations land inside a face box** — on the 173
+sampled stimuli where the detector fires:
+
+| | fixations on a face | 95% CI |
+|---|---|---|
+| **human** | **0.320** | [0.270, 0.372] |
+| thesis model | 0.233 | [0.186, 0.280] |
+| thesis + face channel | 0.449 | [0.400, 0.500] |
+
+| paired difference | Δ | 95% CI | |
+|---|---|---|---|
+| human − thesis | **+0.087** | [+0.054, +0.121] | excludes zero |
+| (thesis + face) − thesis | **+0.216** | [+0.188, +0.247] | excludes zero |
+| human − (thesis + face) | −0.129 | [−0.164, −0.096] | excludes zero |
+
+So both halves of the story are true and they point opposite ways:
+
+1. **The gap is real.** Humans fixate faces more than the thesis model does,
+   +0.087, interval excluding zero. The explanation H4 offered had content.
+2. **The channel closes it, and then some.** +0.216 where +0.087 was needed —
+   it overshoots human behaviour by a factor of about two and a half.
+3. **The scanpath metrics register none of it**, and score the change as very
+   slightly worse.
+
+### What this actually shows
+
+The arm that scores best on every metric here is still `center` (ScanMatch
+0.752), ahead of every model arm and nearly at the inter-observer ceiling of
+0.760. Faces in these photographs are frequently off-centre. Moving fixations
+onto faces therefore moves them *away from the centre*, and on these metrics
+that costs more than the human-like behaviour gains.
+
+**An intervention that provably makes the model more human-like on an
+independent measure scores as slightly worse on the scanpath-similarity
+metrics.** That is a sharper version of this study's existing caveat — that
+ScanMatch cannot separate a constant-centre path from the inter-observer ceiling
+— because it is constructive rather than negative: here is a specific change,
+with a measured effect in the human direction, that the metrics mis-score.
+
+The practical consequences, in order of how much they matter:
+
+- **For H4's verdict:** "no face channel" is *not* the account of the gap to the
+  centre baseline. Adding faces does not close that gap, because the gap is
+  about centrality, not content. The verdict stands and its proposed explanation
+  does not.
+- **For anyone using these metrics:** on a centre-biased free-viewing dataset
+  they reward centrality strongly enough to invert the sign of a real
+  improvement. A model comparison on MIT1003 ScanMatch alone is not safe.
+- **For the channel itself:** weight 1.0 is miscalibrated — it should be set so
+  face coverage *matches* the human rate (0.320) rather than overshooting to
+  0.449. That is a one-parameter fit against a measured target, and it is the
+  obvious next run.
+
 **What would change these numbers, and is cheap:** a centre prior on the
 priority map (the `top_down_map` slot takes one as it is), and the face channel
 (YuNet, weight 0 by default) — MIT1003 is full of faces and text. Both belong to
 the *modern* track (docs/adr/0005), not to the replication.
+
+*(Written 2026-09-21. The face half was built and run on 2026-10-03 and the
+proposal did not survive: see "The face channel, tested" above. The face channel
+moves the model's fixations onto faces by +0.216 — past the human rate — and the
+scanpath metrics score that as very slightly worse, because the gap to the
+centre baseline is about centrality rather than content. The centre-prior half
+is untested and, on this evidence, the more promising of the two.)*
 
 ### Update (2026-09-21): the dissertation's field parameters, and a length-matched control
 

@@ -215,6 +215,11 @@ if(Python3_Interpreter_FOUND)
         # Replication dossier (M10), smoke: three experiments end to end through
         # --emit-features (absolute feature maps; also in --stereo mode); the values themselves are
         # asserted by tests/test_thesis_features.cpp.
+        # H4 follow-up: does the model look at faces where humans do? Imports
+        # numpy/PIL, hence the venv; the run itself needs MIT1003.
+        add_test(NAME help_face_coverage
+            COMMAND ${EVAL_PYTHON} ${CMAKE_SOURCE_DIR}/eval/face_coverage.py --help)
+        set_tests_properties(help_face_coverage PROPERTIES PASS_REGULAR_EXPRESSION "usage")
         # M20 learned top-down weights: --help imports coco_search (PIL), hence
         # the venv. The rule itself is tested in C++ (test_top_down_weights.cpp);
         # a smoke run would need COCO-Search18, which is not in the repo.
