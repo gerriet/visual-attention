@@ -96,6 +96,77 @@ of them accumulating stable "person" identities.
 | loading | 0.32 | 0.23 (34%) | 0.23 (50%) |
 | parkour | 0.98 | 0.23 (19%) | 0.71 (35%) |
 
+## The controls (2026-10-03): what the 51% is worth
+
+The closure plan asked for one control, and the headline needed it: *"recovers
+51% of full-frame detections at 5.8% of the pixels"* is a claim about
+**attention** only if attending somewhere else does worse. On a surveillance
+frame full of people, a tenth of the image chosen at random may already contain
+most of them.
+
+Two floors, same video (vtest, 300 frames), same detector, same scoring:
+
+- **random** — `configs/control_random_roi.yaml`, the `random` selection
+  strategy: ROIs at uniformly random locations, same count and spacing, saliency
+  ignored.
+- **motion** — `configs/control_motion_roi.yaml`: the onset feature alone, i.e.
+  frame differencing. On a surveillance stream the people *are* what moves, so
+  this is the harder floor and nearly free.
+
+| arm | cadence | windowed recovery | pixels | detector ms |
+|---|---|---|---|---|
+| **attention** | frame | **0.609** | **0.075** | 0.156 |
+| random | frame | 0.464 | 0.155 | 0.287 |
+| motion | frame | 0.000 | 0.064 | 0.171 |
+| **attention** | dwell | **0.432** | **0.033** | 0.066 |
+| random | dwell | 0.386 | 0.070 | 0.131 |
+| motion | dwell | 0.000 | 0.023 | 0.054 |
+
+**H2 survives the control, and on both axes at once.** Attention recovers more
+than random (0.609 vs 0.464) while spending *less than half* the pixels (0.075
+vs 0.155). The comparison is deliberately not budget-matched — it did not need
+to be, because attention dominates on both coordinates, which is a stronger
+statement than a matched-budget tie would have been.
+
+**And the control earned its keep**: random recovers 0.464, three quarters of
+what attention does. That is the number the headline was quietly standing on.
+"51% of detections at 5.8% of pixels" is true and much less impressive than it
+sounds, because a sizeable part of it is available to anyone who points a
+detector anywhere. The honest form of the claim is the *paired* one: attention
+buys about 0.15 of recovery over chance **and** halves the pixel cost at the
+same time.
+
+### Why motion scores zero, which is not what it looks like
+
+Zero recovery does not mean the motion arm detected nothing. It ran the detector
+59 times and produced 16 person detections at the default confidence floor. None
+of them **matched**: their best IoU against any full-frame detection within ±5
+frames is 0.20, under the 0.3 threshold, with a median of 0.01 — against
+attention's 0.98 best and 0.56 median.
+
+The mechanism is in the feature's definition rather than in a bug. Onset is the
+rectified positive change in *edge energy*: it marks where structure appeared
+between two frames, which for a walking person is the leading edge, not the
+person. The ROIs land on motion boundaries, HOG fires on partial figures, and
+the boxes do not line up with the boxes a full-frame scan produces.
+
+Worth stating because it is the useful half: *frame differencing finds that
+something moved, not what moved or where it is.* A front-end that has to hand a
+recogniser a well-formed object region cannot be built from it directly — which
+is exactly the gap a saliency or proto-object front-end fills, and an argument
+for H2 that the 51% number alone never made.
+
+### What this changes in the wording
+
+The verdict the closure plan asked for, with the numbers filled in:
+
+> Attention-gated recognition recovers **0.61** of full-frame person detections
+> at **7.5%** of the detector pixels; **+0.15 over a random-ROI floor that costs
+> twice the pixels**, and against a motion-gated baseline that recovers nothing
+> matchable at all.
+
+"Near-full-frame accuracy" is dropped, as the plan required.
+
 ## Reading the results honestly
 
 **Where H2 holds.** On the multi-pedestrian surveillance scene (vtest) the

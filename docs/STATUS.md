@@ -41,7 +41,7 @@ profile is one arm, not the subject.*
 
 | | Hypothesis | Verdict | Basis | n | Date | Detail |
 |---|---|---|---|---|---|---|
-| **H2** | Gated recognition reaches near-full-frame accuracy at a fraction of the compute | **Supported** — 51% of full-frame detections at 5.8% of the pixels | first pass; one control open | vtest sequence | 2026-07-19 | [GATED_RECOGNITION.md](GATED_RECOGNITION.md) |
+| **H2** | Gated recognition reaches near-full-frame accuracy at a fraction of the compute | **Supported, and now against floors** — 0.61 of full-frame person detections at 7.5% of detector pixels; **+0.15 over a random-ROI floor that costs twice the pixels**, and a motion-gated baseline recovers nothing matchable (best IoU 0.20 < 0.3) | first pass + both controls | vtest, 300 frames | 2026-10-03 | [GATED_RECOGNITION.md](GATED_RECOGNITION.md) |
 | **H5** | A priority map beats salience-only for task-driven search | **Supported** — the top-down channel is decisive; the history term buys hold, not acquisition | first pass; one control open | synthetic search + COCO-Search18 | 2026-07-20 | [PRIORITY_MAP.md](PRIORITY_MAP.md) |
 | **H6** | Attention as a VLM token budget | **Partly** — right-region crops beat full resolution at a third of the tokens, but bottom-up crops find the target on 10% of V\*Bench items (65% question-conditioned) and still lose to a same-budget uniform downsample | **pilot** (20 items per V\*Bench category, 10 per HR-Bench category) | pilot scale | 2026-09 | [VLM_FRONT_END.md](VLM_FRONT_END.md) |
 | **H7** | Object files as a video token cache | **Supported on synthetic** (0.95 identity-keyed vs 0.80 location-keyed vs 0.27 frames, chance 0.25); **ties on DAVIS** at 480p and full resolution | **first pass — reported on the seeds the mechanisms were developed on (0–9)** | 10 synthetic scenes × 6 questions = 60; 30 DAVIS val sequences | 2026-09-18 | [VLM_VIDEO.md](VLM_VIDEO.md) |
@@ -70,9 +70,10 @@ Ranked by how much a reviewer would care:
 3. **H6 at full scale.** Everything is pilot-scale: the full V\*Bench run, three
    budgets, `fovea-random` as the floor, HR-Bench at full size. No credentials
    needed — the backend is a local Ollama model.
-4. **The H2 and H5 controls**, one each. Both are now *implemented* — a
-   `random` selection strategy and `configs/control_motion_roi.yaml` for H2,
-   `--pooled-control` for H5 — and need only to be run.
+4. ~~**The H2 control.**~~ **Done 2026-10-03** — H2 clears both floors, and the
+   random floor turned out to be worth 0.46 on its own, so the old "51% at 5.8%
+   of pixels" wording was standing on more chance than it admitted. The H5
+   pooled-prior control is implemented (`--pooled-control`) and running.
 5. **Two cheap things that would move H4**, and are named in its own verdict: a
    centre prior on the priority map (the `top_down_map` slot takes one as it is)
    and a face channel at weight 0 by default — MIT1003 is full of faces and text.
