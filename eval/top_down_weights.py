@@ -33,6 +33,7 @@ import argparse
 import json
 import math
 import os
+import random
 import subprocess
 import sys
 
@@ -263,6 +264,10 @@ def main():
     ap.add_argument("--out", default="results/top_down_weights")
     ap.add_argument("--examples", type=int, default=10,
                     help="training images per category used to learn its weights")
+    ap.add_argument("--example-seed", type=int, default=None,
+                    help="sample the learning examples at random with this seed instead of taking "
+                         "the first ones in filename order, which is arbitrary and makes the "
+                         "weights depend on how the dataset happens to sort")
     ap.add_argument("--limit", type=int, default=120, help="trials to score (0 = all)")
     ap.add_argument("--cap", type=int, default=10, help="model fixation budget")
     ap.add_argument("--factor", type=float, action="append", default=None,
@@ -306,6 +311,10 @@ def main():
     by_task = {}
     for key in train_trials:
         by_task.setdefault(key[1], []).append(key)
+    if args.example_seed is not None:
+        rng = random.Random(args.example_seed)
+        for keys in by_task.values():
+            rng.shuffle(keys)
     learn_keys = {task: keys[: args.examples] for task, keys in by_task.items()}
     learned_images = set(k for keys in learn_keys.values() for k in keys)
 
