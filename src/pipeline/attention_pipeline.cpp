@@ -431,6 +431,18 @@ void AttentionPipeline::extract_features(int pyramid_levels)
 
 void AttentionPipeline::integrate_features()
 {
+  // No feature applied to this frame. That is not a configuration error —
+  // build_components() already rejects a pipeline with nothing enabled — it
+  // means every enabled feature was inapplicable here, which happens on frame 0
+  // of a stream whose only feature is temporal (a motion-only profile, e.g.
+  // configs/control_motion_roi.yaml). The honest answer is "nothing is salient
+  // yet", not a crash.
+  if (features_.empty())
+  {
+    saliency_ = core::SaliencyMap(cv::Mat::zeros(frame_.size(), CV_32F));
+    return;
+  }
+
   cv::Mat fused = fusion_->fuse(features_, feature_weights_, frame_.size());
   // M20: learned per-feature weights (the VOCUS rule) mix a top-down map built
   // from the *individual* feature maps into the fused one. Before the M17

@@ -148,8 +148,25 @@ def mismatched_weights(weights_by_task):
     return {task: weights_by_task[tasks[(i + 1) % len(tasks)]] for i, task in enumerate(tasks)}
 
 
+def base_yaml(profile_path):
+    """The config text every arm starts from.
+
+    With --config this must be the *profile*, not the built-in default: the
+    weights are learned on the profile's channels, and weights naming channels
+    the scoring run does not have would silently match nothing — every arm would
+    then be the bottom-up arm and the study would report a tidy null.
+    """
+    if not profile_path:
+        return BASE_YAML
+    with open(profile_path) as fh:
+        text = fh.read().replace("%", "%%")
+    if "\npriority:" in "\n" + text:
+        sys.exit("--config %s already has a priority: block; the arms add their own" % profile_path)
+    return text.rstrip("\n") + "\n"
+
+
 def score_arms(binary, adapter, trials, keys, weights_by_task, factors, cap, out_dir,
-               priors=None, prior_weight=1.5, controls=False):
+               priors=None, prior_weight=1.5, controls=False, profile=None):
     """Run every arm over the same trials. Returns {arm: [fixations-to-target]}."""
     arms = {"bottom-up": []}
     for t in factors:
@@ -180,24 +197,25 @@ def score_arms(binary, adapter, trials, keys, weights_by_task, factors, cap, out
         bbox = records[0]["bbox"]
         work = os.path.join(out_dir, "runs", "%s_%s" % (task.replace(" ", "_"), os.path.splitext(name)[0]))
         wy = weights_yaml(weights_by_task[task])
+        base = base_yaml(profile)
 
         def run(tag, yaml_text):
             fx = coco_search.run_model(binary, image, yaml_text, work, tag)
             return coco_search.first_hit(fx[:cap], bbox, cap)
 
-        arms["bottom-up"].append(run("bottom_up", BASE_YAML % {"cap": cap}))
+        arms["bottom-up"].append(run("bottom_up", base % {"cap": cap}))
         if priors:
-            arms["prior"].append(run("prior", BASE_YAML % {"cap": cap} + "priority:\n" +
+            arms["prior"].append(run("prior", base % {"cap": cap} + "priority:\n" +
                                      PRIOR_LINES % {"prior_weight": prior_weight, "map": priors[task]}))
         for t in factors:
-            cfg = BASE_YAML % {"cap": cap} + WEIGHTS_BLOCK % {"factor": t, "weights": wy}
+            cfg = base % {"cap": cap} + WEIGHTS_BLOCK % {"factor": t, "weights": wy}
             arms["weights t=%.2f" % t].append(run("w%.2f" % t, cfg))
             if controls:
-                arms["blind t=%.2f" % t].append(run("b%.2f" % t, BASE_YAML % {"cap": cap} +
+                arms["blind t=%.2f" % t].append(run("b%.2f" % t, base % {"cap": cap} +
                                                     WEIGHTS_BLOCK % {"factor": t,
                                                                      "weights": weights_yaml(blind)}))
                 arms["mismatched t=%.2f" % t].append(
-                    run("m%.2f" % t, BASE_YAML % {"cap": cap} +
+                    run("m%.2f" % t, base % {"cap": cap} +
                         WEIGHTS_BLOCK % {"factor": t, "weights": weights_yaml(mismatched[task])}))
             if priors:
                 combined = cfg.rstrip("\n") + "\n" + PRIOR_LINES % {"prior_weight": prior_weight,
@@ -249,7 +267,9 @@ def main():
     ap.add_argument("--cap", type=int, default=10, help="model fixation budget")
     ap.add_argument("--factor", type=float, action="append", default=None,
                     help="top-down factor t; repeatable (default: a sweep)")
-    ap.add_argument("--config", default=None, help="pipeline profile for weight learning")
+    ap.add_argument("--config", default=None,
+                    help="pipeline profile — used for BOTH weight learning and scoring, since weights "
+                         "name that profile's channels (e.g. configs/split_channels.yaml)")
     ap.add_argument("--whole-box", action="store_true",
                     help="learn from the whole bounding box instead of the salient region in it "
                          "(the ablation of VOCUS's own region step)")
@@ -318,7 +338,7 @@ def main():
         priors = coco_search.build_priors(train, os.path.join(args.out, "priors"), adapter)
 
     arms, skipped = score_arms(args.binary, adapter, trials, keys, weights_by_task, factors,
-                               args.cap, args.out, priors, controls=args.controls)
+                               args.cap, args.out, priors, controls=args.controls, profile=args.config)
 
     print("\nCOCO-Search18, %s split — fixations-to-target (cap+1 = never found)" % split_name)
     print("weights learned per category from %d training image(s)%s" % (

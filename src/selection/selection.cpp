@@ -11,6 +11,7 @@
 #include "attention/selection/neural_field_3d.h"
 #include "attention/selection/neural_field_selection.h"
 #include "attention/selection/normalization_selection.h"
+#include "attention/selection/random_selection.h"
 #include "attention/selection/selection_strategy.h"
 #include <algorithm>
 #include <cmath>
@@ -254,6 +255,17 @@ std::unique_ptr<SelectionStrategy> create_selection_strategy(const std::string& 
   if (name == "ior")
   {
     return std::make_unique<IorSelection>(params);
+  }
+  if (name == "random")
+  {
+    // The floor, not a model: fixations anywhere, ignoring saliency. Every
+    // "attending *here* is better than attending anywhere" claim has to clear
+    // it (H2's and H6's controls).
+    RandomSelection::Params rnd;
+    read_param(strategy_params, "seed", rnd.seed);
+    read_param(strategy_params, "min_value", rnd.min_value);
+    read_param(strategy_params, "max_attempts", rnd.max_attempts);
+    return std::make_unique<RandomSelection>(params, rnd);
   }
   if (name == "neural-field")
   {

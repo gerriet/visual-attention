@@ -24,11 +24,12 @@ One command:  eval/coco_search.py --limit 150
 import argparse
 import json
 import os
+import random
 import subprocess
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from study_common import bootstrap_ci  # noqa: E402
+from study_common import bootstrap_ci, paired_bootstrap  # noqa: E402
 
 PRIOR_W, PRIOR_H = 336, 210  # prior raster (display aspect); resized by the core
 
@@ -67,9 +68,16 @@ def image_size(path, cache={}):
     return cache[path]
 
 
-def build_priors(records, out_dir, adapter, sigma_frac=0.08):
+def build_priors(records, out_dir, adapter, sigma_frac=0.08, pooled=False):
     """Per-category spatial priors from training-split target boxes, in
-    normalized image-fraction coordinates, written as grayscale PNGs."""
+    normalized image-fraction coordinates, written as grayscale PNGs.
+
+    `pooled=True` builds **one** prior from every category's boxes together and
+    returns it under every category key. That is the control the closure plan
+    asks for: targets of all kinds sit away from the edges, so a pooled prior is
+    very nearly a centre prior. If it recovers most of the category prior's
+    gain, the H5 COCO result is centre bias wearing a category label.
+    """
     import numpy as np
     from PIL import Image, ImageFilter
 
@@ -82,7 +90,8 @@ def build_priors(records, out_dir, adapter, sigma_frac=0.08):
         bx, by, bw, bh = record["bbox"]
         cx = int((bx + bw / 2.0) / w * (PRIOR_W - 1))
         cy = int((by + bh / 2.0) / h * (PRIOR_H - 1))
-        grid = accum.setdefault(record["task"], np.zeros((PRIOR_H, PRIOR_W), dtype=np.float64))
+        key = "__pooled__" if pooled else record["task"]
+        grid = accum.setdefault(key, np.zeros((PRIOR_H, PRIOR_W), dtype=np.float64))
         if 0 <= cx < PRIOR_W and 0 <= cy < PRIOR_H:
             grid[cy, cx] += 1.0
 
@@ -99,6 +108,12 @@ def build_priors(records, out_dir, adapter, sigma_frac=0.08):
         out_path = os.path.join(out_dir, task.replace(" ", "_") + ".png")
         Image.fromarray(arr.astype("uint8")).save(out_path)
         paths[task] = out_path
+    if pooled:
+        # Same map for every category, so the caller's `priors[task]` lookups
+        # work unchanged.
+        pooled_path = paths["__pooled__"]
+        tasks = set(r["task"] for r in records)
+        paths = {task: pooled_path for task in tasks}
     return paths
 
 
@@ -147,6 +162,12 @@ def main():
     ap.add_argument("--config", default=None,
                     help="pipeline profile to score instead of the built-in default feature set "
                          "(e.g. configs/thesis/thesis.yaml) — compares stage-1 profiles on search")
+    ap.add_argument("--pooled-control", action="store_true",
+                    help="also score a pooled, category-agnostic prior (the H5 control): if it "
+                         "recovers most of the category prior's gain, the finding is centre bias")
+    ap.add_argument("--sample-seed", type=int, default=None,
+                    help="sample --limit trials at random with this seed instead of taking the "
+                         "first ones, so the score is not dominated by whatever sorts first")
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args()
 
@@ -162,12 +183,17 @@ def main():
     print("building category priors from the training split...", file=sys.stderr)
     train = adapter.load_fixations("train")
     priors = build_priors(train, os.path.join(args.out, "priors"), adapter)
+    pooled = (build_priors(train, os.path.join(args.out, "priors_pooled"), adapter, pooled=True)
+              if args.pooled_control else None)
 
     validation = adapter.load_fixations("validation")
     trials = adapter.unique_trials(validation)
-    keys = list(trials)[: args.limit] if args.limit else list(trials)
+    keys = list(trials)
+    if args.sample_seed is not None:
+        random.Random(args.sample_seed).shuffle(keys)
+    keys = keys[: args.limit] if args.limit else keys
 
-    human, bottom_up, prior = [], [], []
+    human, bottom_up, prior, pooled_arm = [], [], [], []
     skipped = 0
     for n, key in enumerate(keys):
         name, task = key
@@ -198,6 +224,11 @@ def main():
                                        "map": priors[task]}
         fx = run_model(args.binary, image, prior_yaml, work, "prior")
         prior.append(first_hit(fx[:args.cap], bbox, args.cap))
+        if pooled:
+            pooled_yaml = prior_template % {"cap": args.cap, "weight": args.top_down_weight,
+                                            "map": pooled[task]}
+            fx = run_model(args.binary, image, pooled_yaml, work, "pooled")
+            pooled_arm.append(first_hit(fx[:args.cap], bbox, args.cap))
         if (n + 1) % 25 == 0:
             print("  %d/%d trials" % (n + 1, len(keys)), file=sys.stderr)
 
@@ -208,6 +239,8 @@ def main():
                 "ci": [lo, hi], "found_rate": found, "n": len(values)}
 
     rows = [row("human", human), row("bottom-up", bottom_up), row("prior", prior)]
+    if pooled_arm:
+        rows.append(row("pooled prior", pooled_arm))
     header = "%-11s %8s %16s %10s %6s" % ("arm", "mean-ftt", "95% CI", "found@%d" % args.cap, "n")
     print("COCO-Search18 target-present search (fixations-to-target; cap+1 = never)")
     if skipped:
@@ -221,6 +254,20 @@ def main():
     os.makedirs(args.out, exist_ok=True)
     with open(os.path.join(args.out, "summary.json"), "w") as fh:
         json.dump({"config": vars(args), "rows": rows}, fh, indent=2)
+    if pooled_arm:
+        # The comparisons the control exists to make, paired over trials: how
+        # much of the category prior's gain survives when the prior is told
+        # nothing about the category.
+        print()
+        print("paired differences (negative = fewer fixations = better):")
+        for label, a, b in (("category prior - bottom-up", prior, bottom_up),
+                            ("pooled prior   - bottom-up", pooled_arm, bottom_up),
+                            ("category prior - pooled   ", prior, pooled_arm)):
+            mean, lo, hi = paired_bootstrap(a, b)
+            flag = "" if lo <= 0 <= hi else "   (excludes zero)"
+            print("  %s  %+6.2f  [%+6.2f, %+6.2f]%s" % (label, mean, lo, hi, flag))
+            rows.append({"name": label.strip(), "paired_delta": mean, "delta_ci": [lo, hi]})
+
     print("summary: %s" % os.path.join(args.out, "summary.json"))
     if args.json:
         print(json.dumps(rows, indent=2))

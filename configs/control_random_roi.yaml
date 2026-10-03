@@ -1,0 +1,23 @@
+# H2 control: recognition gated on RANDOM regions (docs/HYPOTHESIS_CLOSURE_PLAN.md).
+#
+# Track: modern (docs/adr/0005). Not a model — the floor. "Detectors restricted
+# to attended ROIs recover 51% of full-frame detections at 5.8% of the pixels"
+# is only a claim about *attention* if attending somewhere else does worse. With
+# people filling a good part of a surveillance frame, a tenth of the frame
+# chosen at random may already contain most of them, and until this arm is run
+# we cannot tell the two apart.
+#
+# Same feature stack and the same peak budget as configs/attend.yaml, so the
+# arms differ in where they look and in nothing else.
+pipeline:
+  fusion: weighted-sum
+  selection: random
+  selection_params:
+    seed: 0
+    min_value: 0.0      # truly anywhere; raise for "random among plausible places"
+peaks:
+  max_count: 10
+  min_distance: 50
+  threshold: 0.0        # the random arm does not threshold; keep it from pruning
+output:
+  display: false

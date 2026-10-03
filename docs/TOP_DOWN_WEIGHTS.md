@@ -142,10 +142,133 @@ None of that was put in by hand. It is the ratio rule reading the dataset.
 What would refute H8 as stated: prediction 1 failing, or the weights arm being
 indistinguishable from bottom-up at every `t`.
 
-## Results
+## Result 1 — on the thesis's five fused channels: a null, and the reason for it
 
-*The confirmatory run has not been made yet. This section is deliberately empty
-until it has; the tuning numbers do not go here, because t is chosen on them.*
+*Development phase, on training trials held out from weight learning. n = 100
+unique (image, task) trials, 10 training images per category, cap 10.*
+
+| arm | mean fixations-to-target | found@10 | paired Δ vs bottom-up |
+|---|---|---|---|
+| bottom-up | 8.74 | 0.33 | — |
+| weights, t = 0.25 | 8.73 | 0.31 | −0.01 [−0.32, +0.29] |
+| weights, t = 0.50 | 8.72 | 0.31 | −0.02 [−0.42, +0.39] |
+| weights, t = 0.75 | 8.60 | 0.32 | −0.14 [−0.62, +0.34] |
+| weights, t = 1.00 | 8.56 | **0.34** | −0.18 [−0.70, +0.33] |
+
+Every interval spans zero. **Prediction 1 fails on this channel set**: the
+weights arm does not beat bottom-up. Prediction 4 also fails — the best `t` is
+1.0, not interior, which is itself a hint: a top-down map that is barely
+different from the bottom-up one costs nothing to use at full strength.
+
+### Why: the weights are nearly category-blind
+
+The learned vectors looked legible — *stop sign* has the highest colour weight of
+all eighteen categories, *clock* the lowest, *knife* and *sink* load on
+eccentricity. That legibility is real but it is a small part of the signal. The
+large part is shared:
+
+| | colour | eccentricity | intensity | orientation | symmetry |
+|---|---|---|---|---|---|
+| geometric mean over the 18 categories | 1.16 | **2.36** | 1.64 | 1.18 | 1.33 |
+| spread across categories (log SD) | 0.26 | 0.32 | 0.17 | 0.11 | 0.37 |
+
+**Every single category** is excitatory on eccentricity (1.37–4.24) and on
+intensity (1.20–2.10). What the rule mostly learned is *"objects are eccentric
+and bright"* — which is category-independent, and therefore a re-weighted
+bottom-up map rather than a top-down one.
+
+### The control that settles it
+
+Three weight vectors, same trials, same `t` = 1.0: the category's **matched**
+vector, a category-**blind** vector (the geometric mean over all 18, so the
+category-specific part is averaged out), and a **mismatched** one (each category
+gets a different category's weights — a rotation, so none keeps its own).
+
+| arm | mean ftt | found@10 |
+|---|---|---|
+| matched | **8.56** | **0.34** |
+| bottom-up | 8.74 | 0.33 |
+| blind | 8.94 | 0.29 |
+| mismatched | 9.03 | 0.25 |
+
+| paired difference | Δ | 95% CI |
+|---|---|---|
+| matched − mismatched | −0.47 | [−1.07, +0.13] |
+| matched − blind | −0.38 | [−0.93, +0.14] |
+| blind − mismatched | −0.09 | [−0.61, +0.41] |
+| matched − bottom-up | −0.18 | [−0.70, +0.33] |
+
+The **ordering is exactly what H8 predicts** — the right category's weights beat
+the average category's, which beat the wrong category's — and **not one interval
+excludes zero**. So: there is a category-specific component, it points the right
+way, and at n = 100 it is too small to call. It is worth about 0.4 fixations out
+of 8.7.
+
+That is the honest state of H8 on the thesis's channel set, and it is a
+negative. But it is a negative about *this channel set*, which leads to the part
+worth having.
+
+## Result 2 — the diagnosis, and what follows from it
+
+A weight vector can only express what the channel set keeps apart. Weighting one
+combined orientation map cannot say *"this target is horizontal"*; weighting one
+combined colour map cannot say *"this target is red"*, because the sum of the
+red–green and blue–yellow axes has already discarded which one responded. VOCUS
+weights about thirteen maps — four oriented, four coloured, at several scales.
+We were asking five contrast maps, each of which answers *"is something here"*
+for one modality, to answer *"is the thing here a knife"*.
+
+Declaring H8 refuted on a channel set that makes it inexpressible would be a
+weak negative. So the channel set was split (`configs/split_channels.yaml`):
+four orientations, the two colour-opponent axes, plus intensity, eccentricity
+and symmetry — nine channels. The capability behind it is general and opt-in: a
+config entry's key now names an *instance* and `type:` names the registry entry,
+so one extractor can appear several times with different parameters. Every
+existing config is unaffected, and the goldens are unchanged.
+
+### The split channels, same trials, same controls
+
+*Development phase still — training trials held out from weight learning,
+n = 100, t = 1.0.*
+
+| arm | mean ftt | found@10 | paired Δ vs bottom-up |
+|---|---|---|---|
+| matched | **8.08** | **0.37** | **−0.77 [−1.40, −0.16]** |
+| blind | 8.56 | 0.32 | −0.29 [−0.61, +0.04] |
+| bottom-up | 8.85 | 0.30 | — |
+| mismatched | 9.31 | 0.27 | +0.46 [−0.05, +1.02] |
+
+| paired difference | Δ | 95% CI | |
+|---|---|---|---|
+| matched − mismatched | **−1.23** | [−1.87, −0.64] | excludes zero |
+| matched − bottom-up | **−0.77** | [−1.40, −0.16] | excludes zero |
+| blind − mismatched | **−0.75** | [−1.29, −0.27] | excludes zero |
+| matched − blind | −0.48 | [−1.04, +0.05] | just includes zero |
+
+On channels the rule can say something with, **H8's prediction 1 holds**: the
+learned weights beat bottom-up, and the interval excludes zero. The control is
+what makes it a result rather than a coincidence — giving a category the *wrong*
+category's weights is worse than giving it the *average* category's weights
+(−0.75, excluding zero), which cannot happen if the weights are noise.
+
+### A correction: the mechanism is not the one stated above
+
+The obvious story — "split channels let the rule learn more category-specific
+weights" — is **wrong, and the data say so**. The spread of the weights across
+categories is not larger on the split set; it is marginally smaller (mean log-SD
+0.23 vs 0.25). The rule did not become more discriminative in its *numbers*.
+
+What changed is the **leverage** those numbers have. The five fused channels all
+respond to much the same places — they are five ways of saying "something is
+here" — so re-weighting them can only slightly reorder the same peaks. A
+horizontal-edge map and a vertical-edge map respond at *different pixels*, and
+the two colour-opponent axes at different pixels again. The same amount of
+weight variation now moves the priority map somewhere else.
+
+Put as a design lesson rather than a result: **a top-down weight vector is worth
+as much as the spatial independence of the channels it weights**, not as much as
+the variance of the weights themselves. That is the useful thing this milestone
+found, and it was not what it set out to look for.
 
 ## Reproducing
 

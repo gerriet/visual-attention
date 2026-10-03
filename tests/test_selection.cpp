@@ -2,6 +2,7 @@
 
 #include "attention/selection/neural_field_3d.h"
 #include "attention/selection/neural_field_selection.h"
+#include "attention/selection/random_selection.h"
 #include "attention/selection/selection_strategy.h"
 #include <catch2/catch_test_macros.hpp>
 #include <cmath>
@@ -359,4 +360,105 @@ TEST_CASE("3D neural-field selection carries its volume in RunState", "[selectio
 
   state.reset();
   CHECK(state.field_volume.empty());
+}
+
+TEST_CASE("random selection is the floor: it ignores saliency but keeps the budget", "[selection][random]")
+{
+  // The control arm H2 and H6 both need. What must hold is not where it looks
+  // but that it looks the same *number* of times, spread the same way, so a
+  // comparison against it is about placement and not about budget.
+  cv::Mat saliency = cv::Mat::zeros(200, 300, CV_32F);
+  cv::circle(saliency, cv::Point(250, 50), 10, cv::Scalar(1.0f), -1); // one bright spot
+
+  attention::selection::SelectionParams shared;
+  shared.max_count = 6;
+  shared.min_distance = 20;
+  attention::selection::RandomSelection::Params params;
+  params.seed = 7;
+
+  attention::core::RunState state;
+  attention::selection::RandomSelection strategy(shared, params);
+  const auto peaks = strategy.select(saliency, state);
+
+  REQUIRE(peaks.size() == 6);
+  for (const auto& peak : peaks)
+  {
+    CHECK(peak.location.x >= 0);
+    CHECK(peak.location.x < saliency.cols);
+    CHECK(peak.location.y >= 0);
+    CHECK(peak.location.y < saliency.rows);
+  }
+  // Spacing is honoured, so this arm is not denser than the arm it controls.
+  for (size_t i = 0; i < peaks.size(); ++i)
+  {
+    for (size_t j = i + 1; j < peaks.size(); ++j)
+    {
+      const double dx = peaks[i].location.x - peaks[j].location.x;
+      const double dy = peaks[i].location.y - peaks[j].location.y;
+      CHECK(std::sqrt(dx * dx + dy * dy) >= shared.min_distance);
+    }
+  }
+  // And it really does ignore the map: with one bright spot in 60000 pixels,
+  // landing on it would be a coincidence, not a selection.
+  int on_the_spot = 0;
+  for (const auto& peak : peaks)
+  {
+    if (cv::norm(peak.location - cv::Point(250, 50)) < 12)
+    {
+      ++on_the_spot;
+    }
+  }
+  CHECK(on_the_spot == 0);
+}
+
+TEST_CASE("random selection is reproducible for a seed and differs between seeds", "[selection][random]")
+{
+  cv::Mat saliency(120, 160, CV_32F, cv::Scalar(0.5f));
+  attention::selection::SelectionParams shared;
+  shared.max_count = 5;
+  shared.min_distance = 10;
+
+  auto run = [&](unsigned int seed)
+  {
+    attention::selection::RandomSelection::Params params;
+    params.seed = seed;
+    attention::core::RunState state;
+    return attention::selection::RandomSelection(shared, params).select(saliency, state);
+  };
+
+  const auto a = run(42);
+  const auto b = run(42);
+  const auto c = run(43);
+  REQUIRE(a.size() == b.size());
+  for (size_t i = 0; i < a.size(); ++i)
+  {
+    CHECK(a[i].location == b[i].location);
+  }
+  CHECK(a[0].location != c[0].location);
+}
+
+TEST_CASE("random selection returns fewer peaks rather than crowding them", "[selection][random]")
+{
+  // A frame too small to hold max_count well-spaced points must come back
+  // short. Relaxing the spacing instead would make the control arm denser than
+  // the arm it controls — the one thing it must not do.
+  cv::Mat saliency(40, 40, CV_32F, cv::Scalar(0.5f));
+  attention::selection::SelectionParams shared;
+  shared.max_count = 50;
+  shared.min_distance = 30;
+  attention::selection::RandomSelection::Params params;
+  params.seed = 1;
+
+  attention::core::RunState state;
+  const auto peaks = attention::selection::RandomSelection(shared, params).select(saliency, state);
+  CHECK(peaks.size() < 50);
+  CHECK_FALSE(peaks.empty());
+}
+
+TEST_CASE("random selection is reachable from config by name", "[selection][random]")
+{
+  const auto strategy =
+      attention::selection::create_selection_strategy("random", attention::selection::SelectionParams{}, YAML::Node());
+  REQUIRE(strategy != nullptr);
+  CHECK(strategy->name() == "random");
 }

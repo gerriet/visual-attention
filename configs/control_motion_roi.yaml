@@ -1,0 +1,35 @@
+# H2 control: recognition gated on MOTION (docs/HYPOTHESIS_CLOSURE_PLAN.md).
+#
+# Track: modern (docs/adr/0005). The second floor, and the harder one: on a
+# surveillance stream the people are the things that move, so a frame-difference
+# detector is a strong and nearly free competitor to a saliency front-end. If
+# gated recognition does not beat this, its cost argument is an argument for
+# frame differencing.
+#
+# The onset feature already is the frame-difference detector (rectified positive
+# change in edge energy), so the arm is a config, not new code. Everything else
+# is off: this is motion and nothing but motion.
+pipeline:
+  fusion: weighted-sum
+  selection: ior
+features:
+  onset:
+    weight: 1.0
+  color:
+    enabled: false
+  color-munsell:
+    enabled: false
+  intensity:
+    enabled: false
+  orientation:
+    enabled: false
+  eccentricity:
+    enabled: false
+  symmetry:
+    enabled: false
+peaks:
+  max_count: 10
+  min_distance: 50
+  threshold: 0.05
+output:
+  display: false

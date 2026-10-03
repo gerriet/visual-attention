@@ -4,6 +4,7 @@
 #include "attention/core/frame.h"
 #include "attention/features/onset_feature.h"
 #include "attention/features/stereo_feature.h"
+#include "attention/pipeline/attention_pipeline.h"
 #include "attention/selection/neural_field_3d.h"
 #include <catch2/catch_test_macros.hpp>
 #include <filesystem>
@@ -194,4 +195,31 @@ TEST_CASE("neural-field-3d selection stays quiet on an empty map", "[neural-fiel
   core::RunState state;
   auto peaks = strategy->select(cv::Mat::zeros(96, 96, CV_32F), state);
   CHECK(peaks.empty());
+}
+
+TEST_CASE("a motion-only profile yields an empty map on frame 0 instead of throwing", "[onset][pipeline]")
+{
+  // configs/control_motion_roi.yaml is the H2 motion baseline: onset is the
+  // only enabled feature, and onset is inapplicable without a previous frame.
+  // That is not a misconfiguration (the pipeline rejects an empty feature set
+  // at build time) — it is frame 0 of a stream, and the right answer is
+  // "nothing is salient yet".
+  attention::pipeline::PipelineConfig config;
+  config.features.clear();
+  config.features.emplace_back("onset", 1.0f);
+
+  attention::pipeline::AttentionPipeline pipeline(config);
+  cv::Mat frame(60, 80, CV_8UC3, cv::Scalar(40, 40, 40));
+  cv::rectangle(frame, cv::Rect(10, 10, 15, 15), cv::Scalar(220, 220, 220), cv::FILLED);
+
+  pipeline.load_image(frame);
+  REQUIRE_NOTHROW(pipeline.process());
+
+  const cv::Mat& map = pipeline.get_saliency_map().map;
+  REQUIRE_FALSE(map.empty());
+  CHECK(map.size() == frame.size());
+  double lo = 0.0;
+  double hi = 0.0;
+  cv::minMaxLoc(map, &lo, &hi);
+  CHECK(hi == 0.0); // nothing has moved yet
 }
