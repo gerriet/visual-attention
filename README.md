@@ -183,7 +183,9 @@ eval/vlm_video.py --seeds 5 --count-tokens --config configs/attend_proto.yaml \
 ## What it found
 
 Each study is a controlled ablation with its own document; negatives are kept
-and reported.
+and reported. **One table says where every hypothesis stands, and which verdicts
+rest on a confirmatory run rather than a first pass: [STATUS.md](docs/STATUS.md).**
+The summaries below are that table in prose.
 
 - **Object-based inhibition of return in dynamic scenes (H1): supported.** 30
   fresh scenes per regime, predictions written down beforehand (pessimistic
@@ -219,8 +221,18 @@ and reported.
   never binds. Testing this on real video needs questions about fine detail.
   [VLM_VIDEO.md](docs/VLM_VIDEO.md)
 
+What is still owed — H7's confirmatory run on fresh seeds, H6 at full scale,
+one control each for H2 and H5 — is listed in [STATUS.md](docs/STATUS.md).
 Where this stands for a publication, and what a reviewer would object to:
 [PAPER_READINESS.md](docs/PAPER_READINESS.md).
+
+## Contributing
+
+Pull requests welcome; [CONTRIBUTING.md](CONTRIBUTING.md) has the build, the
+test and style contract, and the one rule that is unusual here — the replication
+track is frozen, so a change to it needs a *replication reason*, while the
+modern track is open. The experimental bar for anything that claims a number is
+in the same file.
 
 ## Design decisions
 
@@ -229,7 +241,7 @@ The load-bearing choices are recorded as short ADRs:
 - [C++ core, Python evaluation layer](docs/adr/0001-cpp-core-python-eval.md)
 - [Registry- and config-driven strategies](docs/adr/0002-registry-config-driven-strategies.md)
 - [File-based interchange instead of FFI](docs/adr/0003-file-interchange-not-ffi.md)
-- [IOR as a controlled ablation, and an honest negative result](docs/adr/0004-ior-ablation-honest-negative-result.md)
+- [IOR as a controlled ablation, and an honest negative result](docs/adr/0004-ior-ablation-honest-negative-result.md) — *headline superseded: the negative was about the reimplementation, not the thesis; see [STATUS.md](docs/STATUS.md)*
 - [Two tracks: a finite replication, an open-ended modern system](docs/adr/0005-two-tracks-replication-and-modern.md)
 
 ## Context — where this sits

@@ -1,6 +1,22 @@
 # ADR-0004 — Inhibition of return as a controlled ablation, and an honest negative result
 
-**Status:** accepted · **Date:** 2026-07
+**Status:** accepted · **Date:** 2026-07 · **Headline superseded 2026-09-21**
+
+> **Read this first.** The negative result in this ADR's title and in its
+> *Consequences* section — "object-IOR does not beat space-IOR by default" —
+> **no longer stands.** Every measurement it summarises was taken on a first
+> stage that was not the thesis's: the replication dossier later found the
+> symmetry, colour and eccentricity features defective. After the ports, the
+> confirmatory run on fresh seeds **supports H1 in full**, on latency and on
+> sustained coverage, in every regime. See the three Updates at the end, the
+> current verdict in [../DYNAMIC_IOR_STUDY.md](../DYNAMIC_IOR_STUDY.md), and the
+> one-line status in [../STATUS.md](../STATUS.md).
+>
+> The body below is kept unedited, because an ADR is a record of what was
+> decided and why — and because the *decision* it records (report whatever the
+> ablation shows) is exactly what made the correction possible. The lesson is
+> in the last Update: an honest negative about a replication is a claim about
+> the replication until its fidelity has been tested.
 
 ## Context
 
