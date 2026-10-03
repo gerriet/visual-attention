@@ -98,6 +98,7 @@ class ConfigLoader
   static void load_features(const YAML::Node& yaml_node, pipeline::PipelineConfig& config);
   static void load_peaks(const YAML::Node& yaml_node, pipeline::PipelineConfig& config);
   static void load_priority(const YAML::Node& yaml_node, fusion::PriorityConfig& config);
+  static void load_top_down_weights(const YAML::Node& yaml_node, fusion::TopDownWeightConfig& config);
   static void load_output(const YAML::Node& yaml_node, Config& config);
 };
 

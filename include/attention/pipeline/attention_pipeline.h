@@ -8,6 +8,7 @@
 #include "attention/features/feature_extractor.h"
 #include "attention/fusion/fusion_strategy.h"
 #include "attention/fusion/priority_map.h"
+#include "attention/fusion/top_down_weights.h"
 #include "attention/pipeline/frame_source.h"
 #include "attention/selection/selection_strategy.h"
 #include <functional>
@@ -79,6 +80,7 @@ struct PipelineConfig
   // AttentionSystem's second stage). All weights default to 0 — the map stays
   // the thesis's bottom-up map unless configured otherwise.
   fusion::PriorityConfig priority;
+  fusion::TopDownWeightConfig top_down_weights; ///< M20: learned per-feature weights
 
   // Strategy-specific selection parameters as a YAML snippet (empty =
   // strategy defaults); see the strategy headers for keys
@@ -286,7 +288,8 @@ class AttentionPipeline
   std::vector<std::unique_ptr<features::FeatureExtractor>> extractors_;
   std::map<std::string, float> feature_weights_; // instance name -> weight
   std::unique_ptr<fusion::FusionStrategy> fusion_;
-  std::unique_ptr<fusion::TopDownChannel> top_down_; // M17 priority map (may be inactive)
+  std::unique_ptr<fusion::TopDownChannel> top_down_;         // M17 priority map (may be inactive)
+  std::unique_ptr<fusion::TopDownWeights> top_down_weights_; // M20 learned weights (may be inactive)
   std::unique_ptr<selection::SelectionStrategy> selection_;
 
   // Current frame being processed

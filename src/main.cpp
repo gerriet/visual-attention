@@ -2,6 +2,7 @@
 // Phase 1: Minimal working system
 
 #include "attention/config/config_loader.h"
+#include "attention/fusion/top_down_weights.h"
 #include "attention/io/result_writer.h"
 #include "attention/io/scanpath_writer.h"
 #include "attention/io/trace_writer.h"
@@ -11,6 +12,7 @@
 #include "attention/visualization/visualizer.h"
 #include <algorithm>
 #include <chrono>
+#include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
@@ -629,6 +631,9 @@ void print_usage(const char* program_name, std::ostream& out = std::cerr)
   out << "  --output <dir>       Specify output directory for batch/sequence mode (default: input_dir/results_batch)"
       << std::endl;
   out << "  --emit-json <path>   Write result JSON + saliency map in the interchange format" << std::endl;
+  out << "  --learn-weights <image>:<x,y,w,h> [...]  Learn top-down feature weights from examples of a\n"
+      << "                        target (VOCUS rule, M20); --out <file> writes a config fragment,\n"
+      << "                        --whole-box uses the rectangle instead of the salient region in it" << std::endl;
   out << "  --emit-features <dir> Write each feature map as a 16-bit PNG on a fixed [0,1] scale (image, --stereo)"
       << std::endl;
   out << "                       (see docs/INTERCHANGE_FORMAT.md; single-image and config modes)" << std::endl;
@@ -842,6 +847,135 @@ int main(int argc, char** argv)
       }
       opt.system_yaml = config.attention_system_yaml;
       process_attend(seq_path, config.pipeline, opt);
+      return 0;
+    }
+    else if (std::string(argv[1]) == "--learn-weights")
+    {
+      // M20 / H8: learn one top-down weight per feature channel from examples
+      // of a target, by the VOCUS rule (fusion/top_down_weights.h). Each
+      // example is an image plus the target's box; the weights are combined
+      // over examples by the geometric mean, because they are ratios.
+      //
+      //   attention --learn-weights img.jpg:x,y,w,h [img2.jpg:...] \
+      //             --config p.yaml --out weights.yaml
+      if (argc < 3)
+      {
+        std::cerr << "Usage: attention --learn-weights <image>:<x,y,w,h> [...] [--config <f>] [--out <f>]" << std::endl;
+        return 1;
+      }
+      std::vector<std::string> examples;
+      std::string out_path;
+      float rel_threshold = 0.5f;
+      bool whole_box = false;
+      config = attention::config::ConfigLoader::create_default();
+      config.display = false;
+      for (int i = 2; i < argc; ++i)
+      {
+        std::string arg = argv[i];
+        if (arg == "--config" && i + 1 < argc)
+        {
+          config = attention::config::ConfigLoader::load(argv[++i]);
+          config.display = false;
+        }
+        else if (arg == "--out" && i + 1 < argc)
+        {
+          out_path = argv[++i];
+        }
+        else if (arg == "--region-threshold" && i + 1 < argc)
+        {
+          rel_threshold = std::stof(argv[++i]);
+        }
+        else if (arg == "--whole-box")
+        {
+          whole_box = true;
+        }
+        else if (!arg.empty() && arg[0] != '-')
+        {
+          examples.push_back(arg);
+        }
+      }
+      if (examples.empty())
+      {
+        std::cerr << "No examples given. Each is <image>:<x>,<y>,<w>,<h>." << std::endl;
+        return 1;
+      }
+
+      std::vector<std::map<std::string, float>> per_example;
+      for (const auto& spec : examples)
+      {
+        const size_t colon = spec.rfind(':');
+        if (colon == std::string::npos)
+        {
+          std::cerr << "Malformed example (need <image>:<x,y,w,h>): " << spec << std::endl;
+          return 1;
+        }
+        const std::string image_path = spec.substr(0, colon);
+        int bx = 0;
+        int by = 0;
+        int bw = 0;
+        int bh = 0;
+        if (std::sscanf(spec.c_str() + colon + 1, "%d,%d,%d,%d", &bx, &by, &bw, &bh) != 4)
+        {
+          std::cerr << "Malformed box in: " << spec << std::endl;
+          return 1;
+        }
+
+        attention::pipeline::AttentionPipeline pipeline(config.pipeline);
+        pipeline.load_image(image_path);
+        pipeline.process();
+        const auto& features = pipeline.get_features();
+        const cv::Mat& saliency = pipeline.get_saliency_map().map;
+        const cv::Rect box(bx, by, bw, bh);
+        cv::Mat mask;
+        if (whole_box)
+        {
+          mask = cv::Mat::zeros(saliency.size(), CV_8U);
+          const cv::Rect clipped = box & cv::Rect(0, 0, saliency.cols, saliency.rows);
+          if (clipped.width > 0 && clipped.height > 0)
+          {
+            mask(clipped).setTo(255);
+          }
+        }
+        else
+        {
+          mask = attention::fusion::salient_region_in_box(saliency, box, rel_threshold);
+        }
+        if (cv::countNonZero(mask) == 0)
+        {
+          std::cerr << "  (skipped, box outside the image: " << spec << ")" << std::endl;
+          continue;
+        }
+        per_example.push_back(attention::fusion::learn_top_down_weights(features, mask));
+        std::cout << "  " << image_path << ": target region " << cv::countNonZero(mask) << " px" << std::endl;
+      }
+      if (per_example.empty())
+      {
+        std::cerr << "No usable examples." << std::endl;
+        return 1;
+      }
+
+      const auto combined = attention::fusion::combine_top_down_weights(per_example);
+      std::ostringstream yaml;
+      yaml << "# Learned top-down weights (VOCUS rule; attention --learn-weights)\n";
+      yaml << "# w_i = mean(feature i inside target) / mean(outside); " << per_example.size()
+           << " example(s), combined by the geometric mean.\n";
+      yaml << "priority:\n";
+      yaml << "  top_down_factor: 0.5\n";
+      yaml << "  top_down_weights:\n";
+      for (const auto& entry : combined)
+      {
+        yaml << "    " << entry.first << ": " << entry.second << "\n";
+      }
+      if (out_path.empty())
+      {
+        std::cout << yaml.str();
+      }
+      else
+      {
+        std::ofstream fh(out_path);
+        fh << yaml.str();
+        std::cout << "✓ Saved weights: " << out_path << std::endl;
+      }
       return 0;
     }
     else if (std::string(argv[1]) == "--stereo")

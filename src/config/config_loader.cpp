@@ -47,6 +47,7 @@ ConfigLoader::Config ConfigLoader::load(const std::string& yaml_path)
     if (yaml["priority"])
     {
       load_priority(yaml["priority"], config.pipeline.priority);
+      load_top_down_weights(yaml["priority"], config.pipeline.top_down_weights);
     }
 
     // Load output configuration
@@ -79,6 +80,24 @@ ConfigLoader::Config ConfigLoader::create_default()
   config.output_dir = "results/";
   config.display = false;
   return config;
+}
+
+void ConfigLoader::load_top_down_weights(const YAML::Node& node, fusion::TopDownWeightConfig& config)
+{
+  // Lives under `priority:` beside the M17 channels, since both answer "what
+  // does the task want" — but it is a separate struct because it acts on the
+  // feature maps rather than on the fused map.
+  if (node["top_down_factor"])
+  {
+    config.factor = node["top_down_factor"].as<float>();
+  }
+  if (node["top_down_weights"] && node["top_down_weights"].IsMap())
+  {
+    for (const auto& entry : node["top_down_weights"])
+    {
+      config.weights[entry.first.as<std::string>()] = entry.second.as<float>();
+    }
+  }
 }
 
 void ConfigLoader::load_priority(const YAML::Node& node, fusion::PriorityConfig& config)

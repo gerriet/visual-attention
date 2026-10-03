@@ -13,7 +13,7 @@ if(NOT Catch2_FOUND)
     FetchContent_MakeAvailable(Catch2)
 endif()
 
-add_executable(characterization_tests test_characterization.cpp test_config.cpp test_selection.cpp test_stereo_onset.cpp test_system.cpp test_processors.cpp test_alt_features.cpp test_kalman_mot.cpp test_normalization.cpp test_recognition.cpp test_priority.cpp test_thesis_features.cpp test_visualizer.cpp)
+add_executable(characterization_tests test_characterization.cpp test_config.cpp test_selection.cpp test_stereo_onset.cpp test_system.cpp test_processors.cpp test_alt_features.cpp test_kalman_mot.cpp test_normalization.cpp test_recognition.cpp test_priority.cpp test_top_down_weights.cpp test_thesis_features.cpp test_visualizer.cpp)
 target_link_libraries(characterization_tests PRIVATE attention_core Catch2::Catch2WithMain)
 target_compile_definitions(characterization_tests PRIVATE
     ATTENTION_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
@@ -215,6 +215,12 @@ if(Python3_Interpreter_FOUND)
         # Replication dossier (M10), smoke: three experiments end to end through
         # --emit-features (absolute feature maps; also in --stereo mode); the values themselves are
         # asserted by tests/test_thesis_features.cpp.
+        # M20 learned top-down weights: --help imports coco_search (PIL), hence
+        # the venv. The rule itself is tested in C++ (test_top_down_weights.cpp);
+        # a smoke run would need COCO-Search18, which is not in the repo.
+        add_test(NAME help_top_down_weights
+            COMMAND ${EVAL_PYTHON} ${CMAKE_SOURCE_DIR}/eval/top_down_weights.py --help)
+        set_tests_properties(help_top_down_weights PROPERTIES PASS_REGULAR_EXPRESSION "usage")
         # The demo compositor (docs/DEMO_STEREO_SCENE.md): --help needs numpy and
         # PIL, hence the venv. There is no smoke run — composing needs a trace
         # and the rendered scene, which is a Blender dependency and 175 MB.

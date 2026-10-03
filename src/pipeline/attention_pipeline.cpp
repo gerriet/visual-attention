@@ -62,6 +62,7 @@ void AttentionPipeline::build_components()
 
   fusion_ = fusion::create_fusion_strategy(config_.fusion);
   top_down_ = std::make_unique<fusion::TopDownChannel>(config_.priority);
+  top_down_weights_ = std::make_unique<fusion::TopDownWeights>(config_.top_down_weights);
 
   selection::SelectionParams selection_params;
   selection_params.min_distance = config_.peak_min_distance;
@@ -419,6 +420,13 @@ void AttentionPipeline::extract_features(int pyramid_levels)
 void AttentionPipeline::integrate_features()
 {
   cv::Mat fused = fusion_->fuse(features_, feature_weights_, frame_.size());
+  // M20: learned per-feature weights (the VOCUS rule) mix a top-down map built
+  // from the *individual* feature maps into the fused one. Before the M17
+  // channel on purpose: this one answers "which channels matter for this
+  // target", the next "where is it plausible", and a dense prior should
+  // modulate the already channel-weighted map rather than be weighted by it.
+  // Inactive config returns `fused` untouched.
+  fused = top_down_weights_->apply(fused, features_);
   // M17: fold the top-down task-relevance channel into the master map,
   // turning it into a priority map. Inactive config returns `fused` untouched.
   fused = top_down_->apply(fused, frame_.image);
