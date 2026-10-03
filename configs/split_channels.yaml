@@ -1,0 +1,60 @@
+# Discriminative channel set for learned top-down weights (M20, H8).
+#
+# Track: modern (docs/adr/0005). This is NOT a thesis profile and is not meant
+# to be a better bottom-up detector — on its own it is close to the default.
+#
+# Why it exists. The VOCUS weight rule can only express what the channel set
+# keeps apart: weighting one combined orientation map cannot say "this target
+# is horizontal", and weighting one combined colour map cannot say "this target
+# is red" — the summed map has already thrown away which axis responded. The
+# first M20 run measured the consequence: on the five fused channels the learned
+# weights were nearly identical across all eighteen COCO-Search18 categories
+# (every category excitatory on eccentricity and intensity, log-SD across
+# categories 0.11-0.37), i.e. the rule had learned "objects are eccentric and
+# bright" rather than anything about the target.
+#
+# So this profile splits the two channels that carry target identity: four
+# orientations, and the two colour-opponent axes. Nine channels instead of five,
+# and ones a weight vector can actually say something with. See
+# docs/TOP_DOWN_WEIGHTS.md.
+pipeline:
+  fusion: weighted-sum
+  selection: ior
+features:
+  # The combined channels these replace.
+  orientation:
+    enabled: false
+  color:
+    enabled: false
+
+  ori_0:
+    type: orientation
+    params: {num_orientations: 4, only_orientation: 0}   # 0 degrees
+  ori_45:
+    type: orientation
+    params: {num_orientations: 4, only_orientation: 1}
+  ori_90:
+    type: orientation
+    params: {num_orientations: 4, only_orientation: 2}
+  ori_135:
+    type: orientation
+    params: {num_orientations: 4, only_orientation: 3}
+
+  color_rg:
+    type: color
+    params: {channel: rg}       # red-green opponent axis
+  color_by:
+    type: color
+    params: {channel: by}       # blue-yellow opponent axis
+
+  intensity:
+    weight: 1.0
+  eccentricity:
+    weight: 1.0
+  symmetry:
+    weight: 1.0
+peaks:
+  max_count: 10
+  threshold: 0.05
+output:
+  display: false

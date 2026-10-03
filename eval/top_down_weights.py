@@ -31,6 +31,7 @@ binary's --learn-weights mode, so the rule has one implementation, in C++.
 """
 import argparse
 import json
+import math
 import os
 import subprocess
 import sys
@@ -113,12 +114,53 @@ def learn_category_weights(binary, adapter, task, records, examples, config, out
     return (weights or None), len(specs)
 
 
+def blind_weights(weights_by_task):
+    """The across-category geometric mean: what every category's weight vector
+    agrees on, with the category-specific part averaged out.
+
+    This is the control that decides whether the rule learned anything about
+    *this target* as opposed to about objects in general. If a category-blind
+    vector scores like the matched one, the weights carry no category
+    information, however legible they look.
+    """
+    if not weights_by_task:
+        return {}
+    names = set()
+    for w in weights_by_task.values():
+        names.update(w)
+    blind = {}
+    for name in names:
+        logs = [math.log(w[name]) for w in weights_by_task.values() if w.get(name, 0) > 0]
+        if logs:
+            blind[name] = math.exp(sum(logs) / len(logs))
+    return blind
+
+
+def mismatched_weights(weights_by_task):
+    """Each category gets a *different* category's weights — a derangement, so
+    no category keeps its own. The sharper half of the same control: if search
+    is as good with the wrong category's weights, the matched weights are not
+    doing the work."""
+    tasks = sorted(weights_by_task)
+    if len(tasks) < 2:
+        return dict(weights_by_task)
+    # Rotate by one: deterministic, and a derangement for any list of >= 2.
+    return {task: weights_by_task[tasks[(i + 1) % len(tasks)]] for i, task in enumerate(tasks)}
+
+
 def score_arms(binary, adapter, trials, keys, weights_by_task, factors, cap, out_dir,
-               priors=None, prior_weight=1.5):
+               priors=None, prior_weight=1.5, controls=False):
     """Run every arm over the same trials. Returns {arm: [fixations-to-target]}."""
     arms = {"bottom-up": []}
     for t in factors:
         arms["weights t=%.2f" % t] = []
+    blind = mismatched = None
+    if controls:
+        blind = blind_weights(weights_by_task)
+        mismatched = mismatched_weights(weights_by_task)
+        for t in factors:
+            arms["blind t=%.2f" % t] = []
+            arms["mismatched t=%.2f" % t] = []
     if priors:
         arms["prior"] = []
         for t in factors:
@@ -150,6 +192,13 @@ def score_arms(binary, adapter, trials, keys, weights_by_task, factors, cap, out
         for t in factors:
             cfg = BASE_YAML % {"cap": cap} + WEIGHTS_BLOCK % {"factor": t, "weights": wy}
             arms["weights t=%.2f" % t].append(run("w%.2f" % t, cfg))
+            if controls:
+                arms["blind t=%.2f" % t].append(run("b%.2f" % t, BASE_YAML % {"cap": cap} +
+                                                    WEIGHTS_BLOCK % {"factor": t,
+                                                                     "weights": weights_yaml(blind)}))
+                arms["mismatched t=%.2f" % t].append(
+                    run("m%.2f" % t, BASE_YAML % {"cap": cap} +
+                        WEIGHTS_BLOCK % {"factor": t, "weights": weights_yaml(mismatched[task])}))
             if priors:
                 combined = cfg.rstrip("\n") + "\n" + PRIOR_LINES % {"prior_weight": prior_weight,
                                                                     "map": priors[task]}
@@ -204,6 +253,9 @@ def main():
     ap.add_argument("--whole-box", action="store_true",
                     help="learn from the whole bounding box instead of the salient region in it "
                          "(the ablation of VOCUS's own region step)")
+    ap.add_argument("--controls", action="store_true",
+                    help="also score the category-blind and mismatched-category weight vectors — "
+                         "the test of whether the weights carry anything category-specific")
     ap.add_argument("--with-prior", action="store_true",
                     help="also score M17's category prior, and weights+prior together")
     ap.add_argument("--tune", action="store_true",
@@ -266,7 +318,7 @@ def main():
         priors = coco_search.build_priors(train, os.path.join(args.out, "priors"), adapter)
 
     arms, skipped = score_arms(args.binary, adapter, trials, keys, weights_by_task, factors,
-                               args.cap, args.out, priors)
+                               args.cap, args.out, priors, controls=args.controls)
 
     print("\nCOCO-Search18, %s split — fixations-to-target (cap+1 = never found)" % split_name)
     print("weights learned per category from %d training image(s)%s" % (
@@ -277,6 +329,8 @@ def main():
 
     summary = {"config": vars(args), "split": split_name, "rows": rows,
                "weights": weights_by_task}
+    if args.controls:
+        summary["blind_weights"] = blind_weights(weights_by_task)
     with open(os.path.join(args.out, "summary.json"), "w") as fh:
         json.dump(summary, fh, indent=2)
     print("\nsummary: %s" % os.path.join(args.out, "summary.json"))

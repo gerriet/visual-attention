@@ -23,11 +23,18 @@ fs::path source_dir()
   return fs::path(ATTENTION_SOURCE_DIR);
 }
 
-const FeatureSpec* find_spec(const std::vector<FeatureSpec>& specs, const std::string& type)
+// `instance` disambiguates when one type appears several times under its own
+// names; empty matches the first spec of that type, as before.
+const FeatureSpec* find_spec(const std::vector<FeatureSpec>& specs, const std::string& type,
+                             const std::string& instance = "")
 {
   for (const auto& spec : specs)
   {
-    if (spec.type == type)
+    if (spec.type != type)
+    {
+      continue;
+    }
+    if (instance.empty() || spec.name == instance)
     {
       return &spec;
     }
@@ -214,4 +221,58 @@ TEST_CASE("unknown feature and strategy names are rejected with clear errors", "
   attention::pipeline::PipelineConfig bad_fusion;
   bad_fusion.fusion = "psychic";
   CHECK_THROWS(attention::pipeline::AttentionPipeline(bad_fusion));
+}
+
+TEST_CASE("a feature type can be instantiated several times under its own names", "[config]")
+{
+  // M20 needs this: a learned weight vector can only say "this target is
+  // horizontal" if horizontal is a channel of its own, so the same extractor
+  // has to be able to appear four times with different parameters.
+  auto path = write_temp_config(
+      "features:\n"
+      "  orientation: { enabled: false }\n"
+      "  ori_0: { type: orientation, params: { num_orientations: 4, "
+      "only_orientation: 0 }, weight: 0.5 }\n"
+      "  ori_1: { type: orientation, params: { num_orientations: 4, "
+      "only_orientation: 1 }, weight: 1.5 }\n");
+  const auto config = ConfigLoader::load(path.string());
+  std::remove(path.string().c_str());
+
+  const auto* zero = find_spec(config.pipeline.features, "orientation", "ori_0");
+  const auto* one = find_spec(config.pipeline.features, "orientation", "ori_1");
+  REQUIRE(zero != nullptr);
+  REQUIRE(one != nullptr);
+  CHECK(zero->weight == 0.5f);
+  CHECK(one->weight == 1.5f);
+  // Distinct instances, not one spec overwritten by the other.
+  CHECK(zero != one);
+
+  attention::pipeline::AttentionPipeline pipeline(config.pipeline);
+  cv::Mat frame(60, 80, CV_8UC3, cv::Scalar(30, 30, 30));
+  cv::rectangle(frame, cv::Rect(20, 20, 24, 8), cv::Scalar(230, 230, 230), cv::FILLED);
+  pipeline.load_image(frame);
+  pipeline.process();
+
+  std::set<std::string> names;
+  for (const auto& feature : pipeline.get_features())
+  {
+    names.insert(feature.name);
+  }
+  // Both instances reach the fused map under their own names; without the
+  // instance name they would collide on the extractor's "orientation".
+  CHECK(names.count("ori_0") == 1);
+  CHECK(names.count("ori_1") == 1);
+  CHECK(names.count("orientation") == 0);
+}
+
+TEST_CASE("a config without instance names behaves exactly as before", "[config]")
+{
+  auto path = write_temp_config("features:\n  orientation: { weight: 2.0 }\n");
+  const auto config = ConfigLoader::load(path.string());
+  std::remove(path.string().c_str());
+
+  const auto* spec = find_spec(config.pipeline.features, "orientation");
+  REQUIRE(spec != nullptr);
+  CHECK(spec->weight == 2.0f);
+  CHECK(spec->name.empty()); // no alias -> the extractor's own name is used
 }

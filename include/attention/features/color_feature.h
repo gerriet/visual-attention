@@ -36,8 +36,16 @@ class ColorFeature : public FeatureExtractor
     int center_levels[3];    // Center scales (c)
     int surround_deltas[2];  // Surround offsets (delta)
     bool normalize_channels; // Normalize color channels before processing
+    // Which opponent axis reaches the output: "both" (default, the Itti-Koch
+    // and thesis behaviour), "rg" or "by". Splitting them lets a learned
+    // weight vector distinguish a red target from an achromatic one (M20/H8) —
+    // the summed map cannot say which axis carried the response.
+    std::string channel = "both";
 
-    Config() : pyramid_levels(0), center_levels{2, 3, 4}, surround_deltas{3, 4}, normalize_channels(true) {}
+    Config()
+      : pyramid_levels(0), center_levels{2, 3, 4}, surround_deltas{3, 4}, normalize_channels(true), channel("both")
+    {
+    }
     // Original Itti-Koch uses c ∈ {2,3,4}, δ ∈ {3,4} with 9-level pyramid
     // Creates 6 center-surround pairs: (2,5), (2,6), (3,6), (3,7), (4,7), (4,8)
     // Setting pyramid_levels=0 enables adaptive sizing based on input dimensions

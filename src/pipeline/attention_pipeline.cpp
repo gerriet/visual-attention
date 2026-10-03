@@ -40,6 +40,7 @@ void AttentionPipeline::build_components()
   auto& registry = features::FeatureRegistry::instance();
 
   extractors_.clear();
+  extractor_names_.clear();
   feature_weights_.clear();
 
   for (const auto& spec : config_.features)
@@ -51,7 +52,9 @@ void AttentionPipeline::build_components()
 
     YAML::Node params = spec.params_yaml.empty() ? YAML::Node() : YAML::Load(spec.params_yaml);
     auto extractor = registry.create(spec.type, params);
-    feature_weights_[extractor->name()] = spec.weight;
+    const std::string instance = spec.name.empty() ? extractor->name() : spec.name;
+    feature_weights_[instance] = spec.weight;
+    extractor_names_.push_back(instance);
     extractors_.push_back(std::move(extractor));
   }
 
@@ -289,11 +292,13 @@ void AttentionPipeline::extract_features(int pyramid_levels)
 {
   // Applicable extractors for this frame (e.g. color is skipped on grayscale)
   std::vector<features::FeatureExtractor*> active;
-  for (const auto& extractor : extractors_)
+  std::vector<std::string> active_names;
+  for (size_t i = 0; i < extractors_.size(); ++i)
   {
-    if (extractor->applicable(frame_))
+    if (extractors_[i]->applicable(frame_))
     {
-      active.push_back(extractor.get());
+      active.push_back(extractors_[i].get());
+      active_names.push_back(i < extractor_names_.size() ? extractor_names_[i] : extractors_[i]->name());
     }
   }
 
@@ -385,6 +390,13 @@ void AttentionPipeline::extract_features(int pyramid_levels)
         std::rethrow_exception(error);
       }
     }
+  }
+
+  // Give each map its *instance* name, so two instances of one type stay
+  // distinguishable everywhere downstream (fusion weights are keyed by it).
+  for (size_t i = 0; i < features_.size() && i < active_names.size(); ++i)
+  {
+    features_[i].name = active_names[i];
   }
 
   // Store per-feature timing

@@ -58,6 +58,13 @@ core::FeatureMap OrientationFeature::extract(const core::Frame& frame, DebugCont
 
   for (int orient = 0; orient < config_.num_orientations; ++orient)
   {
+    // only_orientation >= 0 keeps this one channel out of the combination, so
+    // the feature emits a single oriented map (M20: a weight vector can only
+    // say "this target is horizontal" if horizontal is its own channel).
+    if (config_.only_orientation >= 0 && orient != config_.only_orientation)
+    {
+      continue;
+    }
     for (int c : center_scales)
     {
       for (int delta : delta_scales)

@@ -49,7 +49,15 @@ struct PipelineTiming
  */
 struct FeatureSpec
 {
-  std::string type;        // Registry key (e.g. "color", "symmetry")
+  std::string type; // Registry key (e.g. "color", "symmetry")
+  // Instance name: what this feature's map is called downstream (fusion
+  // weights, top-down weights, traces). Empty = the extractor's own name,
+  // which is the only possibility for a type instantiated once. Naming it
+  // lets the *same* type appear several times with different params — four
+  // orientation channels, the two colour-opponent axes apart — which the
+  // learned-weight rule (M20) needs, since it can only weight what the
+  // channel set keeps separate.
+  std::string name;
   bool enabled = true;     // Disabled features are configured but not run
   float weight = 1.0f;     // Fusion weight
   std::string params_yaml; // Feature-specific params as a YAML snippet
@@ -286,6 +294,7 @@ class AttentionPipeline
 
   // Components built from the configuration
   std::vector<std::unique_ptr<features::FeatureExtractor>> extractors_;
+  std::vector<std::string> extractor_names_;     // instance name per entry of extractors_
   std::map<std::string, float> feature_weights_; // instance name -> weight
   std::unique_ptr<fusion::FusionStrategy> fusion_;
   std::unique_ptr<fusion::TopDownChannel> top_down_;         // M17 priority map (may be inactive)

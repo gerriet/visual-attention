@@ -26,6 +26,13 @@ class OrientationFeature : public FeatureExtractor
     double wavelength = 4.0;  // Wavelength for Gabor filters
     double bandwidth = 1.0;   // Bandwidth parameter
     int compute_at_scale = 0; // Pyramid level for computation (0 = full resolution)
+    // -1 (default) combines every orientation into one map, as the thesis and
+    // Itti-Koch do. >= 0 emits *only* that orientation, so a config can run
+    // four instances of this feature as four separate channels — which is what
+    // a learned weight vector needs in order to say "this target is
+    // horizontal" (M20/H8). The angular spacing still comes from
+    // num_orientations, so index i is i * 180 / num_orientations degrees.
+    int only_orientation = -1;
   };
 
   OrientationFeature();

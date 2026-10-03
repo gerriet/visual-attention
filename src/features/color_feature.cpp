@@ -52,8 +52,21 @@ core::FeatureMap ColorFeature::extract(const core::Frame& frame, DebugContext& d
   cv::Mat by_saliency = compute_center_surround(by_pyramid);
   auto t_cs_end = std::chrono::high_resolution_clock::now();
 
-  // Step 3: Combine RG and BY saliencies
-  cv::Mat combined = rg_saliency + by_saliency;
+  // Step 3: Combine RG and BY saliencies — or emit one axis alone, when a
+  // config has asked for the axes as separate channels (M20).
+  cv::Mat combined;
+  if (config_.channel == "rg")
+  {
+    combined = rg_saliency;
+  }
+  else if (config_.channel == "by")
+  {
+    combined = by_saliency;
+  }
+  else
+  {
+    combined = rg_saliency + by_saliency;
+  }
 
   // Step 4: Normalize and resize to original size
   auto t_norm_start = std::chrono::high_resolution_clock::now();

@@ -180,8 +180,12 @@ void ConfigLoader::load_features(const YAML::Node& features, pipeline::PipelineC
   // overrides) working unchanged.
   for (const auto& entry : features)
   {
-    const std::string type = entry.first.as<std::string>();
+    const std::string instance = entry.first.as<std::string>();
     const YAML::Node& node = entry.second;
+    // The key names the *instance*; `type:` names the registry entry when they
+    // differ. Without `type:` they are the same, which is every config written
+    // before this existed.
+    const std::string type = (node && node["type"]) ? node["type"].as<std::string>() : instance;
 
     if (!registry.has(type))
     {
@@ -194,10 +198,13 @@ void ConfigLoader::load_features(const YAML::Node& features, pipeline::PipelineC
       throw std::runtime_error(msg.str());
     }
 
+    // Match on the instance name, falling back to the type for the default
+    // specs (which carry no explicit name).
     pipeline::FeatureSpec* spec = nullptr;
     for (auto& existing : config.features)
     {
-      if (existing.type == type)
+      const std::string existing_name = existing.name.empty() ? existing.type : existing.name;
+      if (existing_name == instance)
       {
         spec = &existing;
         break;
@@ -207,6 +214,11 @@ void ConfigLoader::load_features(const YAML::Node& features, pipeline::PipelineC
     {
       config.features.emplace_back(type);
       spec = &config.features.back();
+    }
+    spec->type = type;
+    if (instance != type)
+    {
+      spec->name = instance;
     }
 
     if (node["enabled"])

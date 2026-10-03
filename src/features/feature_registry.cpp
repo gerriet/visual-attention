@@ -99,6 +99,7 @@ void register_builtin_features()
                  ColorFeature::Config config;
                  read_param(params, "pyramid_levels", config.pyramid_levels);
                  read_param(params, "normalize_channels", config.normalize_channels);
+                 read_param(params, "channel", config.channel);
                  return std::make_unique<ColorFeature>(config);
                });
 
@@ -137,6 +138,7 @@ void register_builtin_features()
                  read_param(params, "wavelength", config.wavelength);
                  read_param(params, "bandwidth", config.bandwidth);
                  read_param(params, "compute_at_scale", config.compute_at_scale);
+                 read_param(params, "only_orientation", config.only_orientation);
                  return std::make_unique<OrientationFeature>(config);
                });
 
